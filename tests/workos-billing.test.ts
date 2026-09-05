@@ -202,8 +202,20 @@ describe("Stripe payment authorization", () => {
     await t.mutation(internal.billing.attachCustomer, { accountId: first.id, customerId: "cus_test" });
     await expect(t.mutation(internal.billing.attachCustomer, { accountId: second.id, customerId: "cus_test" })).rejects.toThrow("CONFLICT");
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_live_not_allowed");
+    expect((await a.client.query(api.billing.current, {}))?.configured).toBe(false);
     await expect(a.client.action(api.stripe.checkout, {})).rejects.toThrow("NOT_CONFIGURED");
     expect(provider.checkout).not.toHaveBeenCalled();
+  });
+
+  it("shows test billing only when payment and webhook configuration is complete", async () => {
+    const t = setup(); const owner = await human(t);
+    expect((await owner.client.query(api.billing.current, {}))?.configured).toBe(true);
+    for (const variable of ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET", "SITE_URL"] as const) {
+      const configuredValue = process.env[variable]!;
+      vi.stubEnv(variable, "");
+      expect((await owner.client.query(api.billing.current, {}))?.configured, variable).toBe(false);
+      vi.stubEnv(variable, configuredValue);
+    }
   });
 
   it("ignores duplicate events and prevents older reconciliations restoring removed access", async () => {

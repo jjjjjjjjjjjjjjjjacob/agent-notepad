@@ -16,7 +16,10 @@ export const current = query({
       .unique()
     return {
       configured:
-        !!process.env.STRIPE_SECRET_KEY && !!process.env.STRIPE_PRICE_ID,
+        !!process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_") &&
+        !!process.env.STRIPE_PRICE_ID &&
+        !!process.env.STRIPE_WEBHOOK_SECRET &&
+        !!process.env.SITE_URL,
       entitlements: account?.entitlements ?? [],
       hasCustomer: !!account?.stripeCustomerId,
     }
