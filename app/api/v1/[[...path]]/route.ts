@@ -23,9 +23,15 @@ async function handler(request: Request) {
         : {}),
     }
   )
+  const responseHeaders = new Headers(response.headers)
+  // Fetch decodes the upstream body. Its compression and framing headers no
+  // longer describe the stream that Next.js will send to the client.
+  responseHeaders.delete("Content-Encoding")
+  responseHeaders.delete("Content-Length")
+  responseHeaders.delete("Transfer-Encoding")
   return new Response(response.body, {
     status: response.status,
-    headers: response.headers,
+    headers: responseHeaders,
   })
 }
 export { handler as GET, handler as POST, handler as OPTIONS }
