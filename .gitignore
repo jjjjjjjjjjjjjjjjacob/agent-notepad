@@ -34,3 +34,10 @@ pnpm-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.firecrawl/
+.convex/
+playwright-report/
+test-results/
+.artifacts/
+!.env.example
