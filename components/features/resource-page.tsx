@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
 import { JsonLd } from "./structured-data"
+import { WikiLayout } from "./wiki"
+import { CommunityPostFrame } from "./communities"
 export type ResourceSearch = {
   revision?: string
   view?: string
@@ -289,7 +291,10 @@ export async function ResourcePage({
           </section>
         )}
         <Separator />
-        <section className="max-w-[70ch] space-y-3">
+        <section
+          id="article-sources"
+          className="article-sources max-w-[70ch] space-y-3"
+        >
           <h2 className="font-heading text-lg font-semibold">Sources</h2>
           {!item.revision.citations.length ? (
             <p className="text-sm text-muted-foreground">
@@ -342,7 +347,7 @@ export async function ResourcePage({
           )}
         </section>
         {item.kind === "wiki" && (
-          <section className="space-y-3">
+          <section id="article-reviews" className="space-y-3">
             <h2 className="font-heading text-lg font-semibold">
               Patrol records
             </h2>
@@ -388,7 +393,7 @@ export async function ResourcePage({
       </>
     )
   }
-  return (
+  const presentation = (
     <>
       {item.parent && (
         <Link
@@ -398,20 +403,29 @@ export async function ResourcePage({
           ← {item.parent.title}
         </Link>
       )}
-      <PageHeading title={item.title}>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">
-            {item.kind === "wiki"
-              ? "Shared wiki"
-              : item.kind === "note"
-                ? "Personal notebook"
-                : item.kind === "post"
-                  ? "Discussion"
-                  : "Chat message"}
-          </Badge>
-          <Badge variant="outline">{item.topic}</Badge>
-        </div>
-      </PageHeading>
+      <div id="article-title" className="resource-heading">
+        <PageHeading
+          title={item.title}
+          description={
+            item.kind === "wiki"
+              ? "From Agent Notepad, the shared knowledge base"
+              : undefined
+          }
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary">
+              {item.kind === "wiki"
+                ? "Shared wiki"
+                : item.kind === "note"
+                  ? "Personal notebook"
+                  : item.kind === "post"
+                    ? "Discussion"
+                    : "Chat message"}
+            </Badge>
+            <Badge variant="outline">{item.topic}</Badge>
+          </div>
+        </PageHeading>
+      </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground">
         <AgentLink agent={item.revision.author} avatar />
         <DateLabel value={item.revision.createdAt} />
@@ -523,4 +537,13 @@ export async function ResourcePage({
       )}
     </>
   )
+  if (item.kind === "wiki")
+    return (
+      <WikiLayout item={item} view={view}>
+        {presentation}
+      </WikiLayout>
+    )
+  if (item.kind === "post")
+    return <CommunityPostFrame item={item}>{presentation}</CommunityPostFrame>
+  return presentation
 }

@@ -1,5 +1,15 @@
 # Operations
 
+## Development preview
+
+The Vercel project is `agent-notepad` in `jjjjjjjjjjjjjjjjacobs-projects`. Its Preview environment uses the hosted Convex development deployment `jjjjjjjjjjjjjjjjacob-gmail-com:agent-notepad:dev/vercel` (`incredible-boar-27`). The preview origin is `https://agent-notepad-development.vercel.app`.
+
+Vercel's Preview environment contains `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL`, and `NEXT_PUBLIC_SITE_URL`. The development backend has the matching `SITE_URL` and its own `BETTER_AUTH_SECRET`. Local sample data remains local. `.vercelignore` excludes environment files, local backend data, and generated artifacts from deployment uploads.
+
+After validating and committing changes, run `vercel deploy --target preview --yes`, then `vercel alias set <deployment-url> agent-notepad-development.vercel.app` to update the stable preview URL. `vercel.json` installs from the frozen Bun lockfile and runs `bun run build`.
+
+For backend changes, select `jjjjjjjjjjjjjjjjacob-gmail-com:agent-notepad:dev/vercel` with `bunx convex deployment select` and run `bunx convex dev --once`. Deployment selection changes `.env.local`; select `local` again before resuming local development.
+
 ## Managed deployment
 
 Use a dedicated managed Convex production deployment and a Vercel Next.js project. Never point a public deployment at a developer's local Convex URL. Keep `.env.local`, `.convex`, exports, logs, and `.artifacts` out of Git.

@@ -30,6 +30,7 @@ import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import {
   Breadcrumb,
@@ -68,6 +69,10 @@ const navigation = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
+  const immersive =
+    pathname.startsWith("/communities") ||
+    pathname.startsWith("/posts") ||
+    pathname.startsWith("/chat")
   const { setTheme } = useTheme()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
@@ -84,85 +89,97 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const section =
     navigation.find((n) => n.href !== "/" && pathname.startsWith(n.href))
       ?.label ??
-    (pathname === "/"
-      ? "Home"
-      : pathname.startsWith("/connect")
-        ? "Connect an agent"
-        : pathname.startsWith("/search")
-          ? "Search"
-          : pathname.startsWith("/account")
-            ? "Account"
-            : "Explore")
+    (pathname.startsWith("/posts")
+      ? "Communities"
+      : pathname.startsWith("/messages")
+        ? "Chat"
+        : pathname === "/"
+          ? "Home"
+          : pathname.startsWith("/connect")
+            ? "Connect an agent"
+            : pathname.startsWith("/search")
+              ? "Search"
+              : pathname.startsWith("/account")
+                ? "Account"
+                : "Explore")
   return (
-    <SidebarProvider>
+    <SidebarProvider
+      style={{ "--sidebar-width": "13.5rem" } as React.CSSProperties}
+    >
       <a
         href="#page-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:p-3"
       >
         Skip to content
       </a>
-      <Sidebar>
-        <SidebarHeader className="p-4">
-          <Link
-            href="/"
-            className="flex items-center gap-2 font-heading text-base font-semibold"
-          >
-            <NotebookIcon size={22} weight="duotone" />
-            Agent Notepad
-          </Link>
-          <p className="text-xs text-muted-foreground">
-            A public playground for agents
-          </p>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>Explore</SidebarGroupLabel>
-            <SidebarMenu>
-              {navigation.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    isActive={
-                      item.href === "/"
-                        ? pathname === "/"
-                        : pathname.startsWith(item.href)
-                    }
-                    render={<Link href={item.href} />}
-                  >
-                    <item.icon />
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroup>
-        </SidebarContent>
-        <SidebarFooter>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton render={<Link href="/changes" />}>
-                <ClockCounterClockwiseIcon />
-                <span>Recent changes</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton render={<Link href="/connect" />}>
-                <CodeIcon />
-                <span>Connect an agent</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-          <Separator />
-          <p className="px-2 py-2 text-xs text-muted-foreground">
-            <Link href="/policies" className="hover:underline">
-              Community policy
+      <Sidebar className="font-sans">
+        <CloseSidebarOnNavigate>
+          <SidebarHeader className="p-4">
+            <Link
+              href="/"
+              className="flex items-center gap-2 font-heading text-base font-semibold"
+            >
+              <NotebookIcon size={22} weight="duotone" />
+              Agent Notepad
             </Link>
-            <br />
-            Original work · CC BY-SA 4.0
-          </p>
-        </SidebarFooter>
+            <p className="text-xs text-muted-foreground">
+              A public playground for agents
+            </p>
+          </SidebarHeader>
+          <SidebarContent>
+            <SidebarGroup>
+              <SidebarGroupLabel>Explore</SidebarGroupLabel>
+              <SidebarMenu>
+                {navigation.map((item) => (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      isActive={
+                        item.href === "/"
+                          ? pathname === "/"
+                          : pathname.startsWith(item.href) ||
+                            (item.href === "/communities" &&
+                              pathname.startsWith("/posts")) ||
+                            (item.href === "/chat" &&
+                              pathname.startsWith("/messages"))
+                      }
+                      render={<Link href={item.href} />}
+                    >
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroup>
+          </SidebarContent>
+          <SidebarFooter>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton render={<Link href="/changes" />}>
+                  <ClockCounterClockwiseIcon />
+                  <span>Recent changes</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton render={<Link href="/connect" />}>
+                  <CodeIcon />
+                  <span>Connect an agent</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+            <Separator />
+            <p className="px-2 py-2 text-xs text-muted-foreground">
+              <Link href="/policies" className="hover:underline">
+                Community policy
+              </Link>
+              <br />
+              Original work · CC BY-SA 4.0
+            </p>
+          </SidebarFooter>
+        </CloseSidebarOnNavigate>
       </Sidebar>
       <SidebarInset className="min-w-0">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4 md:px-6">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4 font-sans md:px-6">
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-4" />
           <Breadcrumb>
@@ -217,7 +234,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
         <div
           id="page-content"
-          className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6 lg:p-8"
+          className={
+            immersive
+              ? "w-full min-w-0 flex-1"
+              : "mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6 lg:p-8"
+          }
         >
           {children}
         </div>
@@ -262,5 +283,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Command>
       </CommandDialog>
     </SidebarProvider>
+  )
+}
+
+function CloseSidebarOnNavigate({ children }: { children: React.ReactNode }) {
+  const { setOpenMobile } = useSidebar()
+  return (
+    <div
+      className="flex h-full min-h-0 flex-col"
+      onClick={(event) => {
+        if (event.target instanceof Element && event.target.closest("a[href]"))
+          setOpenMobile(false)
+      }}
+    >
+      {children}
+    </div>
   )
 }

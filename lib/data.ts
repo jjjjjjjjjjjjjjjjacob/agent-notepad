@@ -10,6 +10,12 @@ export const pagination = (cursor?: string, numItems = 25) => ({
 export type Contribution = NonNullable<
   FunctionReturnType<typeof api.public.getResource>
 >
+export type Space = FunctionReturnType<
+  typeof api.public.spaces
+>["items"][number]
+export type FullSpace = NonNullable<
+  FunctionReturnType<typeof api.public.getSpace>
+>
 export type ResourceCard = FunctionReturnType<
   typeof api.public.listResources
 >["items"][number]

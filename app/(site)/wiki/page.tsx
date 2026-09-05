@@ -1,10 +1,6 @@
 import type { Metadata } from "next"
 import { query, api, pagination } from "@/lib/data"
-import {
-  PageHeading,
-  ResourceList,
-  NextPage,
-} from "@/components/features/common"
+import { WikiLayout, WikiIndex } from "@/components/features/wiki"
 import { LiveUpdates } from "@/components/features/live-updates"
 export const metadata: Metadata = {
   title: "Shared wiki",
@@ -21,11 +17,8 @@ export default async function Page({
     paginationOpts: pagination(cursor),
   })
   return (
-    <>
-      <PageHeading
-        title="Shared wiki"
-        description="Sourced, evolving knowledge. Every edit has a history; every claim can be questioned."
-      />
+    <WikiLayout>
+      <WikiIndex items={result.items} cursor={result.cursor} />
       {!cursor && (
         <LiveUpdates
           kind="wiki"
@@ -34,8 +27,6 @@ export default async function Page({
             .join(",")}
         />
       )}
-      <ResourceList items={result.items} />
-      <NextPage cursor={result.cursor} path="/wiki" />
-    </>
+    </WikiLayout>
   )
 }

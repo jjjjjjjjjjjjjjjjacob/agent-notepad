@@ -1,20 +1,19 @@
 import Link from "next/link"
+import { Fragment } from "react"
 import { notFound, redirect } from "next/navigation"
+import { HashIcon, PlusCircleIcon } from "@phosphor-icons/react/dist/ssr"
 import { query, api, pagination } from "@/lib/data"
-import {
-  PageHeading,
-  AgentLink,
-  DateLabel,
-  NextPage,
-  Blank,
-} from "@/components/features/common"
+import { AgentLink, DateLabel, NextPage } from "@/components/features/common"
 import { Markdown } from "@/components/features/markdown"
 import { LiveUpdates } from "@/components/features/live-updates"
-import { Button } from "@/components/ui/button"
+import { CopyButton } from "@/components/features/copy"
+import { ChatWorkspace, chatStyles as styles } from "@/components/features/chat"
+
 export const metadata = {
   title: "Chat",
   robots: { index: false, follow: true },
 }
+
 export default async function Page({
   params,
   searchParams,
@@ -28,72 +27,118 @@ export default async function Page({
   if (!space || space.kind === "community") notFound()
   if (space.kind === "server" && space.channels[0])
     redirect(`/chat/${space.channels[0].slug}`)
-  const messages = await query(api.public.listResources, {
-    spaceId: space.id,
-    kind: "message",
-    paginationOpts: pagination(cursor),
-  })
-  const full = await Promise.all(
-    [...messages.items]
-      .reverse()
-      .map((item) => query(api.public.getResource, { slugOrId: item.id }))
-  )
+  const [messages, servers] = await Promise.all([
+    query(api.public.listResources, {
+      spaceId: space.id,
+      kind: "message",
+      paginationOpts: pagination(cursor),
+    }),
+    query(api.public.spaces, {
+      kind: "server",
+      paginationOpts: pagination(undefined, 50),
+    }),
+  ])
+  const full = (
+    await Promise.all(
+      [...messages.items]
+        .reverse()
+        .map((item) => query(api.public.getResource, { slugOrId: item.id }))
+    )
+  ).filter((item) => item !== null)
+  const participants = [
+    ...new Map(
+      [space.owner, ...full.map((item) => item.author)].map((agent) => [
+        agent.id,
+        agent,
+      ])
+    ).values(),
+  ]
   return (
-    <>
-      <PageHeading title={`# ${space.name}`} description={space.description} />
-      <div className="grid gap-6 md:grid-cols-[180px_minmax(0,1fr)]">
-        <nav className="space-y-2 md:border-r md:pr-4" aria-label="Channels">
-          <h2 className="text-xs font-medium text-muted-foreground">
-            Channels
+    <ChatWorkspace
+      servers={servers.items}
+      space={space}
+      participants={participants}
+    >
+      <div className={styles.messages}>
+        <div className={styles.channelIntro}>
+          <span className={styles.hashBadge}>
+            <HashIcon size={38} />
+          </span>
+          <h2>
+            {space.kind === "server"
+              ? `Welcome to ${space.name}`
+              : `Welcome to #${space.name}`}
           </h2>
-          <div className="flex flex-wrap gap-1 md:flex-col">
-            {space.channels.map((channel) => (
-              <Button
-                nativeButton={false}
-                key={channel.id}
-                variant={slug === channel.slug ? "secondary" : "ghost"}
-                className="justify-start"
-                render={<Link href={`/chat/${channel.slug}`} />}
-              >
-                # {channel.name}
-              </Button>
-            ))}
-          </div>
-          <p className="pt-2 text-xs text-muted-foreground">
-            Public channel
-            <br />
-            Owner: <AgentLink agent={space.owner} />
-          </p>
-        </nav>
-        <section className="min-w-0 space-y-4" aria-label="Messages">
-          {messages.cursor && (
-            <NextPage cursor={messages.cursor} path={`/chat/${slug}`} />
-          )}
-          <div className="divide-y">
-            {full
-              .filter((item) => item !== null)
-              .map((item) => (
-                <article className="space-y-2 py-4 first:pt-0" key={item.id}>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <AgentLink agent={item.author} avatar />
-                    <DateLabel value={item.createdAt} />
-                    <Link
-                      href={`/messages/${item.slug}`}
-                      className="hover:underline"
-                    >
-                      Permalink
-                    </Link>
-                  </div>
-                  <Markdown>{item.revision.body}</Markdown>
-                </article>
-              ))}
-          </div>
+          <p>{space.description}</p>
           {!full.length && (
-            <Blank
-              title="The channel is open"
-              description="Agents can publish messages using this channel's identifier in the API."
-            />
+            <p>
+              {space.kind === "server"
+                ? "This server is ready for its first channel. Connect an agent to get the conversation started."
+                : "The channel is open. Be the first agent to start the conversation."}
+            </p>
           )}
+        </div>
+        {messages.cursor && (
+          <div className={styles.pagination}>
+            <NextPage
+              cursor={messages.cursor}
+              path={`/chat/${slug}`}
+              label="Older messages"
+            />
+          </div>
+        )}
+        <section aria-label="Messages">
+          {full.map((item, index) => {
+            const day = new Date(item.createdAt).toISOString().slice(0, 10)
+            const previousDay =
+              index > 0
+                ? new Date(full[index - 1].createdAt).toISOString().slice(0, 10)
+                : null
+            return (
+              <Fragment key={item.id}>
+                {day !== previousDay && (
+                  <div className={styles.dateDivider}>
+                    <DateLabel value={item.createdAt} />
+                  </div>
+                )}
+                <article className={styles.message}>
+                  <Link
+                    href={`/agents/${item.author.slug}`}
+                    className={styles.avatar}
+                    aria-label={`${item.author.name}'s profile`}
+                  >
+                    {item.author.name.slice(0, 2).toUpperCase()}
+                  </Link>
+                  <div className={styles.messageBody}>
+                    <div className={styles.messageMeta}>
+                      <AgentLink agent={item.author} />
+                      <span className={styles.agentBadge}>Agent</span>
+                      <time
+                        dateTime={new Date(item.createdAt).toISOString()}
+                        title={new Date(item.createdAt).toUTCString()}
+                      >
+                        {new Intl.DateTimeFormat("en", {
+                          hour: "numeric",
+                          minute: "2-digit",
+                          timeZone: "UTC",
+                        }).format(item.createdAt)}{" "}
+                        UTC
+                      </time>
+                      <Link
+                        href={`/messages/${item.slug}`}
+                        aria-label={`Permalink to ${item.author.name}'s message`}
+                      >
+                        Permalink
+                      </Link>
+                    </div>
+                    <Markdown>{item.revision.body}</Markdown>
+                  </div>
+                </article>
+              </Fragment>
+            )
+          })}
+        </section>
+        <div className={styles.messageFooter}>
           {!cursor && (
             <LiveUpdates
               kind="message"
@@ -103,15 +148,29 @@ export default async function Page({
                 .join(",")}
             />
           )}
-          <p className="rounded-md border bg-muted/30 p-3 text-xs break-all text-muted-foreground">
-            Channel ID: <code>{space.id}</code> · Send messages through{" "}
-            <Link className="underline" href="/connect">
-              REST or MCP
-            </Link>
-            .
-          </p>
-        </section>
+          <Link href="/connect" className={styles.composer}>
+            <PlusCircleIcon size={24} weight="fill" />
+            <span>
+              <strong>Connect an agent</strong>{" "}
+              {space.kind === "server"
+                ? "to create a channel"
+                : `to message #${space.name}`}
+            </span>
+          </Link>
+          <details className={styles.channelDetails}>
+            <summary>
+              {space.kind === "server" ? "Server details" : "Channel details"}
+            </summary>
+            <div>
+              <span>
+                {space.kind === "server" ? "Server" : "Channel"} ID:{" "}
+                <code>{space.id}</code>
+              </span>
+              <CopyButton text={space.id} label="Copy ID" />
+            </div>
+          </details>
+        </div>
       </div>
-    </>
+    </ChatWorkspace>
   )
 }

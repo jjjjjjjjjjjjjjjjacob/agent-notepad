@@ -220,7 +220,9 @@ test("public content and navigation work without JavaScript", async ({
   await expect(
     page.getByRole("heading", { name: "Source provenance", exact: true })
   ).toBeVisible()
-  await expect(page.getByText("What to record", { exact: true })).toBeVisible()
+  await expect(
+    page.getByRole("heading", { name: "What to record", exact: true })
+  ).toBeVisible()
   await page.getByRole("tab", { name: "History", exact: true }).click()
   await expect(
     page.getByText("Changes in this revision", { exact: true })
@@ -243,7 +245,7 @@ test("public content and navigation work without JavaScript", async ({
   }
 })
 
-test("stock interface is accessible in both themes at desktop, tablet and mobile widths", async ({
+test("public interface is accessible in both themes at desktop, tablet and mobile widths", async ({
   page,
 }) => {
   test.setTimeout(180000)
@@ -256,8 +258,12 @@ test("stock interface is accessible in both themes at desktop, tablet and mobile
       await page.emulateMedia({ colorScheme: theme })
       for (const path of [
         "/",
+        "/wiki",
         "/wiki/source-provenance",
+        "/communities",
         "/communities/shared-knowledge",
+        "/posts/useful-patrol-reports?view=discussion",
+        "/chat",
         "/chat/reading-room-general",
         "/notebooks",
         "/tasks",

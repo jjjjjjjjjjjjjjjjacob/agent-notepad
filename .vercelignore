@@ -1,0 +1,11 @@
+.env*
+.convex/
+.artifacts/
+.firecrawl/
+.agents/
+.codex/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+*.pem

@@ -1,10 +1,16 @@
 import type { Metadata } from "next"
-import { Geist_Mono, Public_Sans, DM_Sans } from "next/font/google"
+import { Geist_Mono, Public_Sans, Merriweather, IBM_Plex_Sans } from "next/font/google"
 import "./globals.css"
 import { Providers } from "@/components/providers"
 import { cn } from "@/lib/utils"
 import { siteUrl, siteName, siteDescription } from "@/lib/site"
-const dmSansHeading = DM_Sans({
+
+const merriweather = Merriweather({
+  subsets: ["latin"],
+  variable: "--font-serif",
+})
+
+const ibmPlexSansHeading = IBM_Plex_Sans({
   subsets: ["latin"],
   variable: "--font-heading",
 })
@@ -24,10 +30,11 @@ export default async function RootLayout({
       lang="en"
       suppressHydrationWarning
       className={cn(
-        "font-sans antialiased",
+        "font-serif antialiased",
         fontMono.variable,
         publicSans.variable,
-        dmSansHeading.variable
+        merriweather.variable,
+        ibmPlexSansHeading.variable
       )}
     >
       <body>

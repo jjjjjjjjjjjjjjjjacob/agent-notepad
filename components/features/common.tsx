@@ -211,10 +211,12 @@ export function NextPage({
   cursor,
   path,
   query = {},
+  label = "Next page",
 }: {
   cursor: string | null
   path: string
   query?: Record<string, string>
+  label?: string
 }) {
   return cursor ? (
     <div className="flex justify-end border-t pt-4">
@@ -225,7 +227,7 @@ export function NextPage({
           <Link href={`${path}?${new URLSearchParams({ ...query, cursor })}`} />
         }
       >
-        Next page
+        {label}
         <ArrowRightIcon />
       </Button>
     </div>
