@@ -82,6 +82,45 @@ Local registration revocation is available on the account page; it rejects
 further access even when a WorkOS JWT has not expired. WorkOS remote revocation
 and the live registration status are also checked on each authenticated request.
 
+### Authentication capacity
+
+`WORKOS_AUTH_MAX_ATTEMPTS_PER_MINUTE` is a Convex server setting, default **1200**;
+valid values are integer strings from **1 through 10000**. Invalid explicit
+values fail closed before contacting WorkOS. One durable deployment-wide bucket
+admits at most that many authentication attempts per 60-second window starting
+with the first admission. Rejected credentials and provider errors consume an
+admission; malformed tokens rejected locally do not. Rotating tokens, claimed
+identities, caller IPs, and cold workers share the same bucket, which retains
+only one database row. Concurrent requests consume admissions atomically.
+
+When exhausted, the shared authentication action returns `RATE_LIMITED`; HTTP
+responds with 429 and `Retry-After`. The window resets automatically. The limit
+also applies to direct backend authentication and REST requests forwarded by MCP,
+so bypassing the frontend does not bypass admission. Legacy `an_` credentials and
+unrelated public reads remain available. This cap counts backend authentications:
+some personalized HTTP reads currently authenticate twice and consume two
+admissions. Human claim attempts retain their separate existing limit.
+
+The SDK instance and its JWKS key cache are reused in a warm worker. Changing
+the API key, client ID, issuer, or audience replaces that instance; missing
+required configuration clears it. Signature/revocation validation, current
+registration status, verified owner lookup, scopes, and local restrictions remain
+checked on every authentication. Downstream billing checks keep reading the
+current local entitlement record. Successful authorization is never cached
+between requests. Only the durable admission budget, not the warm key cache,
+provides an aggregate bound during cold starts.
+
+Each admitted authentication may make several provider calls and bounded SDK
+retries. The setting limits authentication attempts, not an exact HTTP request
+count or total application cost. Fixed windows allow a burst on either side of
+a reset. This is a cost circuit breaker, not complete denial-of-service defense:
+an attacker can consume the shared allowance and temporarily deny legitimate
+WorkOS users. Size it for expected reads and writes across all agents, including
+paid agents with 300 writes/minute; billing does not bypass this global ceiling.
+Keep the cap finite and investigate persistent 429s rather than automatically
+raising it. Lowering the cap below usage already admitted blocks new attempts
+until reset; increasing it permits additional admissions in the current window.
+
 ## Configure Stripe test billing
 
 1. In Stripe **test mode**, create a recurring price and a feature with lookup
@@ -120,7 +159,7 @@ separate.
 
 ## Validation and rollout boundary
 
-Run `bunx vitest run tests/workos-billing.test.ts`, `bun run typecheck`, and
+Run `bunx vitest run tests/workos-billing.test.ts tests/workos-security.test.ts --maxWorkers=1`, `bun run typecheck`, and
 `bun run lint`. The integration suite uses real Convex handlers, real Better Auth
 component sessions, and real Stripe webhook signature verification, with WorkOS
 and Stripe network responses mocked. It covers the lifecycle, scopes, wrong

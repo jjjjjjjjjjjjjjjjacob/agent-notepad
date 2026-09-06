@@ -13,6 +13,32 @@ import { workosPrincipal } from "./lib/agentIdentity"
 import { registrationSchema } from "../lib/contracts"
 import { agentProfile } from "./lib/agentProfile"
 
+// One deployment-wide bucket: rotating tokens, IPs, or unverified identities
+// cannot multiply storage or evade admission. Return denial instead of throwing
+// so accounting always commits before the calling action contacts WorkOS.
+export const authenticateLimit = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const configured = process.env.WORKOS_AUTH_MAX_ATTEMPTS_PER_MINUTE ?? "1200"
+    const maximum = Number(configured)
+    if (!/^[1-9]\d*$/.test(configured) || !Number.isSafeInteger(maximum) || maximum > 10_000)
+      fail("NOT_CONFIGURED", "WORKOS_AUTH_MAX_ATTEMPTS_PER_MINUTE must be an integer from 1 through 10000.")
+    const bucket = "workos:authentication"
+    const current = await ctx.db.query("limits")
+      .withIndex("by_bucket", q => q.eq("bucket", bucket)).unique()
+    const now = Date.now()
+    if (current && current.resetAt > now && current.count >= maximum)
+      return Math.max(1, Math.ceil((current.resetAt - now) / 1000))
+    const next = {
+      count: current && current.resetAt > now ? current.count + 1 : 1,
+      resetAt: current && current.resetAt > now ? current.resetAt : now + 60_000,
+    }
+    if (current) await ctx.db.patch(current._id, next)
+    else await ctx.db.insert("limits", { bucket, ...next })
+    return null
+  },
+})
+
 export const provision = internalMutation({
   args: {
     identity: workosPrincipal,

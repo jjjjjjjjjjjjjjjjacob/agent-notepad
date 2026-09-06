@@ -7,18 +7,41 @@ import { fail } from "./lib/core"
 import { validatedAgentClaims } from "../lib/workos-agent"
 import type { WorkosPrincipal } from "./lib/agentIdentity"
 
-function client() {
-  if (
-    !process.env.WORKOS_API_KEY ||
-    !process.env.WORKOS_CLIENT_ID ||
-    !process.env.WORKOS_AUTHKIT_ISSUER
-  )
+type Configuration = {
+  apiKey: string
+  clientId: string
+  issuer: string
+  audience: string
+}
+let cachedClient: { configuration: Configuration; workos: WorkOS } | undefined
+
+function configuration(): Configuration {
+  const apiKey = process.env.WORKOS_API_KEY
+  const clientId = process.env.WORKOS_CLIENT_ID
+  const issuer = process.env.WORKOS_AUTHKIT_ISSUER
+  if (!apiKey || !clientId || !issuer) {
+    cachedClient = undefined
     fail("NOT_CONFIGURED", "WorkOS Agent Registration is not configured.")
-  return new WorkOS(process.env.WORKOS_API_KEY, {
-    clientId: process.env.WORKOS_CLIENT_ID,
-    timeout: 10_000,
-    maxRetries: 1,
-  })
+  }
+  return { apiKey, clientId, issuer, audience: process.env.WORKOS_AGENT_AUDIENCE ?? clientId }
+}
+
+function client(settings = configuration()) {
+  const previous = cachedClient?.configuration
+  if (!previous || previous.apiKey !== settings.apiKey ||
+      previous.clientId !== settings.clientId || previous.issuer !== settings.issuer ||
+      previous.audience !== settings.audience) {
+    cachedClient = {
+      configuration: settings,
+      workos: new WorkOS(settings.apiKey, {
+        clientId: settings.clientId,
+        timeout: 10_000,
+        maxRetries: 1,
+      }),
+    }
+  }
+  // Only the SDK's key cache is reused. Authorization is checked on every call.
+  return cachedClient!.workos
 }
 
 export const authenticate = internalAction({
@@ -26,13 +49,18 @@ export const authenticate = internalAction({
   handler: async (ctx, { token }): Promise<WorkosPrincipal> => {
     if (!token || token.length > 16_384 || token.split(".").length !== 3)
       fail("UNAUTHORIZED", "Supply a WorkOS agent access token.")
-    const workos = client()
+    const settings = configuration()
+    // A separate committed mutation bounds external work across warm/cold
+    // workers. A later authentication failure cannot roll this admission back.
+    const retryAfterSeconds = await ctx.runMutation(internal.workosIdentity.authenticateLimit, {})
+    if (retryAfterSeconds !== null)
+      fail("RATE_LIMITED", "WorkOS authentication capacity reached. Retry later.", { retryAfterSeconds })
     try {
+      const workos = client(settings)
       const validation = await workos.agents.validateCredential({
         type: "access_token",
         credential: token,
-        audience:
-          process.env.WORKOS_AGENT_AUDIENCE ?? process.env.WORKOS_CLIENT_ID!,
+        audience: settings.audience,
         checkForRevoked: true,
       })
       if (!validation.valid)
@@ -41,9 +69,8 @@ export const authenticate = internalAction({
         validation.registrationId
       )
       const checked = validatedAgentClaims(validation, registration, {
-        issuer: process.env.WORKOS_AUTHKIT_ISSUER!,
-        audience:
-          process.env.WORKOS_AGENT_AUDIENCE ?? process.env.WORKOS_CLIENT_ID!,
+        issuer: settings.issuer,
+        audience: settings.audience,
       })
       // Ownership comes from the verified WorkOS user, never an email or ID sent by an agent.
       const ownerId = checked.workosUserId
