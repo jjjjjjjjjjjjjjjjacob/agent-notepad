@@ -5,11 +5,11 @@ import { DAY, committeeSize, voteWeight } from "../lib/moderation-policy"
 import {
   agentRestricted,
   approvedOwner,
-  reputation,
   observe,
   principalRestricted,
 } from "./moderation/access"
-import { fillSeats, closeRound, releaseSeats } from "./moderation/rounds"
+import { fillSeats, closeRound, releaseSeats, queueRound, escalateRound } from "./moderation/rounds"
+import { moderationReads, ModerationCapacityExceeded, juryScore, MAX_CANDIDATES } from "./moderation/authorship"
 import { cancelAgentWork } from "./moderation/sanctions"
 import { openQualityCase } from "./moderation/cases"
 import { recomputeCommunity, reverseSource } from "./moderation/reputation"
@@ -27,9 +27,12 @@ export const freezeRoster = internalMutation({
         .unique()
     )
       return
-    for (const nomination of await ctx.db.query("juryNominations").collect()) {
+    const reads = moderationReads(ctx)
+    const roster: { ownerId: string; agentId: import("./_generated/dataModel").Id<"agents">; reputation: number; weight: number }[] = []
+    try {
+    for (const nomination of await reads.rows(ctx.db.query("juryNominations"), MAX_CANDIDATES)) {
       if (!nomination.available || nomination.effectiveDay > day) continue
-      const agent = await ctx.db.get(nomination.agentId)
+      const agent = await reads.get(nomination.agentId)
       if (
         !agent ||
         agent.ownerId !== nomination.ownerId ||
@@ -38,17 +41,24 @@ export const freezeRoster = internalMutation({
         (await agentRestricted(ctx, agent))
       )
         continue
-      const { score } = await reputation(ctx, agent._id)
+      const score = await juryScore(reads, agent._id)
       if (score < 10) continue
-      await ctx.db.insert("juryRoster", {
-        day,
+      roster.push({
         ownerId: nomination.ownerId,
         agentId: agent._id,
         reputation: score,
         weight: voteWeight(score),
       })
     }
-    await ctx.db.insert("juryEpochs", { day, frozenAt: Date.now() })
+    } catch (error) {
+      if (!(error instanceof ModerationCapacityExceeded)) throw error
+      await ctx.db.insert("juryEpochs", { day, frozenAt: Date.now(), state: "saturated" })
+      return
+    }
+    // Install only a fully evaluated population. No partial roster may bias the
+    // uniform draw when an owner or the total operation saturates its budget.
+    for (const row of roster) await ctx.db.insert("juryRoster", { day, ...row })
+    await ctx.db.insert("juryEpochs", { day, frozenAt: Date.now(), state: "complete" })
   },
 })
 export const drawCandidates = internalQuery({
@@ -56,23 +66,27 @@ export const drawCandidates = internalQuery({
   handler: async (ctx, { caseId }) => {
     const c = await ctx.db.get(caseId)
     if (!c || c.state !== "queued") return null
-    const roster = await ctx.db
+    const epoch = await ctx.db.query("juryEpochs").withIndex("by_day", q => q.eq("day", c.rosterDay)).unique()
+    if (!epoch || epoch.state === "saturated" || c.authorshipState === "incomplete") return { saturated: true, candidates: [] }
+    let roster
+    try { roster = await moderationReads(ctx).rows(ctx.db
       .query("juryRoster")
-      .withIndex("by_day", (q) => q.eq("day", c.rosterDay))
-      .collect()
-    return roster
+      .withIndex("by_day", (q) => q.eq("day", c.rosterDay)), MAX_CANDIDATES) }
+    catch (error) { if (!(error instanceof ModerationCapacityExceeded)) throw error; return { saturated: true, candidates: [] } }
+    return { saturated: false, candidates: roster
       .filter(
         (r) =>
           !c.excludedOwners.includes(r.ownerId) &&
           !c.excludedAgents.includes(r.agentId)
       )
-      .map(({ agentId, ownerId, weight }) => ({ agentId, ownerId, weight }))
+      .map(({ agentId, ownerId, weight }) => ({ agentId, ownerId, weight })) }
   },
 })
 export const installDraw = internalMutation({
   args: {
     caseId: v.id("moderationCases"),
     seed: v.string(),
+    saturated: v.optional(v.boolean()),
     candidates: v.array(
       v.object({
         agentId: v.id("agents"),
@@ -86,18 +100,21 @@ export const installDraw = internalMutation({
     if (!c || c.state !== "queued") return
     // Only this internal mutation can install a draw. An action retry cannot reroll it.
     const state =
+      args.saturated || c.authorshipState === "incomplete" || args.candidates.length > MAX_CANDIDATES ||
+      new Set(args.candidates.map(candidate => candidate.ownerId)).size !== args.candidates.length ||
+      new Set(args.candidates.map(candidate => candidate.agentId)).size !== args.candidates.length ||
       args.candidates.length < committeeSize(c.kind) ||
       Date.now() >= c.seatingUntil
         ? "escalated"
         : "seating"
     await ctx.db.patch(c._id, {
-      candidates: args.candidates,
+      candidates: args.candidates.length <= MAX_CANDIDATES ? args.candidates : [],
       drawSeed: args.seed,
       state,
       ...(state === "escalated"
         ? {
             decisionReason:
-              "The frozen roster does not contain enough independent jurors.",
+              "The complete frozen roster could not be evaluated safely or does not contain enough independent jurors.",
           }
         : {}),
     })
@@ -134,16 +151,7 @@ export const recover = internalMutation({
           await ctx.scheduler.runAfter(0, internal.committee.draw, {
             caseId: c._id,
           })
-      } else if (state === "seating") await fillSeats(ctx, c)
-      else if (Date.now() > c.deadline + 2 * 60000) {
-        // Recover even if an earlier close exceeded a backend limit or failed.
-        await ctx.db.patch(c._id, {
-          state: "escalated",
-          decisionReason:
-            "Automatic closure did not complete by the deadline. Human review is required without lowering the thresholds.",
-        })
-        await releaseSeats(ctx, (await ctx.db.get(c._id))!)
-      } else await closeRound(ctx, c)
+      } else await queueRound(ctx, c)
     }
     if (!page.isDone)
       await ctx.scheduler.runAfter(0, internal.governance.recover, {
@@ -154,6 +162,29 @@ export const recover = internalMutation({
       await ctx.scheduler.runAfter(0, internal.governance.recover, {
         state: state === "queued" ? "seating" : "voting",
       })
+  },
+})
+// Each round gets a fresh transaction and one pending continuation. Stale work
+// observes current state; it cannot reopen a resolved case or reroll a draw.
+export const continueCase = internalMutation({
+  args: { caseId: v.id("moderationCases"), generation: v.number() },
+  handler: async (ctx, { caseId, generation }) => {
+    const c = await ctx.db.get(caseId)
+    if (!c?.roundJobPending || c.roundJobVersion !== generation) return
+    await ctx.db.patch(c._id, { roundJobPending: false })
+    if (c.state === "seating") await fillSeats(ctx, c)
+    else if (c.state === "voting") {
+      if (Date.now() > c.deadline + 2 * 60000) await escalateRound(ctx, c,
+        "Automatic closure did not complete by the deadline. Human review is required without lowering the thresholds.")
+      else await closeRound(ctx, c)
+    }
+  },
+})
+export const releaseCaseSeats = internalMutation({
+  args: { caseId: v.id("moderationCases"), cursor: v.string() },
+  handler: async (ctx, { caseId, cursor }) => {
+    const c = await ctx.db.get(caseId)
+    if (c && ["resolved", "escalated"].includes(c.state)) await releaseSeats(ctx, c, cursor)
   },
 })
 export const cancelOwnerWork = internalMutation({

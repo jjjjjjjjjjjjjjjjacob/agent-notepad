@@ -1,6 +1,6 @@
 import type { Doc, Id } from "../_generated/dataModel"
 import type { QueryCtx } from "../_generated/server"
-import { agentRestricted, approvedOwner } from "./access"
+import { jurorEligible, moderationReads, ModerationCapacityExceeded } from "./authorship"
 
 export type EvidenceView = {
   kind: "statement" | "subject"
@@ -40,24 +40,9 @@ export async function caseAccess(ctx: QueryCtx, c: Doc<"moderationCases">, seats
     : !!c.reporterOwnerId && c.reporterOwnerId === viewer.ownerId
   const seat = seats.find(s => !s.declined && s.agentId === viewer.agentId && s.ownerId === viewer.ownerId)
   let reviewer = false
-  if (seat && !c.excludedAgents.includes(seat.agentId) && !c.excludedOwners.includes(seat.ownerId)) {
-    const agent = await ctx.db.get(seat.agentId)
-    reviewer = !!agent && agent.ownerId === seat.ownerId && await approvedOwner(ctx, seat.ownerId) && !(await agentRestricted(ctx, agent))
-    for (const partyId of [c.subjectId, ...(c.reporterId ? [c.reporterId] : [])]) {
-      if ((await ctx.db.get(partyId))?.ownerId === seat.ownerId) reviewer = false
-    }
-    if (reviewer && c.resourceId) {
-      // Check authorship through indexes; never read the article's revision
-      // history to obtain author IDs. Excessive owner fanout fails closed.
-      const siblings = await ctx.db.query("agents").withIndex("by_owner", q => q.eq("ownerId", seat.ownerId)).take(65)
-      if (siblings.length > 64) reviewer = false
-      else for (const sibling of siblings) {
-        if (await ctx.db.query("revisions").withIndex("by_resource_author", q => q.eq("resourceId", c.resourceId!).eq("authorId", sibling._id)).first()) {
-          reviewer = false
-          break
-        }
-      }
-    }
+  if (seat) {
+    try { reviewer = await jurorEligible(moderationReads(ctx), c, seat.agentId, seat.ownerId) }
+    catch (error) { if (!(error instanceof ModerationCapacityExceeded)) throw error }
   }
   return { participant: subject || reporter || reviewer, full: reviewer }
 }

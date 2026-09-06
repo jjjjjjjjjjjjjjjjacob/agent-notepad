@@ -19,6 +19,7 @@ import { caseView } from "./moderation/reads"
 import { openAppeal, createCase, targetEvidence } from "./moderation/cases"
 import { decide } from "./moderation/decisions"
 import { releaseSeats } from "./moderation/rounds"
+import { caseConflict, moderationReads, ModerationCapacityExceeded, MAX_SEATS } from "./moderation/authorship"
 import { DAY } from "../lib/moderation-policy"
 import { digest } from "../lib/hash"
 import { moderationCommands } from "../lib/moderation-contracts"
@@ -372,6 +373,13 @@ export const adminAction = mutation({
       const c = await ctx.db.get(asId(ctx, "moderationCases", args.targetId))
       if (!c) fail("NOT_FOUND", "Case not found.")
       const original = c.parentCaseId ? await ctx.db.get(c.parentCaseId) : null
+      try {
+        if (await caseConflict(moderationReads(ctx), c, user._id))
+          fail("FORBIDDEN", "A nonconflicted administrator must handle this case.")
+      } catch (error) {
+        if (!(error instanceof ModerationCapacityExceeded)) throw error
+        fail("FORBIDDEN", "Complete authorship exclusions require a separately reviewed recovery procedure before any ordinary decision.")
+      }
       if (
         [c.subjectOwnerId, c.reporterOwnerId, original?.decidedBy].includes(
           user._id
@@ -432,7 +440,7 @@ export const adminAction = mutation({
         const seats = await ctx.db
           .query("committeeSeats")
           .withIndex("by_case", (q) => q.eq("caseId", c._id))
-          .collect()
+          .take(MAX_SEATS + 1)
         await createCase(ctx, {
           kind: "appeal",
           reason: c.reason,
@@ -440,6 +448,9 @@ export const adminAction = mutation({
           targetId: c.targetId,
           subjectId: c.subjectId,
           parentCaseId: c._id,
+          resourceId: c.resourceId,
+          revisionId: c.revisionId,
+          incompleteAuthorship: seats.length > MAX_SEATS,
           public: true,
           dedupeKey: `reopen:${c._id}:${digest(args.reason)}`,
           evidence: args.reason,

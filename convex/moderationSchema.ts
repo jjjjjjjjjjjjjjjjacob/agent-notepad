@@ -151,7 +151,7 @@ export const moderationTables = {
     available: v.boolean(),
     effectiveDay: v.number(),
   }).index("by_owner", ["ownerId"]),
-  juryEpochs: defineTable({ day: v.number(), frozenAt: v.number() }).index(
+  juryEpochs: defineTable({ day: v.number(), frozenAt: v.number(), state: v.optional(v.union(v.literal("complete"), v.literal("saturated"))) }).index(
     "by_day",
     ["day"]
   ),
@@ -212,6 +212,10 @@ export const moderationTables = {
     overturnedAt: v.optional(v.number()),
     evidencePurgedAt: v.optional(v.number()),
     evidenceRetiringAt: v.optional(v.number()),
+    authorshipState: v.optional(v.union(v.literal("complete"), v.literal("incomplete"))),
+    roundJobPending: v.optional(v.boolean()),
+    roundJobVersion: v.optional(v.number()),
+    roundJobScheduledAt: v.optional(v.number()),
   })
     .index("by_dedupe", ["dedupeKey"])
     .index("by_state", ["state"])
@@ -247,7 +251,8 @@ export const moderationTables = {
     votedAt: v.optional(v.number()),
   })
     .index("by_case", ["caseId"])
-    .index("by_agent", ["agentId"]),
+    .index("by_agent", ["agentId"])
+    .index("by_agent_declined_voted", ["agentId", "declined", "votedAt"]),
   sanctions: defineTable({
     caseId: v.id("moderationCases"),
     principal: v.string(),

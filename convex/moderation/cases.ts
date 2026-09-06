@@ -11,6 +11,7 @@ import {
 } from "../../lib/moderation-policy"
 import { audit } from "./access"
 import type { EvidenceView } from "./evidenceAccess"
+import { snapshotAuthors, MAX_EXCLUSIONS, MAX_SEATS, MAX_ANCESTORS, moderationReads, ModerationCapacityExceeded, caseLineage } from "./authorship"
 
 export async function targetEvidence(
   ctx: MutationCtx,
@@ -28,7 +29,8 @@ export async function targetEvidence(
   } as const
   const id = ctx.db.normalizeId(table[kind], value)
   if (!id) fail("NOT_FOUND", "Report target not found.")
-  const row = await ctx.db.get(id)
+  const reads = moderationReads(ctx)
+  const row = await reads.get(id)
   if (!row) fail("NOT_FOUND", "Report target not found.")
   let subjectId: Id<"agents">,
     resourceId: Id<"resources"> | undefined,
@@ -42,15 +44,15 @@ export async function targetEvidence(
   if ("resourceId" in row) resourceId = row.resourceId
   if (kind === "resource") {
     resourceId = row._id as Id<"resources">
-    const resource = await ctx.db.get(resourceId)
+    const resource = await reads.get(resourceId)
     revisionId = resource?.currentRevisionId
-    if (revisionId) subjectId = (await ctx.db.get(revisionId))!.authorId
+    if (revisionId) subjectId = (await reads.get(revisionId))!.authorId
   }
   if (kind === "revision") revisionId = row._id as Id<"revisions">
   // Only the subject's own authored fields are suitable for their evidence
   // view. Internal IDs, storage locations and another reporter's statements
   // remain exclusively in the full reviewer snapshot.
-  const material = kind === "resource" && revisionId ? await ctx.db.get(revisionId) : row
+  const material = kind === "resource" && revisionId ? await reads.get(revisionId) : row
   const ownFields = ["title", "body", "summary", "citations", "name", "bio", "capabilities", "topics", "provider", "model", "thinkingLevel", "description", "filename", "contentType", "report", "verdict", "evidence", "log", "integrityCorrection"] as const
   const subjectContent: Record<string, unknown> = {}
   if (material) for (const key of ownFields) if (key in material) subjectContent[key] = material[key as keyof typeof material]
@@ -61,7 +63,7 @@ export async function targetEvidence(
     subjectEvidence: { agentId: subjectId, content: stableJson(subjectContent) },
     snapshot: stableJson(
       kind === "resource" && revisionId
-        ? { target: row, revision: await ctx.db.get(revisionId) }
+        ? { target: row, revision: await reads.get(revisionId) }
         : row
     ),
   }
@@ -91,6 +93,7 @@ export async function createCase(
     statement?: string
     statementOwnerId?: string
     subjectEvidence?: { agentId: Id<"agents">; content: string }
+    incompleteAuthorship?: boolean
   }
 ) {
   const existing = await ctx.db
@@ -106,6 +109,11 @@ export async function createCase(
       "CONFLICT",
       "This case is retiring expired evidence. Retry after cleanup finishes."
     )
+  const reads = moderationReads(ctx)
+  // Reserve/read inherited forensic material before spending the remaining
+  // transaction budget on exclusion discovery. Capacity in that discovery
+  // escalates the case instead of rolling back its already available evidence.
+  const parentEvidence = args.parentCaseId ? await reads.rows(ctx.db.query("moderationEvidence").withIndex("by_case", q => q.eq("caseId", args.parentCaseId!)), 32) : []
   const subject = await ctx.db.get(args.subjectId)
   if (!subject) fail("NOT_FOUND", "Agent not found.")
   const excludedAgents = new Set<Id<"agents">>([
@@ -118,17 +126,23 @@ export async function createCase(
     ...(args.reporterOwnerId ? [args.reporterOwnerId] : []),
     ...(args.excludeOwners ?? []),
   ])
-  if (args.resourceId) {
-    const authors = await ctx.db
-      .query("revisions")
-      .withIndex("by_resource", (q) => q.eq("resourceId", args.resourceId!))
-      .collect()
-    for (const rev of authors) {
-      excludedAgents.add(rev.authorId)
-      const author = await ctx.db.get(rev.authorId)
-      if (author?.ownerId) excludedOwners.add(author.ownerId)
+  let complete = !args.incompleteAuthorship
+  if (args.parentCaseId) {
+    const parent = await ctx.db.get(args.parentCaseId)
+    if (!parent) complete = false
+    else {
+      args = { ...args, resourceId: args.resourceId ?? parent.resourceId, revisionId: args.revisionId ?? parent.revisionId }
+      try { if ((await caseLineage(reads, parent)).length >= MAX_ANCESTORS) complete = false }
+      catch (error) { if (!(error instanceof ModerationCapacityExceeded)) throw error; complete = false }
     }
   }
+  if (args.resourceId) {
+    const snapshot = await snapshotAuthors(ctx, args.resourceId)
+    for (const id of snapshot.agents) excludedAgents.add(id)
+    for (const owner of snapshot.owners) excludedOwners.add(owner)
+    complete &&= snapshot.complete
+  }
+  if (excludedAgents.size > MAX_EXCLUSIONS || excludedOwners.size > MAX_EXCLUSIONS) complete = false
   const now = Date.now()
   const {
     evidence,
@@ -138,21 +152,25 @@ export async function createCase(
     statement,
     statementOwnerId,
     subjectEvidence,
+    incompleteAuthorship: _incomplete,
     ...fields
   } = args
   void _owners
   void _agents
+  void _incomplete
   const caseId = await ctx.db.insert("moderationCases", {
     ...fields,
     ...(subject.ownerId ? { subjectOwnerId: subject.ownerId } : {}),
     public: args.public ?? false,
     policyVersion: MODERATION_POLICY,
-    state: "queued",
+    state: complete ? "queued" : "escalated",
+    authorshipState: complete ? "complete" : "incomplete",
+    ...(!complete ? { decisionReason: "Authorship exclusions exceeded safe snapshot capacity. Evidence is retained; ordinary decisions require a separately reviewed recovery procedure." } : {}),
     seatingUntil: now + 2 * HOUR,
     deadline: now + (args.kind === "appeal" ? 3 : 1) * DAY,
     ...(args.public ? { admittedAt: now } : {}),
-    excludedOwners: [...excludedOwners],
-    excludedAgents: [...excludedAgents],
+    excludedOwners: [...excludedOwners].slice(0, MAX_EXCLUSIONS),
+    excludedAgents: [...excludedAgents].slice(0, MAX_EXCLUSIONS),
     candidates: [],
     candidateCursor: 0,
     rosterDay: Math.floor(now / DAY),
@@ -161,7 +179,6 @@ export async function createCase(
   // Restricted projections live in separate documents to keep a valid large
   // source plus its projection from exceeding the per-document size limit.
   if (args.parentCaseId) {
-    const parentEvidence = await ctx.db.query("moderationEvidence").withIndex("by_case", q => q.eq("caseId", args.parentCaseId!)).collect()
     for (const row of parentEvidence) await ctx.db.insert("moderationEvidence", {
       caseId, content: row.content, fingerprint: row.fingerprint, provenance: row.provenance,
       ...(row.audience ? { audience: row.audience } : {}),
@@ -187,7 +204,7 @@ export async function createCase(
     caseId, content, audience, fingerprint: digest(content),
     provenance: audience.kind === "statement" ? "Attributed statement; untrusted evidence." : "Attributed authored material; untrusted evidence.",
   })
-  await ctx.scheduler.runAfter(0, internal.committee.draw, { caseId })
+  if (complete) await ctx.scheduler.runAfter(0, internal.committee.draw, { caseId })
   return caseId
 }
 export async function reportAbuse(
@@ -355,7 +372,7 @@ export async function openAppeal(
   const seats = await ctx.db
     .query("committeeSeats")
     .withIndex("by_case", (q) => q.eq("caseId", original._id))
-    .collect()
+    .take(MAX_SEATS + 1)
   const caseId = await createCase(ctx, {
     kind: "appeal",
     reason: original.reason,
@@ -365,6 +382,7 @@ export async function openAppeal(
     dedupeKey: `appeal:${original._id}`,
     statement: reason,
     statementOwnerId: ownerId,
+    incompleteAuthorship: seats.length > MAX_SEATS,
     evidence: stableJson({ appeal: reason }),
     provenance:
       "Human-owner appeal. Accept means overturn the original decision.",

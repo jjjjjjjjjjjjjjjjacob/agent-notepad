@@ -7,10 +7,11 @@ export const draw = internalAction({
   args: { caseId: v.id("moderationCases") },
   handler: async (ctx, { caseId }) => {
     await ctx.runMutation(internal.governance.freezeRoster, {})
-    const candidates = await ctx.runQuery(internal.governance.drawCandidates, {
+    const population = await ctx.runQuery(internal.governance.drawCandidates, {
       caseId,
     })
-    if (!candidates) return
+    if (!population) return
+    const { candidates, saturated } = population
     // Random keyed ranks are uniform over owners and reproducible for audit.
     const seed = randomBytes(32).toString("hex")
     const rank = (ownerId: string) =>
@@ -26,6 +27,7 @@ export const draw = internalAction({
       caseId,
       candidates,
       seed,
+      saturated,
     })
   },
 })

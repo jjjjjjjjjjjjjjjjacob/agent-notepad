@@ -1,7 +1,9 @@
 import type { MutationCtx } from "../_generated/server"
 import type { Doc, Id } from "../_generated/dataModel"
-import { agentRestricted, approvedOwner, reputation } from "./access"
+import { agentRestricted, approvedOwner } from "./access"
 import { fail } from "../lib/core"
+import { internal } from "../_generated/api"
+import { moderationReads, ModerationReads, ModerationCapacityExceeded, jurorEligible, juryScore, caseLineage, MAX_CANDIDATES, MAX_SEATS } from "./authorship"
 import {
   ballotResult,
   committeeSize,
@@ -23,42 +25,35 @@ export async function eligibleNow(
     !(await agentRestricted(ctx, agent))
   )
 }
-async function caseEligible(
-  ctx: MutationCtx,
-  c: Doc<"moderationCases">,
-  agentId: Id<"agents">,
-  ownerId: string
-) {
-  if (
-    c.excludedOwners.includes(ownerId) ||
-    c.excludedAgents.includes(agentId) ||
-    !(await eligibleNow(ctx, agentId, ownerId))
-  )
-    return false
-  if (c.resourceId) {
-    for (const revision of await ctx.db
-      .query("revisions")
-      .withIndex("by_resource", (q) => q.eq("resourceId", c.resourceId!))
-      .collect()) {
-      if (
-        revision.authorId === agentId ||
-        (await ctx.db.get(revision.authorId))?.ownerId === ownerId
-      )
-        return false
-    }
-  }
-  return true
+export async function queueRound(ctx: MutationCtx, c: Doc<"moderationCases">) {
+  const current = await ctx.db.get(c._id)
+  if (!current || !["seating", "voting"].includes(current.state) ||
+    (current.roundJobPending && (current.roundJobScheduledAt ?? 0) > Date.now() - 5 * 60000)) return
+  const generation = (current.roundJobVersion ?? 0) + 1
+  await ctx.db.patch(c._id, { roundJobPending: true, roundJobVersion: generation, roundJobScheduledAt: Date.now() })
+  await ctx.scheduler.runAfter(0, internal.governance.continueCase, { caseId: c._id, generation })
+}
+export async function escalateRound(ctx: MutationCtx, c: Doc<"moderationCases">, reason = "Independent jury checks exceeded safe capacity. Human review is required without lowering thresholds.") {
+  const current = await ctx.db.get(c._id)
+  if (!current || !["queued", "seating", "voting"].includes(current.state)) return
+  await ctx.db.patch(c._id, { state: "escalated", decisionReason: reason })
+  await releaseSeats(ctx, { ...c, state: "escalated" })
 }
 export async function fillSeats(ctx: MutationCtx, c: Doc<"moderationCases">) {
+  try { await fillSeatsBounded(ctx, c, moderationReads(ctx)) }
+  catch (error) { if (!(error instanceof ModerationCapacityExceeded)) throw error; await escalateRound(ctx, c) }
+}
+async function fillSeatsBounded(ctx: MutationCtx, c: Doc<"moderationCases">, reads: ModerationReads) {
   if (c.state !== "seating") return
-  const seats = await ctx.db
+  await caseLineage(reads, c)
+  if (c.candidates.length > MAX_CANDIDATES) throw new ModerationCapacityExceeded()
+  const seats = await reads.rows(ctx.db
     .query("committeeSeats")
-    .withIndex("by_case", (q) => q.eq("caseId", c._id))
-    .collect()
+    .withIndex("by_case", (q) => q.eq("caseId", c._id)), MAX_SEATS)
   for (const seat of seats) {
     if (
       !seat.declined &&
-      !(await caseEligible(ctx, c, seat.agentId, seat.ownerId))
+      !(await jurorEligible(reads, c, seat.agentId, seat.ownerId))
     ) {
       await ctx.db.patch(seat._id, { declined: true })
       const task = await ctx.db.get(seat.taskId)
@@ -70,6 +65,7 @@ export async function fillSeats(ctx: MutationCtx, c: Doc<"moderationCases">) {
   }
   const active = seats.filter((s) => !s.declined)
   const size = committeeSize(c.kind)
+  if (active.length > size) throw new ModerationCapacityExceeded()
   if (active.length === size && active.every((s) => s.accepted)) {
     await ctx.db.patch(c._id, { state: "voting" })
     return
@@ -84,9 +80,10 @@ export async function fillSeats(ctx: MutationCtx, c: Doc<"moderationCases">) {
     return
   }
   let cursor = c.candidateCursor
-  while (active.length < size && cursor < c.candidates.length) {
+  let checked = 0, totalSeats = seats.length
+  while (active.length < size && cursor < c.candidates.length && checked++ < 12) {
     const candidate = c.candidates[cursor++]
-    if (!(await caseEligible(ctx, c, candidate.agentId, candidate.ownerId)))
+    if (!(await jurorEligible(reads, c, candidate.agentId, candidate.ownerId)))
       continue
     const occupied = await ctx.db
       .query("assignments")
@@ -95,23 +92,17 @@ export async function fillSeats(ctx: MutationCtx, c: Doc<"moderationCases">) {
       )
       .filter((q) => q.gt(q.field("expiresAt"), Date.now()))
       .first()
-    const invitedElsewhere = await ctx.db
+    const invitedElsewhere = await reads.rows(ctx.db
       .query("committeeSeats")
-      .withIndex("by_agent", (q) => q.eq("agentId", candidate.agentId))
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("declined"), false),
-          q.eq(q.field("votedAt"), undefined)
-        )
-      )
-      .collect()
+      .withIndex("by_agent_declined_voted", (q) => q.eq("agentId", candidate.agentId).eq("declined", false).eq("votedAt", undefined)), MAX_SEATS)
     let unavailable = !!occupied
     for (const invitation of invitedElsewhere) {
-      const other = await ctx.db.get(invitation.caseId)
+      const other = await reads.get(invitation.caseId)
       if (other && ["queued", "seating", "voting"].includes(other.state))
         unavailable = true
     }
     if (unavailable) continue
+    if (++totalSeats > MAX_SEATS) throw new ModerationCapacityExceeded()
     const taskId = await ctx.db.insert("tasks", {
       committeeCaseId: c._id,
       type: "committee_review",
@@ -135,6 +126,7 @@ export async function fillSeats(ctx: MutationCtx, c: Doc<"moderationCases">) {
     active.push((await ctx.db.get(seatId))!)
   }
   await ctx.db.patch(c._id, { candidateCursor: cursor })
+  if (active.length < size && cursor < c.candidates.length) await queueRound(ctx, c)
 }
 export async function respond(
   ctx: MutationCtx,
@@ -142,21 +134,29 @@ export async function respond(
   caseId: Id<"moderationCases">,
   accept: boolean
 ) {
+  try { return await respondBounded(ctx, agent, caseId, accept, moderationReads(ctx)) }
+  catch (error) {
+    if (!(error instanceof ModerationCapacityExceeded)) throw error
+    const c = await ctx.db.get(caseId)
+    if (c) await escalateRound(ctx, c)
+    return { caseId, accepted: false, status: "escalated" }
+  }
+}
+async function respondBounded(ctx: MutationCtx, agent: Doc<"agents">, caseId: Id<"moderationCases">, accept: boolean, reads: ModerationReads) {
   const c = await ctx.db.get(caseId)
-  const seat = await ctx.db
+  const seats = await reads.rows(ctx.db
     .query("committeeSeats")
-    .withIndex("by_case", (q) => q.eq("caseId", caseId))
-    .filter((q) => q.eq(q.field("agentId"), agent._id))
-    .unique()
+    .withIndex("by_case", (q) => q.eq("caseId", caseId)), MAX_SEATS)
+  const seat = seats.find(s => s.agentId === agent._id && !s.declined)
   if (!c || !seat || seat.ownerId !== agent.ownerId || seat.declined)
     fail("NOT_FOUND", "Committee invitation not found.")
+  if (!(await jurorEligible(reads, c, agent._id, seat.ownerId)))
+    fail("FORBIDDEN", "You are not eligible for this committee.")
   if (seat.accepted && accept) return { caseId, accepted: true }
   if (c.state !== "seating" || Date.now() >= c.seatingUntil)
     fail("CONFLICT", "Membership is already frozen or seating has ended.")
-  if (!(await caseEligible(ctx, c, agent._id, seat.ownerId)))
-    fail("FORBIDDEN", "You are not eligible for this committee.")
   if (accept) {
-    const { score } = await reputation(ctx, agent._id)
+    const score = await juryScore(reads, agent._id)
     if (agent._creationTime > Date.now() - 14 * DAY || score < 10)
       fail(
         "FORBIDDEN",
@@ -170,12 +170,11 @@ export async function respond(
       .filter((q) => q.gt(q.field("expiresAt"), Date.now()))
       .first()
     if (active) fail("CONFLICT", "Finish or release your active task first.")
-    for (const waiting of await ctx.db
+    for (const waiting of await reads.rows(ctx.db
       .query("assignments")
       .withIndex("by_agent_status", (q) =>
         q.eq("agentId", agent._id).eq("status", "waiting")
-      )
-      .collect())
+      ), 64))
       await ctx.db.patch(waiting._id, { status: "cancelled" })
     const assignmentId = await ctx.db.insert("assignments", {
       agentId: agent._id,
@@ -196,17 +195,19 @@ export async function respond(
     if (task?.assignmentId)
       await ctx.db.patch(task.assignmentId, { status: "cancelled" })
   }
-  await fillSeats(ctx, c)
+  await fillSeatsBounded(ctx, c, reads)
   return { caseId, accepted: accept }
 }
 export async function releaseSeats(
   ctx: MutationCtx,
-  c: Doc<"moderationCases">
+  c: Doc<"moderationCases">,
+  cursor?: string
 ) {
-  for (const seat of await ctx.db
+  const page = await ctx.db
     .query("committeeSeats")
     .withIndex("by_case", (q) => q.eq("caseId", c._id))
-    .collect()) {
+    .paginate({ cursor: cursor ?? null, numItems: 32 })
+  for (const seat of page.page) {
     const task = await ctx.db.get(seat.taskId)
     if (task?.assignmentId)
       await ctx.db.patch(task.assignmentId, {
@@ -217,6 +218,7 @@ export async function releaseSeats(
       updatedAt: Date.now(),
     })
   }
+  if (!page.isDone) await ctx.scheduler.runAfter(0, internal.governance.releaseCaseSeats, { caseId: c._id, cursor: page.continueCursor })
 }
 export async function ballot(
   ctx: MutationCtx,
@@ -226,16 +228,26 @@ export async function ballot(
   vote: "accept" | "reject" | "abstain",
   rationale: string
 ) {
+  try { return await ballotBounded(ctx, agent, caseId, policyVersion, vote, rationale, moderationReads(ctx)) }
+  catch (error) {
+    if (!(error instanceof ModerationCapacityExceeded)) throw error
+    const c = await ctx.db.get(caseId)
+    if (c) await escalateRound(ctx, c)
+    return { caseId, submitted: false, status: "escalated" }
+  }
+}
+async function ballotBounded(ctx: MutationCtx, agent: Doc<"agents">, caseId: Id<"moderationCases">, policyVersion: number, vote: "accept" | "reject" | "abstain", rationale: string, reads: ModerationReads) {
   const c = await ctx.db.get(caseId)
-  const seats = await ctx.db
+  const seats = await reads.rows(ctx.db
     .query("committeeSeats")
-    .withIndex("by_case", (q) => q.eq("caseId", caseId))
-    .collect()
+    .withIndex("by_case", (q) => q.eq("caseId", caseId)), MAX_SEATS)
   const seat = seats.find((s) => s.agentId === agent._id && !s.declined)
   if (!c || !seat?.accepted || seat.ownerId !== agent.ownerId)
     fail("FORBIDDEN", "Only the assigned juror may vote.")
   if (policyVersion !== c.policyVersion)
     fail("CONFLICT", "This ballot must use the case policy version.")
+  if (!(await jurorEligible(reads, c, agent._id, seat.ownerId)))
+    fail("FORBIDDEN", "Your committee eligibility has been revoked.")
   if (seat.votedAt) {
     if (seat.vote !== vote || seat.rationale !== rationale)
       fail("CONFLICT", "A submitted ballot is immutable.")
@@ -250,8 +262,6 @@ export async function ballot(
       "CONFLICT",
       "This case is not accepting ballots at that policy version."
     )
-  if (!(await caseEligible(ctx, c, agent._id, seat.ownerId)))
-    fail("FORBIDDEN", "Your committee eligibility has been revoked.")
   await ctx.db.patch(seat._id, { vote, rationale, votedAt: Date.now() })
   const task = await ctx.db.get(seat.taskId)
   if (task?.assignmentId)
@@ -261,18 +271,21 @@ export async function ballot(
   return { caseId, submitted: true }
 }
 export async function closeRound(ctx: MutationCtx, c: Doc<"moderationCases">) {
+  try { await closeRoundBounded(ctx, c, moderationReads(ctx)) }
+  catch (error) { if (!(error instanceof ModerationCapacityExceeded)) throw error; await escalateRound(ctx, c) }
+}
+async function closeRoundBounded(ctx: MutationCtx, c: Doc<"moderationCases">, reads: ModerationReads) {
   if (c.state !== "voting" || Date.now() < c.deadline) return
-  const rows = (
-    await ctx.db
+  await caseLineage(reads, c)
+  const rows = (await reads.rows(ctx.db
       .query("committeeSeats")
-      .withIndex("by_case", (q) => q.eq("caseId", c._id))
-      .collect()
-  ).filter((s) => !s.declined)
+      .withIndex("by_case", (q) => q.eq("caseId", c._id)), MAX_SEATS)).filter((s) => !s.declined)
+  if (rows.length > committeeSize(c.kind)) throw new ModerationCapacityExceeded()
   const valid = []
   for (const seat of rows)
     valid.push({
       weight: seat.weight,
-      vote: (await caseEligible(ctx, c, seat.agentId, seat.ownerId))
+      vote: (await jurorEligible(reads, c, seat.agentId, seat.ownerId))
         ? seat.vote
         : undefined,
     })
