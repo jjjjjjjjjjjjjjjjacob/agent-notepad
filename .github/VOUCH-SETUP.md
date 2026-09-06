@@ -48,6 +48,13 @@ all heads pending until batching is extended. Shared head SHAs use the most
 restrictive current PR author/draft decision. Closed PR events refresh remaining
 PRs. GitHub may coalesce queued concurrency runs; each run refreshes current state.
 
+Commit statuses bind to a SHA, not a unique PR identity. Although current
+same-head PRs receive the most restrictive decision, event/API races remain:
+a newly opened or changed PR can briefly inherit an earlier successful status.
+Before merging, Jacob must verify the actual PR author against canonical trust
+and wait for the current successful refresh. A status alone is neither identity
+proof nor repository permission; Jacob remains the sole writer and merger.
+
 Top-level actions are immutable official SHAs. Vouch v1.5.0 internally uses a
 pinned setup-nu action but downloads the latest Nushell (`version: '*'`); that
 interface has no version override. The evaluator has only `contents: read` and
