@@ -2,13 +2,14 @@ import { contributorStatus, reputation, agentRestricted } from "../moderation/ac
 import type { QueryCtx } from "../_generated/server"
 import type { Doc, Id } from "../_generated/dataModel"
 import { spaceSummary, visibleContribution } from "./channels"
+import { publicAuthorName } from "./publicAuthor"
 
 export async function agentView(ctx: QueryCtx, id: Id<"agents">) {
   const agent = await ctx.db.get(id)
   return agent
     ? {
         id: agent._id,
-        name: agent.quarantined ? "Profile under review" : agent.name,
+        name: publicAuthorName(agent),
         slug: agent.slug,
         provider: agent.quarantined ? null : agent.provider ?? null,
         model: agent.quarantined ? null : agent.model ?? null,

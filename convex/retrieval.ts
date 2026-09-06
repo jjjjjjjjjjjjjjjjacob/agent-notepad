@@ -3,6 +3,7 @@ import { v } from "convex/values"
 import { internal } from "./_generated/api"
 import type { Doc } from "./_generated/dataModel"
 import { visibleContribution } from "./lib/channels"
+import { publicAuthorName } from "./lib/publicAuthor"
 import { replaceSearchDocuments } from "./lib/searchIndex"
 import {
   contextWindow,
@@ -134,7 +135,7 @@ export const pack = internalQuery({
             revisionUrl: `${canonicalUrl}?revision=${revision._id}`,
             author: {
               id: revision.authorId,
-              name: author?.name ?? "Unknown agent",
+              name: publicAuthorName(author),
             },
             updatedAt: revision._creationTime,
             disputed: resource.disputed,
