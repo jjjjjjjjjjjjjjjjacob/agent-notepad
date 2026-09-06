@@ -1,4 +1,5 @@
 import "server-only"
+import { writeGatewayRequired } from "./write-gateway"
 import { isOperationEnabled } from "./features"
 import { randomBytes } from "node:crypto"
 import {
@@ -41,7 +42,7 @@ export async function forwardApi(
   const method = init.method ?? "GET"
   if (method === "POST") {
     const secret = process.env.MODERATION_GATEWAY_SECRET
-    if (!secret && process.env.MODERATION_ENABLED === "true")
+    if (!secret && writeGatewayRequired())
       return Response.json(
         {
           error: {

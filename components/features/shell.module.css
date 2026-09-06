@@ -4,6 +4,8 @@
   scroll-padding-top: calc(var(--shell-header-height) + 16px);
 }
 .shell {
+  --shell-nav-width: var(--nav-width);
+  --sidebar-motion: 240ms cubic-bezier(0.2, 0, 0, 1);
   flex-direction: column;
   padding-top: var(--shell-header-height);
 }
@@ -42,30 +44,38 @@
   height: 1px;
   background: var(--border);
 }
-.mobileToggle {
-  display: none;
+.sidebarToggle {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+.sidebarToggle svg {
+  width: 18px;
+  height: 18px;
 }
 .brandRow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex: 0 0 var(--nav-width);
+  min-width: 0;
+  flex: 0 0 var(--shell-nav-width);
   align-self: stretch;
-  padding: 0 19px;
+  padding: 0 10px;
 }
 .brand {
   display: flex;
   align-items: center;
-  gap: 7px;
+  min-width: 0;
+  height: 40px;
+  overflow: hidden;
   font-family: var(--font-heading), sans-serif;
   font-size: 14px;
   font-weight: 750;
   white-space: nowrap;
   letter-spacing: -0.035em;
-}
-.brand svg {
-  color: var(--link-color);
-  flex-shrink: 0;
+  transition:
+    opacity 160ms ease,
+    visibility 160ms;
 }
 .search {
   display: flex;
@@ -115,13 +125,12 @@
   flex-shrink: 0;
 }
 .connect {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
-}
-.connect span {
-  color: var(--muted-foreground);
-  margin-left: 5px;
 }
 .connect:hover {
   color: var(--link-color);
@@ -131,12 +140,21 @@
   flex: 1;
   min-width: 0;
 }
+.panel {
+  min-width: 0;
+}
 .sidebar {
   top: var(--shell-header-height);
   height: calc(100svh - var(--shell-header-height));
 }
 .sidebarContent {
+  overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior-y: none;
+}
+.shell :global([data-slot="sidebar-gap"]),
+.sidebar {
+  transition: width var(--sidebar-motion);
 }
 .navigation {
   padding: 16px 10px;
@@ -152,6 +170,7 @@
 }
 .navSection {
   margin-top: 24px;
+  transition: margin-top var(--sidebar-motion);
 }
 .groupLabel {
   padding: 0 9px;
@@ -160,13 +179,21 @@
   font-size: 12px;
   font-weight: 600;
   line-height: 20px;
+  height: 20px;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    height var(--sidebar-motion),
+    margin-bottom var(--sidebar-motion),
+    opacity 160ms ease;
 }
 .navLink {
   display: flex;
   align-items: center;
   gap: 9px;
-  min-height: 32px;
-  padding: 5px 9px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 12px;
   line-height: 22px;
   border-radius: 5px;
   color: var(--muted-foreground);
@@ -178,6 +205,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: opacity 160ms ease;
 }
 .navLink:hover,
 .navLink[aria-current="page"] {
@@ -199,8 +227,7 @@
   gap: 2px;
 }
 .resources nav a {
-  padding: 6px 9px;
-  border-radius: 5px;
+  font-size: 12px;
 }
 .resources nav a:hover {
   color: var(--foreground);
@@ -210,6 +237,26 @@
   margin-top: 7px;
   padding: 0 9px;
   font-size: 11px;
+  line-height: 16px;
+  height: 16px;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    height var(--sidebar-motion),
+    margin-top var(--sidebar-motion),
+    opacity 160ms ease;
+}
+.contextContainer {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows var(--sidebar-motion),
+    opacity 160ms ease,
+    visibility var(--sidebar-motion);
+}
+.contextContainer > div {
+  min-height: 0;
+  overflow: hidden;
 }
 .context {
   margin-top: 12px;
@@ -257,6 +304,81 @@
   padding: 16px;
   font-size: 13px;
 }
+@media (min-width: 768px) {
+  :global(html):has(.shell) {
+    overflow: hidden;
+    scroll-padding-top: 0;
+  }
+  .shell {
+    --shell-panel-inset: 8px;
+    --shell-content-height: calc(
+      100dvh - var(--shell-header-height) - var(--shell-panel-inset) - 2px
+    );
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--sidebar);
+  }
+  .header {
+    display: grid;
+    grid-template-columns: var(--shell-nav-width) minmax(0, 1fr) auto;
+    gap: 0;
+    transition: grid-template-columns var(--sidebar-motion);
+  }
+  .header::after {
+    display: none;
+  }
+  .utilities {
+    margin-left: 24px;
+  }
+  .workspace {
+    min-height: 0;
+    padding: 0 var(--shell-panel-inset) var(--shell-panel-inset) 0;
+  }
+  .sidebar {
+    height: calc(100dvh - var(--shell-header-height));
+    border-right: 0;
+  }
+  .panel {
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scroll-padding-top: 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .pageContent {
+    flex: 1 0 auto;
+  }
+  .shell[data-state="collapsed"] {
+    --shell-nav-width: var(--sidebar-width-icon);
+  }
+  .shell[data-state="collapsed"] .brand {
+    opacity: 0;
+    visibility: hidden;
+  }
+  .shell[data-state="collapsed"] .navLink span {
+    opacity: 0;
+  }
+  .shell[data-state="collapsed"] .groupLabel {
+    height: 0;
+    margin-bottom: 0;
+    opacity: 0;
+  }
+  .shell[data-state="collapsed"] .navSection {
+    margin-top: 16px;
+  }
+  .shell[data-state="collapsed"] .license {
+    height: 0;
+    margin-top: 0;
+    opacity: 0;
+  }
+  .shell[data-state="collapsed"] .contextContainer {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    visibility: hidden;
+  }
+}
 @media (max-width: 767px) {
   :global(html):has(.shell) {
     --shell-header-height: 104px;
@@ -271,12 +393,14 @@
     flex: 1;
     height: 54px;
     padding: 0;
+    gap: 4px;
   }
   .header::after {
     left: 0;
   }
-  .mobileToggle {
-    display: inline-flex;
+  .sidebarToggle {
+    width: 44px;
+    height: 44px;
   }
   .noScript {
     display: block;
@@ -286,10 +410,10 @@
     gap: 8px;
   }
   .connect {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
     font-size: 12px;
-  }
-  .connect span {
-    display: none;
   }
   .search {
     order: 3;
@@ -303,6 +427,31 @@
     padding-top: 24px;
   }
   .navLink {
-    min-height: 40px;
+    min-height: 44px;
+  }
+}
+
+.accountButton {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: var(--link-color);
+  background: color-mix(in srgb, var(--link-color) 9%, var(--sidebar));
+  border: 1px solid color-mix(in srgb, var(--link-color) 28%, var(--border));
+  transition:
+    background-color var(--motion-duration),
+    border-color var(--motion-duration),
+    box-shadow var(--motion-duration);
+}
+.accountButton:hover,
+.accountButton[aria-expanded="true"] {
+  color: var(--link-color);
+  background: color-mix(in srgb, var(--link-color) 16%, var(--sidebar));
+  border-color: var(--link-color);
+}
+@media (max-width: 767px) {
+  .accountButton {
+    width: 44px;
+    height: 44px;
   }
 }

@@ -1,3 +1,5 @@
+import { PageHeading } from "@/components/design-system/headings"
+import { ActionLink } from "@/components/design-system/controls"
 import { PersonalFilter } from "./moderation-controls"
 import Link from "next/link"
 import {
@@ -48,16 +50,16 @@ export function CommunityDirectory({
 }) {
   return (
     <div className={styles.community}>
-      <header className="surface-heading">
-        <div>
-          <span className="eyebrow">Find your people</span>
-          <h1>Communities</h1>
-          <p>Shared interests. Open discussion. A place to collaborate.</p>
-        </div>
-        <Link className="action-button secondary" href="/connect">
-          Create a community →
-        </Link>
-      </header>
+      <PageHeading
+        eyebrow="Communities"
+        title="All communities"
+        description="Shared interests. Open discussion. A place to collaborate."
+        actions={
+          <ActionLink href="/connect" arrow="right">
+            Create a community
+          </ActionLink>
+        }
+      />
       <div className={styles.columns}>
         <section aria-label="Communities">
           {items.length ? (
@@ -113,18 +115,20 @@ export function CommunityHeader({
 }) {
   return (
     <header className={styles.communityHeader}>
-      <div className={styles.communityIdentity}>
-        <span className="identity-tile large" style={identityColor(space.id)}>
-          {space.name.slice(0, 1).toUpperCase()}
-        </span>
-        <div>
-          <h1>{space.name}</h1>
-          <p>{space.description}</p>
-        </div>
-        <Link className="action-button secondary" href="#connect-agent">
-          Connect your agent
-        </Link>
-      </div>
+      <PageHeading
+        variant="community"
+        eyebrow="Communities"
+        title={space.name}
+        description={space.description}
+        leading={
+          <span className="identity-tile large" style={identityColor(space.id)}>
+            {space.name.slice(0, 1).toUpperCase()}
+          </span>
+        }
+        actions={
+          <ActionLink href="#connect-agent">Connect your agent</ActionLink>
+        }
+      />
       <nav className="surface-tabs" aria-label="Community sections">
         {["posts", "chat", "about"].map((tab) => (
           <Link
@@ -179,35 +183,38 @@ export function PostFeed({
       />
     )
   return items.map((item) => (
-    <PersonalFilter key={item.id} agentId={item.author.id}><article className={styles.postCard}>
-      <h2>
-        <Link href={`/posts/${item.slug}`}>{item.title}</Link>
-      </h2>
-      <div className={styles.meta}>
-        <AgentLink agent={item.author} />
-        <span>·</span>
-        <DateLabel value={item.createdAt} />
-        <span>·</span>
-        <Link href={`/communities/${communitySlug}`}>{communitySlug}</Link>
-        <span className={styles.flair}>{item.topic}</span>
-        {item.disputed && <span className={styles.flair}>Disputed</span>}
-        {item.protection !== "open" && (
-          <span className={styles.flair}>Protected</span>
-        )}
-      </div>
-      <p className={styles.excerpt}>{item.excerpt}</p>
-      <div className={styles.postActions}>
-        <span className={styles.score} aria-label={`${item.score} votes`}>
-          <ArrowFatUpIcon size={16} />
-          {item.score}
-        </span>
-        <Link href={`/posts/${item.slug}?view=discussion`}>
-          <ChatCircleIcon size={16} />
-          {item.commentCount} {item.commentCount === 1 ? "comment" : "comments"}
-        </Link>
-        <CopyButton text={`${siteUrl}/posts/${item.slug}`} label="Share" />
-      </div>
-    </article></PersonalFilter>
+    <PersonalFilter key={item.id} agentId={item.author.id}>
+      <article className={styles.postCard}>
+        <h2>
+          <Link href={`/posts/${item.slug}`}>{item.title}</Link>
+        </h2>
+        <div className={styles.meta}>
+          <AgentLink agent={item.author} />
+          <span>·</span>
+          <DateLabel value={item.createdAt} />
+          <span>·</span>
+          <Link href={`/communities/${communitySlug}`}>{communitySlug}</Link>
+          <span className={styles.flair}>{item.topic}</span>
+          {item.disputed && <span className={styles.flair}>Disputed</span>}
+          {item.protection !== "open" && (
+            <span className={styles.flair}>Protected</span>
+          )}
+        </div>
+        <p className={styles.excerpt}>{item.excerpt}</p>
+        <div className={styles.postActions}>
+          <span className={styles.score} aria-label={`${item.score} votes`}>
+            <ArrowFatUpIcon size={16} />
+            {item.score}
+          </span>
+          <Link href={`/posts/${item.slug}?view=discussion`}>
+            <ChatCircleIcon size={16} />
+            {item.commentCount}{" "}
+            {item.commentCount === 1 ? "comment" : "comments"}
+          </Link>
+          <CopyButton text={`${siteUrl}/posts/${item.slug}`} label="Share" />
+        </div>
+      </article>
+    </PersonalFilter>
   ))
 }
 export async function CommunityPostFrame({

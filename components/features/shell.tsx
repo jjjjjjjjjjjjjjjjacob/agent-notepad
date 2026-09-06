@@ -4,9 +4,10 @@ import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { useTheme } from "next-themes"
 import {
-  NotebookIcon,
+  BookOpenTextIcon,
   MagnifyingGlassIcon,
-  UserCircleIcon,
+  ShieldCheckIcon,
+  UserIcon,
 } from "@phosphor-icons/react"
 import {
   Sidebar,
@@ -17,6 +18,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { LinkArrow } from "@/components/design-system/controls"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -36,7 +38,11 @@ import {
   CommandGroup,
   CommandItem,
 } from "@/components/ui/command"
-import { PrimaryNavigation, commandNavigation } from "./primary-navigation"
+import {
+  NavigationLink,
+  PrimaryNavigation,
+  commandNavigation,
+} from "./primary-navigation"
 import styles from "./shell.module.css"
 
 export function AppShell({
@@ -72,18 +78,21 @@ export function AppShell({
   }, [])
   return (
     <SidebarProvider
-      open={true}
       className={styles.shell}
-      style={{ "--sidebar-width": "var(--nav-width)" } as React.CSSProperties}
+      style={
+        {
+          "--sidebar-width": "var(--nav-width)",
+          "--sidebar-width-icon": "60px",
+        } as React.CSSProperties
+      }
     >
       <a href="#page-content" className={styles.skip}>
         Skip to content
       </a>
       <header className={styles.header}>
         <div className={styles.brandRow}>
-          <SidebarTrigger className={styles.mobileToggle} />
+          <SidebarTrigger className={styles.sidebarToggle} />
           <Link href="/" className={styles.brand}>
-            <NotebookIcon size={21} weight="duotone" />
             <span>Agent Notepad</span>
           </Link>
         </div>
@@ -114,19 +123,24 @@ export function AppShell({
         </form>
         <div className={styles.utilities}>
           <Link href="/connect" className={styles.connect}>
-            Connect agent <span aria-hidden="true">↗</span>
+            Connect agent <LinkArrow />
           </Link>
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="icon"
+                  className={styles.accountButton}
                   aria-label="Account and appearance"
                 />
               }
             >
-              <UserCircleIcon size={22} />
+              <UserIcon
+                weight="duotone"
+                className="size-5"
+                aria-hidden="true"
+              />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem render={<Link href="/account" />}>
@@ -146,7 +160,7 @@ export function AppShell({
         </div>
       </header>
       <div className={styles.workspace}>
-        <Sidebar className={styles.sidebar}>
+        <Sidebar collapsible="icon" className={styles.sidebar}>
           <CloseSidebarOnNavigate>
             <SidebarContent className={styles.sidebarContent}>
               <PrimaryNavigation
@@ -160,19 +174,29 @@ export function AppShell({
                   Resources
                 </p>
                 <nav aria-label="Resources">
-                  <Link href="/for-agents">Agent guide</Link>
-                  <Link href="/policies">Community policy</Link>
+                  <NavigationLink
+                    href="/for-agents"
+                    label="Agent guide"
+                    icon={BookOpenTextIcon}
+                    active={pathname === "/for-agents"}
+                  />
+                  <NavigationLink
+                    href="/policies"
+                    label="Community policy"
+                    icon={ShieldCheckIcon}
+                    active={pathname === "/policies"}
+                  />
                 </nav>
                 <p className={styles.license}>Original work · CC BY-SA 4.0</p>
               </div>
             </SidebarFooter>
           </CloseSidebarOnNavigate>
         </Sidebar>
-        <SidebarInset className="min-w-0">
+        <SidebarInset className={styles.panel}>
           <div
             id="page-content"
             tabIndex={-1}
-            className={immersive ? "w-full min-w-0 flex-1" : "standard-page"}
+            className={`${styles.pageContent} ${immersive ? "w-full min-w-0 flex-1" : "standard-page"}`}
           >
             {children}
           </div>

@@ -1,7 +1,7 @@
 .community {
   max-width: var(--page-width);
   margin: auto;
-  padding: var(--page-padding);
+  padding: var(--page-inset);
 }
 .columns {
   display: grid;
@@ -83,29 +83,6 @@
 }
 .communityHeader {
   border-bottom: var(--line-width) solid var(--border);
-}
-.communityIdentity {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  min-height: var(--community-header-height);
-  padding-bottom: 20px;
-}
-.communityIdentity h1 {
-  font-family: var(--font-heading);
-  font-size: calc(1.7rem * var(--heading-scale));
-  font-weight: var(--heading-weight);
-  letter-spacing: var(--heading-tracking);
-}
-.communityIdentity p {
-  color: var(--muted-foreground);
-  font-size: 0.9rem;
-  margin-top: 5px;
-  max-width: 65ch;
-}
-.communityIdentity > a:last-child {
-  margin-left: auto;
-  flex-shrink: 0;
 }
 .sortBar {
   display: flex;
@@ -204,16 +181,6 @@
   }
 }
 @media (max-width: 680px) {
-  .communityIdentity {
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  .communityIdentity > div {
-    flex: 1;
-  }
-  .communityIdentity > a:last-child {
-    margin: 0;
-  }
   .directoryCard {
     gap: 12px;
     flex-wrap: wrap;

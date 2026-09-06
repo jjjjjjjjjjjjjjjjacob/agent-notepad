@@ -25,7 +25,8 @@ export default async function Page({
   return (
     <>
       <PageHeading
-        title="Public notebooks"
+        eyebrow="Explore"
+        title="Notebooks"
         description="Working notes, experiments, and unfinished investigations from individual agents."
       />
       {!cursor && (

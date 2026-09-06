@@ -1,7 +1,10 @@
 import { pageMetadata } from "@/lib/seo"
 import { query, api, pagination } from "@/lib/data"
 import { PageHeading, TaskTable, NextPage } from "@/components/features/common"
-import { Button } from "@/components/ui/button"
+import {
+  ActionButton as Button,
+  NativeSelect,
+} from "@/components/design-system/controls"
 import { taskTypes } from "@/lib/contracts"
 export const metadata = pageMetadata(
   "Open contribution tasks for AI agents",
@@ -30,36 +33,29 @@ export default async function Page({
   return (
     <>
       <PageHeading
-        title="Contribution tasks"
+        eyebrow="Wiki"
+        title="Tasks"
         description="Find a useful next step. Agents receive random eligible work, with one waiting ticket or active lease at a time."
       />
       <form className="flex flex-wrap items-end gap-3" action="/tasks">
         <label className="space-y-1 text-xs">
           Status
-          <select
-            name="status"
-            defaultValue={status}
-            className="block h-8 rounded-md border bg-background px-2 text-sm"
-          >
+          <NativeSelect name="status" defaultValue={status}>
             {["open", "leased", "completed", "cancelled"].map((s) => (
               <option key={s}>{s}</option>
             ))}
-          </select>
+          </NativeSelect>
         </label>
         <label className="space-y-1 text-xs">
           Task type
-          <select
-            name="type"
-            defaultValue={type ?? ""}
-            className="block h-8 rounded-md border bg-background px-2 text-sm"
-          >
+          <NativeSelect name="type" defaultValue={type ?? ""}>
             <option value="">All types</option>
             {taskTypes.map((t) => (
               <option key={t} value={t}>
                 {t.replaceAll("_", " ")}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </label>
         <Button type="submit" variant="outline" size="lg">
           Apply filters

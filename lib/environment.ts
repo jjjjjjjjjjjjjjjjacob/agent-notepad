@@ -1,5 +1,7 @@
 export const developmentDeployment = "incredible-boar-27"
 export const productionDeployment = "gregarious-chickadee-782"
+export const productionSiteOrigin = "https://agentnotepad.com"
+export const productionHttpOrigin = "https://api.agentnotepad.com"
 export type Environment = Record<string, string | undefined>
 export function appEnvironment(env: Environment) {
   if (env.VERCEL_ENV === "production") return "production"
@@ -31,7 +33,20 @@ export function validateEnvironment(env: Environment) {
       mode === "production" ? productionDeployment : developmentDeployment
     if (
       cloud.origin !== `https://${target}.convex.cloud` ||
-      site.origin !== `https://${target}.convex.site`
+      site.origin !==
+        (mode === "production"
+          ? productionHttpOrigin
+          : `https://${target}.convex.site`) ||
+      cloud.pathname !== "/" ||
+      site.pathname !== "/" ||
+      !!cloud.search ||
+      !!site.search ||
+      !!cloud.hash ||
+      !!site.hash ||
+      !!cloud.username ||
+      !!cloud.password ||
+      !!site.username ||
+      !!site.password
     )
       throw new Error(
         `${mode} must use the ${target} Convex deployment. Check frontend environment scopes.`
@@ -41,6 +56,13 @@ export function validateEnvironment(env: Environment) {
     throw new Error(
       "NEXT_PUBLIC_SITE_URL is required for frontend links and MCP."
     )
+  if (
+    mode === "production" &&
+    env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "") !== productionSiteOrigin
+  )
+    throw new Error(
+      `Production must use ${productionSiteOrigin} as its public origin.`
+    )
   return mode
 }
 export function allowedFrontendOrigin(origin: string, env: Environment) {
@@ -49,6 +71,8 @@ export function allowedFrontendOrigin(origin: string, env: Environment) {
     configured,
     env.VERCEL_URL && `https://${env.VERCEL_URL}`,
     env.VERCEL_BRANCH_URL && `https://${env.VERCEL_BRANCH_URL}`,
-  ].filter(Boolean)
+  ]
+    .filter(Boolean)
+    .map((value) => value!.replace(/\/$/, ""))
   return origins.includes(origin)
 }

@@ -1,7 +1,7 @@
 .directory {
   max-width: var(--page-width);
   margin: auto;
-  padding: var(--page-padding);
+  padding: var(--page-inset);
 }
 .filters {
   display: flex;
@@ -16,17 +16,6 @@
   gap: 6px;
   font-size: 0.8rem;
   color: var(--muted-foreground);
-}
-.filters input:not([type="checkbox"]),
-.filters select {
-  min-height: 38px;
-  border: var(--line-width) solid var(--border);
-  background: var(--background);
-  color: var(--foreground);
-  border-radius: var(--radius-md);
-  padding: 7px 10px;
-  min-width: 0;
-  width: 100%;
 }
 .searchField {
   flex: 1 1 220px;
@@ -119,7 +108,7 @@
   padding-top: 12px;
 }
 .chat {
-  min-height: calc(100svh - 56px);
+  min-height: var(--shell-content-height, calc(100svh - 56px));
   display: flex;
   flex-direction: column;
 }
@@ -127,26 +116,8 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 18px var(--page-padding);
+  padding: 18px var(--page-inset);
   border-bottom: var(--line-width) solid var(--border);
-}
-.channelHeader h1 {
-  font-family: var(--font-heading);
-  font-size: 1.2rem;
-  font-weight: 650;
-}
-.channelHeader > p {
-  border-left: var(--line-width) solid var(--border);
-  padding-left: 18px;
-  font-size: 0.85rem;
-  color: var(--muted-foreground);
-  max-width: 50ch;
-}
-.publicBadge {
-  margin-left: auto;
-  font-size: 0.75rem;
-  white-space: nowrap;
-  color: var(--muted-foreground);
 }
 .conversation {
   flex: 1;
@@ -323,9 +294,6 @@
 @media (max-width: 760px) {
   .channelHeader > p,
   .activity,
-  .publicBadge {
-    display: none;
-  }
   .channelRow {
     gap: 10px;
   }

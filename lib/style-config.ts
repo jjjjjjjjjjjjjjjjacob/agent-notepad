@@ -5,7 +5,8 @@ type Field = {
   group: string
   css: string
   default: string | number | boolean
-  kind: "number" | "color" | "font" | "boolean"
+  kind: "number" | "color" | "font" | "boolean" | "select"
+  options?: Record<string, string>
   min?: number
   max?: number
   step?: number
@@ -54,6 +55,120 @@ export const fonts: Record<string, { label: string; value: string }> = {
   systemMono: { label: "System mono", value: "ui-monospace, monospace" },
 }
 export const styleFields = {
+  heroVariant: {
+    label: "Particle effect",
+    group: "Hero animation",
+    css: "--hero-variant",
+    default: "constellation",
+    kind: "select",
+    options: {
+      constellation: "Liquid currents",
+      wave: "Wave field",
+      orbit: "Orbital streams",
+      notebook: "Notebook assembly",
+      off: "Off",
+    },
+  } as Field,
+  heroDensity: number(
+    "Particle density",
+    "Hero animation",
+    "--hero-density",
+    1,
+    0.5,
+    2,
+    "×",
+    0.1
+  ),
+  heroSpeed: number(
+    "Animation speed",
+    "Hero animation",
+    "--hero-speed",
+    0.6,
+    0,
+    2,
+    "×",
+    0.1
+  ),
+  heroWind: number(
+    "Drift",
+    "Hero animation",
+    "--hero-wind",
+    1,
+    0,
+    2,
+    "×",
+    0.1
+  ),
+  heroConvection: number(
+    "Liquid circulation",
+    "Hero animation",
+    "--hero-convection",
+    1,
+    0,
+    2,
+    "×",
+    0.1
+  ),
+  heroViscosity: number(
+    "Viscosity",
+    "Hero animation",
+    "--hero-viscosity",
+    0.7,
+    0,
+    1,
+    "",
+    0.05
+  ),
+  heroReach: number(
+    "Particle field height",
+    "Hero animation",
+    "--hero-reach",
+    880,
+    400,
+    1400,
+    "px",
+    40
+  ),
+  heroOpacity: number(
+    "Particle opacity",
+    "Hero animation",
+    "--hero-opacity",
+    0.4,
+    0,
+    1,
+    "",
+    0.05
+  ),
+  heroSize: number(
+    "Particle size",
+    "Hero animation",
+    "--hero-size",
+    1.5,
+    0.5,
+    3,
+    "px",
+    0.1
+  ),
+  heroPointer: number(
+    "Pointer response",
+    "Hero animation",
+    "--hero-pointer",
+    0.25,
+    0,
+    1,
+    "",
+    0.05
+  ),
+  heroPrism: number(
+    "Prismatic light",
+    "Hero animation",
+    "--hero-prism",
+    0.8,
+    0,
+    1,
+    "",
+    0.05
+  ),
   bodyFont: font("Body font", "--ui-font-body", "source"),
   headingFont: font("Heading font", "--ui-font-heading", "manrope"),
   readingFont: font("Article font", "--font-reading", "source"),
@@ -351,7 +466,10 @@ export function parseStyle(value: unknown): StyleConfig {
           ? typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value)
           : field.kind === "font"
             ? typeof value === "string" && Object.hasOwn(fonts, value)
-            : typeof value === "boolean"
+            : field.kind === "select"
+              ? typeof value === "string" &&
+                Object.hasOwn(field.options!, value)
+              : typeof value === "boolean"
     if (!valid) throw new Error(`Invalid value for ${field.label}.`)
     result[key as StyleKey] = value as string | number | boolean
   }
@@ -370,7 +488,7 @@ export function styleTokens(config: StyleConfig): CSSProperties {
           ? value
             ? "block"
             : "none"
-          : `${value}${field.unit ?? ""}`
+          : `${value}${field.unit === "×" ? "" : (field.unit ?? "")}`
   }
   css["--support-width"] = config.supportingPanels ? "260px" : "0px"
   return css as CSSProperties

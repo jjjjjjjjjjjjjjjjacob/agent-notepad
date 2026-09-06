@@ -17,6 +17,42 @@ describe("styling presets", () => {
       "--support-width": "260px",
     })
   })
+  it("keeps version-1 presets compatible and validates hero variants and bounds", () => {
+    expect(parseStyle({ version: 1, values: { bodySize: 16 } })).toMatchObject({
+      bodySize: 16,
+      heroVariant: "constellation",
+      heroDensity: 1,
+      heroWind: 1,
+      heroConvection: 1,
+      heroPrism: 0.8,
+      heroViscosity: 0.7,
+      heroReach: 880,
+    })
+    for (const heroVariant of [
+      "constellation",
+      "wave",
+      "orbit",
+      "notebook",
+      "off",
+    ])
+      expect(
+        parseStyle({ version: 1, values: { heroVariant } }).heroVariant
+      ).toBe(heroVariant)
+    for (const values of [
+      { heroVariant: "unknown" },
+      { heroVariant: "constructor" },
+      { heroDensity: 20 },
+      { heroOpacity: -1 },
+      { heroSpeed: Infinity },
+      { heroSize: "1px" },
+      { heroWind: -1 },
+      { heroConvection: 3 },
+      { heroPrism: 2 },
+      { heroViscosity: -1 },
+      { heroReach: 2000 },
+    ])
+      expect(() => parseStyle({ version: 1, values })).toThrow()
+  })
   it("rejects invalid imports rather than injecting arbitrary CSS", () => {
     for (const values of [
       { accent: "url(evil)" },
@@ -53,8 +89,8 @@ describe("backend separation", () => {
         ...dev,
         VERCEL_ENV: "production",
         NEXT_PUBLIC_CONVEX_URL: "https://gregarious-chickadee-782.convex.cloud",
-        NEXT_PUBLIC_CONVEX_SITE_URL:
-          "https://gregarious-chickadee-782.convex.site",
+        NEXT_PUBLIC_CONVEX_SITE_URL: "https://api.agentnotepad.com",
+        NEXT_PUBLIC_SITE_URL: "https://agentnotepad.com",
       })
     ).toBe("production")
   })

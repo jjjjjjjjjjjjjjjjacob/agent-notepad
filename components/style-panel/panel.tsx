@@ -4,39 +4,62 @@ import { SlidersHorizontalIcon, XIcon } from "@phosphor-icons/react"
 import {
   defaultStyle,
   styleFields,
-  styleTokens,
   stylePresets,
   parseStyle,
   fonts,
-  type StyleConfig,
   type StyleKey,
 } from "@/lib/style-config"
 import styles from "./panel.module.css"
-const storageKey = "agent-notepad:style:v1"
-function savedStyle() {
-  try {
-    const saved = localStorage.getItem(storageKey)
-    return saved ? parseStyle(JSON.parse(saved)) : { ...defaultStyle }
-  } catch {
-    return { ...defaultStyle }
-  }
+import { useUiStyle, setUiStyle, loadStyleOverrides } from "./style-store"
+import { ActionButton, NativeSelect } from "@/components/design-system/controls"
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select"
+
+function StyleSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: string
+  options: Record<string, string>
+  onChange: (value: string) => void
+}) {
+  return (
+    <Select
+      value={value}
+      items={options}
+      onValueChange={(next) => {
+        if (next) onChange(next)
+      }}
+    >
+      <SelectTrigger aria-label={label} className="h-10 w-full text-sm">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {Object.entries(options).map(([id, name]) => (
+          <SelectItem key={id} value={id}>
+            {name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
 }
 export default function StylePanel() {
-  const [values, setValues] = useState<StyleConfig>(savedStyle)
+  const values = useUiStyle()
+  const setValues = setUiStyle
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState("")
   const button = useRef<HTMLButtonElement>(null)
   const heading = useRef<HTMLHeadingElement>(null)
-  useEffect(() => {
-    const tokens = styleTokens(values)
-    for (const [key, value] of Object.entries(tokens))
-      document.documentElement.style.setProperty(key, String(value))
-    try {
-      localStorage.setItem(storageKey, JSON.stringify({ version: 1, values }))
-    } catch {
-      /* Styling remains usable without storage. */
-    }
-  }, [values])
+  useEffect(loadStyleOverrides, [])
   useEffect(() => {
     if (open) heading.current?.focus()
   }, [open])
@@ -72,7 +95,8 @@ export default function StylePanel() {
   }
   return (
     <>
-      <button
+      <ActionButton
+        variant="outline"
         ref={button}
         className={styles.trigger}
         onClick={() => setOpen(!open)}
@@ -81,7 +105,7 @@ export default function StylePanel() {
       >
         <SlidersHorizontalIcon size={18} />
         Style lab
-      </button>
+      </ActionButton>
       {open && (
         <aside
           id="style-panel"
@@ -101,9 +125,13 @@ export default function StylePanel() {
                 Style lab
               </h2>
             </div>
-            <button onClick={close} aria-label="Close style lab">
+            <ActionButton
+              variant="outline"
+              onClick={close}
+              aria-label="Close style lab"
+            >
               <XIcon size={20} />
-            </button>
+            </ActionButton>
           </header>
           <p className={styles.intro}>
             Tune this view live. Changes stay in this browser; export a preset
@@ -112,7 +140,7 @@ export default function StylePanel() {
           <div className={styles.presets}>
             <label>
               Preset
-              <select
+              <NativeSelect
                 defaultValue=""
                 onChange={(e) => {
                   const preset = stylePresets[e.target.value]
@@ -125,22 +153,24 @@ export default function StylePanel() {
                 {Object.keys(stylePresets).map((name) => (
                   <option key={name}>{name}</option>
                 ))}
-              </select>
+              </NativeSelect>
             </label>
-            <button
+            <ActionButton
+              variant="outline"
               onClick={() => {
                 setValues({ ...defaultStyle })
                 setStatus("All settings reset.")
               }}
             >
               Reset all
-            </button>
+            </ActionButton>
           </div>
           {[...new Set(Object.values(styleFields).map((f) => f.group))].map(
             (group) => (
               <details key={group} open={group === "Typography"}>
                 <summary>{group}</summary>
-                <button
+                <ActionButton
+                  variant="outline"
                   className={styles.sectionReset}
                   aria-label={`Reset ${group}`}
                   onClick={() => {
@@ -155,7 +185,7 @@ export default function StylePanel() {
                   }}
                 >
                   Reset
-                </button>
+                </ActionButton>
                 <div className={styles.fields}>
                   {Object.entries(styleFields)
                     .filter(([, f]) => f.group === group)
@@ -172,23 +202,24 @@ export default function StylePanel() {
                             </output>
                           )}
                         </span>
-                        {field.kind === "font" ? (
-                          <select
-                            aria-label={field.label}
+                        {field.kind === "font" || field.kind === "select" ? (
+                          <StyleSelect
+                            label={field.label}
                             value={String(values[key as StyleKey])}
-                            onChange={(e) =>
-                              setValues((v) => ({
-                                ...v,
-                                [key]: e.target.value,
-                              }))
+                            options={
+                              field.kind === "font"
+                                ? Object.fromEntries(
+                                    Object.entries(fonts).map(([id, font]) => [
+                                      id,
+                                      font.label,
+                                    ])
+                                  )
+                                : field.options!
                             }
-                          >
-                            {Object.entries(fonts).map(([id, f]) => (
-                              <option key={id} value={id}>
-                                {f.label}
-                              </option>
-                            ))}
-                          </select>
+                            onChange={(value) =>
+                              setValues((v) => ({ ...v, [key]: value }))
+                            }
+                          />
                         ) : field.kind === "boolean" ? (
                           <input
                             aria-label={field.label}
@@ -227,7 +258,9 @@ export default function StylePanel() {
             )
           )}
           <footer>
-            <button onClick={download}>Export JSON</button>
+            <ActionButton variant="outline" onClick={download}>
+              Export JSON
+            </ActionButton>
             <label className={styles.import}>
               Import JSON
               <input

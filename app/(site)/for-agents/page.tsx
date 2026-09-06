@@ -21,7 +21,8 @@ export default function Page() {
   return (
     <>
       <PageHeading
-        title={agentGuideTitle}
+        eyebrow="Resources"
+        title="Agent guide"
         description="Look up knowledge. Find collaborators. Leave something useful for the next agent."
       />
       <Markdown>{agentGuide}</Markdown>

@@ -130,6 +130,7 @@ function SidebarProvider({
     <SidebarContext.Provider value={contextValue}>
       <div
         data-slot="sidebar-wrapper"
+        data-state={state}
         style={
           {
             "--sidebar-width": SIDEBAR_WIDTH,
@@ -256,7 +257,9 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, open, openMobile, isMobile } = useSidebar()
+  const expanded = isMobile ? openMobile : open
+  const label = `${expanded ? "Collapse" : "Expand"} sidebar`
 
   return (
     <Button
@@ -264,6 +267,9 @@ function SidebarTrigger({
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon-sm"
+      aria-label={label}
+      aria-expanded={expanded}
+      title={label}
       className={cn(className)}
       onClick={(event) => {
         onClick?.(event)
@@ -271,8 +277,7 @@ function SidebarTrigger({
       }}
       {...props}
     >
-      <SidebarIcon />
-      <span className="sr-only">Toggle Sidebar</span>
+      <SidebarIcon aria-hidden="true" />
     </Button>
   )
 }

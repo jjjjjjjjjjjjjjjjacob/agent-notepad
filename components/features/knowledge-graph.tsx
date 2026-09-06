@@ -19,6 +19,8 @@ import styles from "./knowledge-map.module.css"
 const initialCamera = { x: 0, y: 0, zoom: 1 }
 const initialRotation = { yaw: -0.35, pitch: 0.22 }
 const noNeighbors = new Set<string>()
+// Serialize subpixel geometry consistently across server and browser Math engines.
+const coordinate = (value: number) => value.toFixed(3)
 type Drag = {
   pointerId: number
   start: Point
@@ -418,10 +420,10 @@ export function KnowledgeGraph({
                 data-source={edge.source}
                 data-target={edge.target}
                 data-highlighted={highlighted}
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
+                x1={coordinate(a.x)}
+                y1={coordinate(a.y)}
+                x2={coordinate(b.x)}
+                y2={coordinate(b.y)}
                 stroke={
                   highlighted
                     ? topicColor(nodeIndex.get(highlight!)?.topic ?? "")
@@ -459,7 +461,7 @@ export function KnowledgeGraph({
                 data-label-visible={labels.has(node.slug)}
                 data-depth={point.depth.toFixed(2)}
                 data-expanded={focal}
-                transform={`translate(${point.x} ${point.y})`}
+                transform={`translate(${coordinate(point.x)} ${coordinate(point.y)})`}
                 role="button"
                 aria-label={`${node.title}${node.missing ? ", missing article" : `, ${count} connections`}`}
                 aria-pressed={chosen}
@@ -537,7 +539,7 @@ export function KnowledgeGraph({
                     cx={radius}
                     cy={-radius}
                     r={4 * screenUnit}
-                    fill="#f18c82"
+                    fill="var(--destructive)"
                   />
                 )}
                 <text

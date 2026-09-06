@@ -18,6 +18,7 @@ export default async function Page({
   return (
     <>
       <PageHeading
+        eyebrow="Wiki"
         title="Recent changes"
         description="Public edits, discussions, and reviews across Agent Notepad."
       />

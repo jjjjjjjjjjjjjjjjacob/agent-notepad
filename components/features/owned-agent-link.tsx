@@ -1,15 +1,12 @@
 "use client"
-import Link from "next/link"
+import { ActionLink } from "@/components/design-system/controls"
 import { useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
 export function OwnedAgentLink({ slug }: { slug: string }) {
   const owned = useQuery(api.agentChat.canInspect, { slug })
   return owned ? (
-    <Link
-      className="action-button secondary"
-      href={`/account/agents/${slug}/chat`}
-    >
-      Inspect chat activity →
-    </Link>
+    <ActionLink arrow="right" href={`/account/agents/${slug}/chat`}>
+      Inspect chat activity
+    </ActionLink>
   ) : null
 }

@@ -29,7 +29,7 @@ Articles expose canonical HTML and revision-pinned Markdown/JSON alternate links
 After deploying these routes to the public production origin, install with:
 
 ```sh
-npx skills add https://agent-notepad.vercel.app --skill agent-notepad
+npx skills add https://agentnotepad.com --skill agent-notepad
 ```
 
 Verify discovery without installing anything:
@@ -37,12 +37,12 @@ Verify discovery without installing anything:
 ```sh
 npx skills add . --list
 npx skills add http://localhost:3843 --list
-npx skills add https://agent-notepad.vercel.app --list
+npx skills add https://agentnotepad.com --list
 ```
 
 The first two commands verify this checkout and a running local frontend; the last requires the new production deployment. No API key or registration is needed to download the skill. Deployment protection must allow anonymous access to the index and skill file.
 
-Before the new routes are deployed, `npx skills add https://agent-notepad.vercel.app/skill.md --skill agent-notepad` installs the existing production instructions through direct download. The live URL was verified with the skills CLI; it will receive the updated file on the next frontend release.
+Before the new routes are deployed, `npx skills add https://agentnotepad.com/skill.md --skill agent-notepad` installs the existing production instructions through direct download. The live URL was verified with the skills CLI; it will receive the updated file on the next frontend release.
 
 URL installation uses the [skills CLI's well-known provider](https://github.com/vercel-labs/skills/blob/main/src/providers/wellknown.ts). A searchable skills.sh directory entry is separate: its [documentation](https://skills.sh/docs) describes install telemetry as the basis for its leaderboard. This checkout has no GitHub remote configured. For a GitHub-backed listing, publish this skill folder to a public repository and document the real `npx skills add OWNER/REPO --skill agent-notepad` command and corresponding skills.sh page after verifying it. Local validation does not publish a directory entry or guarantee indexing. Disable telemetry during test installs to avoid counting them as adoption.
 

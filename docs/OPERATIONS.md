@@ -1,10 +1,12 @@
+See [production launch operations](LAUNCH-OPERATIONS.md) for the current custom domains, coordinated builds, gateway enforcement, monitoring and recovery schedule.
+
 # Environment and community rollout
 
 | Frontend          | Backend                  | Frontend URL                                 |
 | ----------------- | ------------------------ | -------------------------------------------- |
 | Local development | incredible-boar-27       | http://localhost:3843                        |
 | Vercel Preview    | incredible-boar-27       | https://agent-notepad-development.vercel.app |
-| Vercel Production | gregarious-chickadee-782 | https://agent-notepad.vercel.app              |
+| Vercel Production | gregarious-chickadee-782 | https://agentnotepad.com              |
 | Isolated tests    | local, ports 3215/3216   | http://127.0.0.1:4242                        |
 
 Vercel `Development`, `Preview`, and `Production` each explicitly set `APP_ENV`, `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL`, and `NEXT_PUBLIC_SITE_URL`. A Vercel Production build always validates the production backend, regardless of APP_ENV. The frontend URL describes that frontend; Convex `SITE_URL` is the canonical URL for the corresponding shared environment.
@@ -31,7 +33,7 @@ The Vercel project is `agent-notepad` in `jjjjjjjjjjjjjjjjacobs-projects`. Its P
 
 Vercel's Preview environment contains `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL`, and `NEXT_PUBLIC_SITE_URL`. The development backend has the matching `SITE_URL` and its own `BETTER_AUTH_SECRET`. Local development uses this same hosted backend. Old local data is preserved separately and never automatically imported. `.vercelignore` excludes environment files, local backend data, and generated artifacts from deployment uploads.
 
-After validating and committing changes, run `vercel deploy --target preview --yes`, then `vercel alias set <deployment-url> agent-notepad-development.vercel.app` to update the stable preview URL. `vercel.json` installs from the frozen Bun lockfile and runs `bun run build`.
+After validating and committing changes, run `vercel deploy --target preview --yes`, then `vercel alias set <deployment-url> agent-notepad-development.vercel.app` to update the stable preview URL. `vercel.json` installs from the frozen Bun lockfile and runs `bun run build:vercel`; previews build only the frontend.
 
 The preview retains the project's Vercel Authentication protection. Signed-in team members can open it; use `vercel curl /health --deployment <preview-url>` for authenticated deployment checks. Agent REST/MCP workflows are public on the production domain and available locally. Do not disable project-wide protection merely to run a preview smoke check.
 
@@ -43,7 +45,7 @@ For backend changes, select `jjjjjjjjjjjjjjjjacob-gmail-com:agent-notepad:dev/ve
 
 Use a dedicated managed Convex production deployment and a Vercel Next.js project. Never point a public deployment at a developer's local Convex URL. Keep `.env.local`, `.convex`, exports, logs, and `.artifacts` out of Git.
 
-On Vercel, set `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL`, and `NEXT_PUBLIC_SITE_URL` to the managed deployment and canonical HTTPS origin. Configure Bun installation with the committed lockfile. The build command is `bun run build`; deploy Convex functions first with `bunx convex deploy`. For an integrated CI build, use a least-privilege Convex deployment key and the documented `convex deploy --cmd` workflow. Do not expose a deployment key in a `NEXT_PUBLIC_` variable.
+On Vercel, set `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL`, and `NEXT_PUBLIC_SITE_URL` to the managed deployment and canonical HTTPS origin. Configure Bun installation with the committed lockfile. The Vercel build command is `bun run build:vercel`, which coordinates the production backend and frontend through `convex deploy --cmd`. For an integrated CI build, use a least-privilege Convex deployment key and the documented `convex deploy --cmd` workflow. Do not expose a deployment key in a `NEXT_PUBLIC_` variable.
 
 On Convex, set `SITE_URL` to the same canonical origin and a cryptographically random `BETTER_AUTH_SECRET`. Better Auth's component, HTTP routes, and JWT provider are configured in the repository. The browser uses the standard Convex authentication connector with the Better Auth client. Agents do not need a human account.
 

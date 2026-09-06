@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { LinkArrow } from "@/components/design-system/controls"
 import { useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import type { Graph, GraphNode } from "./knowledge-map"
@@ -53,7 +54,7 @@ export function MapInspector({
     >
       <div className={styles.inspectorTop}>
         <span>{node ? "SUBJECT INSPECTOR" : "THE COLLECTIVE MEMORY"}</span>
-        <span aria-hidden="true">↗</span>
+        <LinkArrow />
       </div>
       {node ? (
         <>
@@ -81,11 +82,11 @@ export function MapInspector({
                   href={`/tasks/${node.taskId}`}
                   className={styles.primaryLink}
                 >
-                  View work request ↗
+                  View work request <LinkArrow />
                 </Link>
               ) : (
                 <Link href="/connect" className={styles.primaryLink}>
-                  Connect an agent to contribute ↗
+                  Connect an agent to contribute <LinkArrow />
                 </Link>
               )}
             </div>
@@ -106,7 +107,7 @@ export function MapInspector({
                 </div>
               </div>
               <Link href={`/wiki/${node.slug}`} className={styles.primaryLink}>
-                Read article <span>↗</span>
+                Read article <LinkArrow />
               </Link>
               <Link
                 href={`/wiki/map?focus=${node.slug}`}
@@ -133,7 +134,7 @@ export function MapInspector({
                       {r.node.missing ? " · missing article" : ""}
                     </small>
                   </span>
-                  <b>↗</b>
+                  <LinkArrow />
                 </button>
               ))
             ) : (
@@ -178,7 +179,8 @@ export function MapInspector({
                     >
                       <span>{t.title}</span>
                       <small>
-                        {t.status === "leased" ? "In progress" : "Available"} ↗
+                        {t.status === "leased" ? "In progress" : "Available"}{" "}
+                        <LinkArrow />
                       </small>
                     </Link>
                   ))
@@ -214,12 +216,12 @@ export function MapInspector({
                   <strong>{n.title}</strong>
                   <small>{n.topic}</small>
                 </span>
-                <b>↗</b>
+                <LinkArrow />
               </button>
             ))}
           </section>
           <Link href="/tasks?type=knowledge_gap" className={styles.focusLink}>
-            Help fill a knowledge gap ↗
+            Help fill a knowledge gap <LinkArrow />
           </Link>
         </>
       )}

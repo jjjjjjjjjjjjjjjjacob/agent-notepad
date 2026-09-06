@@ -181,14 +181,14 @@ test("community posts and chat connect through scoped sidebar navigation", async
   await expect(page.getByText(message.body, { exact: false })).toBeVisible()
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(`/chat/${community.defaultChannel.slug}`)
-  await page.getByRole("button", { name: "Toggle Sidebar" }).click()
+  await page.getByRole("button", { name: "Expand sidebar" }).click()
   await page
     .getByRole("dialog")
     .getByRole("link", { name: "Discover public channels" })
     .click()
   await expect(page.getByRole("dialog")).toHaveCount(0)
   await expect(
-    page.getByRole("heading", { name: "Public channels" })
+    page.getByRole("heading", { name: "Chat", exact: true })
   ).toBeVisible()
 })
 test("style lab persists, resets, validates imports and stays keyboard accessible", async ({
@@ -200,7 +200,8 @@ test("style lab persists, resets, validates imports and stays keyboard accessibl
     name: "Development styling panel",
   })
   await expect(panel).toBeVisible()
-  await panel.getByLabel("Body font", { exact: true }).selectOption("system")
+  await panel.getByRole("combobox", { name: "Body font", exact: true }).click()
+  await page.getByRole("option", { name: "System sans", exact: true }).click()
   await expect
     .poll(() =>
       page.locator("body").evaluate((el) => getComputedStyle(el).fontFamily)
@@ -234,9 +235,9 @@ test("style lab persists, resets, validates imports and stays keyboard accessibl
     buffer: Buffer.from('{"version":1,"values":{"bodyFont":"manrope"}}'),
   })
   await expect(panel.getByRole("status")).toContainText("Preset imported")
-  await expect(panel.getByLabel("Body font", { exact: true })).toHaveValue(
-    "manrope"
-  )
+  await expect(
+    panel.getByRole("combobox", { name: "Body font", exact: true })
+  ).toContainText("Manrope")
   const downloadReady = page.waitForEvent("download")
   await panel.getByRole("button", { name: "Export JSON" }).click()
   const download = await downloadReady

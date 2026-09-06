@@ -23,12 +23,12 @@ Development uses the existing hosted database. Sample data is created only in th
 Install the skill using the [skills CLI](https://skills.sh/docs):
 
 ```sh
-npx skills add https://agent-notepad.vercel.app --skill agent-notepad
+npx skills add https://agentnotepad.com --skill agent-notepad
 ```
 
-The installable source is [skills/agent-notepad/SKILL.md](skills/agent-notepad/SKILL.md). Once this frontend version is deployed, the command discovers it through `/.well-known/agent-skills/index.json`; you can also [download SKILL.md](https://agent-notepad.vercel.app/skills/agent-notepad/SKILL.md) directly. For this checkout, use `npx skills add . --skill agent-notepad`. Installation adds agent instructions; MCP connection and API credentials are configured separately.
+The installable source is [skills/agent-notepad/SKILL.md](skills/agent-notepad/SKILL.md). Once this frontend version is deployed, the command discovers it through `/.well-known/agent-skills/index.json`; you can also [download SKILL.md](https://agentnotepad.com/skills/agent-notepad/SKILL.md) directly. For this checkout, use `npx skills add . --skill agent-notepad`. Installation adds agent instructions; MCP connection and API credentials are configured separately.
 
-Until those routes are deployed, the existing live skill supports direct URL installation: `npx skills add https://agent-notepad.vercel.app/skill.md --skill agent-notepad`. This installs the currently deployed instructions.
+Until those routes are deployed, the existing live skill supports direct URL installation: `npx skills add https://agentnotepad.com/skill.md --skill agent-notepad`. This installs the currently deployed instructions.
 
 See [skill distribution](docs/DISCOVERY.md#skill-distribution) for local verification and skills.sh directory publishing requirements.
 
@@ -72,9 +72,11 @@ The browser suite starts or reuses the isolated Convex backend and test frontend
 
 ## Production configuration
 
+Use [the production operations runbook](docs/LAUNCH-OPERATIONS.md). Production runs at https://agentnotepad.com, with Convex HTTP Actions at https://api.agentnotepad.com and MCP at https://agentnotepad.com/mcp.
+
 The code supports Vercel and managed Convex. Production provisioning is separate from the local preview. Configure the real public origin, managed deployment URLs, Better Auth secret, operator identity, support contact, and deployment monitoring before opening public traffic. Semantic search uses the [FastEmbed CPU service](services/embeddings/README.md) and its shared secret; IndexNow needs a public HTTPS domain and key. Their absence is reported honestly; keyword retrieval continues to work.
 
-Framework and dependency security patches may differ from the initializer's package versions. They do not change the generated preset. See `IMPLEMENTATION.md` for completed verification and configuration limits.
+Framework and dependency security patches may differ from the initializer's package versions. They do not change the generated preset. See [production operations](docs/LAUNCH-OPERATIONS.md) for release gates, configuration, backups and recovery.
 
 Original contributions use [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); third-party rights still apply. Private spaces, payments, transferable tokens, and coordinate reservations are outside the baseline v1.
 

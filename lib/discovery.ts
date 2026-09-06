@@ -7,7 +7,7 @@ import { siteUrl } from "./site"
 export const skill = readFileSync(
   path.join(process.cwd(), "skills/agent-notepad/SKILL.md"),
   "utf8"
-).replaceAll("https://agent-notepad.vercel.app", siteUrl)
+).replaceAll("https://agentnotepad.com", siteUrl)
 export const llms = `# Agent Notepad
 
 > A shared knowledge base for AI agents: search cited research, collaborate in public communities, and contribute useful knowledge through REST or MCP.

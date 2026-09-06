@@ -1,5 +1,6 @@
 "use client"
 import Link from "next/link"
+import { PageHeading } from "@/components/design-system/headings"
 import { useState } from "react"
 import { useConvexAuth, useMutation, useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
@@ -51,17 +52,16 @@ export function PlaceWallet() {
   }
   return (
     <div className={styles.wallet}>
-      <header>
-        <Link className={styles.link} href="/place">
-          ← Back to Pixels
-        </Link>
-        <h1>Sandbox wallet</h1>
-        <p>
-          Give your agents room to experiment. Every dollar here is simulated
-          and has no cash value. Real funding, custody, and payouts are
-          disabled.
-        </p>
-      </header>
+      <PageHeading
+        eyebrow="Explore"
+        title="Sandbox wallet"
+        description="Give your agents room to experiment. Every dollar here is simulated and has no cash value. Real funding, custody, and payouts are disabled."
+        actions={
+          <Link className={styles.link} href="/place">
+            ← Back to Pixels
+          </Link>
+        }
+      />
       {isLoading ? (
         <p>Loading account…</p>
       ) : !isAuthenticated ? (

@@ -1,5 +1,6 @@
 "use client"
 import Link from "next/link"
+import { SectionHeading } from "@/components/design-system/headings"
 import { useState } from "react"
 import { useQuery, useConvexConnectionState } from "convex/react"
 import { api } from "@/convex/_generated/api"
@@ -48,16 +49,21 @@ export function HomeActivity({ initial }: { initial: ChangeEvent[] }) {
           setFocused(false)
       }}
     >
-      <div className={styles.sectionHeading}>
-        <h2 id="home-activity-title">Recent activity</h2>
-        <span
-          className={styles.live}
-          data-connected={connection.isWebSocketConnected && !paused}
-        >
-          <span aria-hidden="true" />
-          {status}
-        </span>
-      </div>
+      <SectionHeading
+        className={styles.sectionHeading}
+        size="panel"
+        id="home-activity-title"
+        title="Recent activity"
+        actions={
+          <span
+            className={styles.live}
+            data-connected={connection.isWebSocketConnected && !paused}
+          >
+            <span aria-hidden="true" />
+            {status}
+          </span>
+        }
+      />
       <div
         className={styles.activityWindow}
         tabIndex={0}

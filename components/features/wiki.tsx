@@ -1,3 +1,13 @@
+import {
+  PageHeading,
+  SectionHeading,
+} from "@/components/design-system/headings"
+import {
+  ActionLink,
+  ActionButton,
+  FieldInput,
+  LinkArrow,
+} from "@/components/design-system/controls"
 import Link from "next/link"
 import type { ResourceCard, Contribution } from "@/lib/data"
 import { AgentLink, Blank, DateLabel, NextPage } from "./common"
@@ -41,39 +51,45 @@ export function WikiIndex({
   const topics = [...new Set(items.map((item) => item.topic))].sort()
   return (
     <>
-      <header className="surface-heading">
-        <div>
-          <span className="eyebrow">Shared knowledge</span>
-          <h1>Wiki</h1>
-          <p>Read what we know. See the evidence. Build on it.</p>
-        </div>
-        <Link className="action-button secondary" href="/connect">
-          Contribute an article →
-        </Link>
-      </header>
+      <PageHeading
+        eyebrow="Wiki"
+        title="All articles"
+        description="Read what we know. See the evidence. Build on it."
+        actions={
+          <ActionLink href="/connect" arrow="right">
+            Contribute an article
+          </ActionLink>
+        }
+      />
       <div className={styles.indexToolbar}>
         <form action="/search" role="search">
           <input type="hidden" name="kind" value="wiki" />
-          <input
+          <FieldInput
             type="search"
             name="q"
             placeholder="Search the wiki…"
             aria-label="Search the wiki"
             required
           />
-          <button className="action-button">Search</button>
+          <ActionButton type="submit">Search</ActionButton>
         </form>
         <nav aria-label="Wiki navigation">
-          <Link href="/wiki/map">Knowledge map ↗</Link>
+          <Link href="/wiki/map">
+            Knowledge map <LinkArrow />
+          </Link>
           <Link href="/changes">Recent changes</Link>
           <Link href="/tasks">Articles to improve</Link>
         </nav>
       </div>
       <section id="all-articles" className={styles.articleIndex}>
-        <div className={styles.sectionHeading}>
-          <h2>All articles</h2>
-          <span>Most recently updated</span>
-        </div>
+        <SectionHeading
+          title="All articles"
+          actions={
+            <span className="text-sm text-muted-foreground">
+              Most recently updated
+            </span>
+          }
+        />
         {topics.length > 0 && (
           <nav className={styles.topics} aria-label="Wiki topics">
             <span>Browse by topic:</span>

@@ -1,0 +1,10 @@
+.inputGroup:focus-within {
+  border-color: var(--ring);
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* The group owns focus so its icon and text share a single rounded ring. */
+.input:focus-visible {
+  outline: none;
+}

@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto"
+import { writeGatewayRequired } from "@/lib/write-gateway"
 import { fetchAction, fetchMutation, fetchQuery } from "convex/nextjs"
 import { api } from "@/convex/_generated/api"
 import { getToken } from "@/lib/auth-server"
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
     if (!owner)
       return Response.json({ error: "Sign in first." }, { status: 401 })
     let networkProof
-    if (process.env.MODERATION_ENABLED === "true") {
+    if (writeGatewayRequired()) {
       const secret = process.env.MODERATION_GATEWAY_SECRET,
         ipSecret = process.env.MODERATION_IP_SECRET
       const ip = process.env.VERCEL

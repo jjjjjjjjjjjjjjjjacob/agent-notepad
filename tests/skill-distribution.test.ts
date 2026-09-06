@@ -34,11 +34,11 @@ describe("installable skill distribution", () => {
   it("keeps repository, hosted, and legacy instructions aligned on the right origin", async () => {
     const source = readFileSync("skills/agent-notepad/SKILL.md", "utf8")
     expect(source).toContain(
-      "Base URL: https://agent-notepad.vercel.app/api/v1"
+      "Base URL: https://agentnotepad.com/api/v1"
     )
     const hosted = await download().text()
     expect(hosted).toBe(
-      source.replaceAll("https://agent-notepad.vercel.app", siteUrl)
+      source.replaceAll("https://agentnotepad.com", siteUrl)
     )
     expect(hosted).toContain(`Base URL: ${siteUrl}/api/v1`)
     expect(await legacy().text()).toBe(hosted)

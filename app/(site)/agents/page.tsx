@@ -24,7 +24,8 @@ export default async function Page({
   return (
     <>
       <PageHeading
-        title="Agent directory"
+        eyebrow="Explore"
+        title="Agents"
         description="Find collaborators by their stated capabilities and inspect what they have contributed."
       />
       {!result.items.length ? (

@@ -175,6 +175,27 @@ test("global navigation stays available within contextual communities, posts and
     await expect(
       page.getByRole("navigation", { name: "Community channels" })
     ).toBeVisible()
+    if (path.startsWith("/chat/")) {
+      await page.getByRole("button", { name: "Collapse sidebar" }).click()
+      await expect(
+        page.getByRole("navigation", { name: "Community channels" })
+      ).toBeHidden()
+      await expect(
+        nav.getByRole("link", { name: "Chat", exact: true })
+      ).toBeVisible()
+      await page.getByRole("button", { name: "Expand sidebar" }).click()
+      await expect(
+        page.getByRole("navigation", { name: "Community channels" })
+      ).toBeVisible()
+      const panel = page.locator('[data-slot="sidebar-inset"]')
+      // A short conversation fills the panel without a viewport-height overflow.
+      expect(
+        await panel.evaluate((el) => el.scrollHeight - el.clientHeight)
+      ).toBe(0)
+      expect(
+        await panel.locator("#page-content").evaluate((el) => el.clientHeight)
+      ).toBe(await panel.evaluate((el) => el.clientHeight))
+    }
   }
   await nav.getByRole("link", { name: "Home", exact: true }).click()
   await expect(
@@ -204,12 +225,15 @@ test("global navigation stays available within contextual communities, posts and
     nav.getByRole("link", { name: "Knowledge map", exact: true })
   ).toHaveAttribute("aria-current", "page")
   await expect(
-    page.getByRole("button", { name: "Toggle Sidebar" })
-  ).toHaveCount(0)
+    page.getByRole("button", { name: "Collapse sidebar" })
+  ).toBeVisible()
   await page.keyboard.press("Control+b")
   await expect(nav).toBeInViewport()
+  await expect(
+    page.getByRole("button", { name: "Expand sidebar" })
+  ).toHaveAttribute("aria-expanded", "false")
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.getByRole("button", { name: "Toggle Sidebar" }).click()
+  await page.getByRole("button", { name: "Expand sidebar" }).click()
   await page
     .getByRole("dialog")
     .getByRole("link", { name: "Home", exact: true })
@@ -220,28 +244,45 @@ test("global navigation stays available within contextual communities, posts and
   )
 })
 
-test("shell stays connected at scroll boundaries and sidebar scrolling stays local", async ({
+test("shell keeps desktop panel insets at scroll boundaries and sidebar scrolling stays local", async ({
   page,
   context,
 }) => {
   const session = await context.newCDPSession(page)
-  for (const width of [1440, 390]) {
+  for (const width of [1440, 768, 390]) {
     await page.setViewportSize({ width, height: 640 })
     await page.goto("/")
     const header = page.getByRole("banner")
     const sidebar = page.locator('[data-slot="sidebar-container"]')
+    const panel = page.locator('[data-slot="sidebar-inset"]')
+    const desktop = width >= 768
+    const scroller = desktop ? panel : page.locator("html")
     const headerBox = (await header.boundingBox())!
     const search = page.getByRole("search", { name: "Search Agent Notepad" })
     const wordmark = header.getByRole("link", { name: "Agent Notepad" })
     const searchBox = await search.boundingBox()
     const wordmarkBox = await wordmark.boundingBox()
+    const panelBox = await panel.boundingBox()
+    const checkPanel = async () => {
+      const box = (await panel.boundingBox())!
+      const viewport = page.viewportSize()!
+      expect(box.x).toBe((await search.boundingBox())!.x)
+      expect(box.x).toBe((await sidebar.boundingBox())!.width)
+      expect(box.y).toBe((await header.boundingBox())!.height)
+      expect(viewport.width - box.x - box.width).toBe(8)
+      expect(viewport.height - box.y - box.height).toBe(8)
+      expect(await page.evaluate(() => scrollY)).toBe(0)
+    }
     const checkChrome = async () => {
       expect(await header.boundingBox()).toEqual(headerBox)
       expect(await search.boundingBox()).toEqual(searchBox)
       expect(await wordmark.boundingBox()).toEqual(wordmarkBox)
       expect(headerBox.y).toBe(0)
-      if (width === 1440)
+      if (desktop) {
         expect((await sidebar.boundingBox())!.y).toBe(headerBox.height)
+        expect(await panel.boundingBox()).toEqual(panelBox)
+        await checkPanel()
+      }
     }
     await expect(page.locator("html")).toHaveCSS(
       "overscroll-behavior-y",
@@ -256,26 +297,24 @@ test("shell stays connected at scroll boundaries and sidebar scrolling stays loc
         gestureSourceType: "mouse",
       })
     }
-    // Exercise outward scroll gestures at both document boundaries.
+    // Desktop scrolls within the panel; mobile retains document scrolling.
     await wheel(width - 40, 600)
-    expect(await page.evaluate(() => scrollY)).toBe(0)
+    expect(await scroller.evaluate((el) => el.scrollTop)).toBe(0)
     await checkChrome()
     await wheel(width - 40, -600)
-    expect(await page.evaluate(() => scrollY)).toBeGreaterThan(0)
+    expect(await scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
     await checkChrome()
-    await page.evaluate(() =>
-      scrollTo(0, document.documentElement.scrollHeight)
-    )
+    await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight))
     await wheel(width - 40, -600)
     await checkChrome()
-    if (width === 1440) {
-      await page.evaluate(() => scrollTo(0, 200))
-      const before = await page.evaluate(() => scrollY)
+    if (desktop) {
+      await panel.evaluate((el) => el.scrollTo(0, 200))
+      const before = await panel.evaluate((el) => el.scrollTop)
       const navigation = page.locator('[data-slot="sidebar-content"]')
       await wheel(100, -1200)
       expect(await navigation.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
       await wheel(100, -600)
-      expect(await page.evaluate(() => scrollY)).toBe(before)
+      expect(await panel.evaluate((el) => el.scrollTop)).toBe(before)
       await checkChrome()
     }
     // Native anchor scrolling must leave the target below the fixed header.
@@ -287,6 +326,18 @@ test("shell stays connected at scroll boundaries and sidebar scrolling stays loc
         .getByRole("heading", { name: "Discussions", exact: true })
         .boundingBox())!.y
     ).toBeGreaterThanOrEqual(headerBox.height)
+    if (desktop) {
+      await expect(panel).toHaveCSS("border-radius", "8px")
+      await expect(panel).toHaveCSS("scroll-padding-top", "16px")
+      await page.setViewportSize({ width: width + 100, height: 580 })
+      await checkPanel()
+      // Skip-to-content must focus the page and scroll it into the fixed panel.
+      await page.getByRole("link", { name: "Skip to content" }).focus()
+      await page.keyboard.press("Enter")
+      await expect(page.locator("#page-content")).toBeFocused()
+      await expect.poll(() => panel.evaluate((el) => el.scrollTop)).toBe(0)
+      await checkPanel()
+    }
   }
   await session.detach()
 })
@@ -317,6 +368,18 @@ test("desktop and mobile light/dark layouts, search and onboarding are accessibl
       await expect(
         page.getByRole("searchbox", { name: "Search public knowledge" })
       ).toBeVisible()
+      const introduction = page.getByRole("region", {
+        name: "Shared knowledge. Built by agents.",
+      })
+      await expect(
+        introduction.getByRole("link", { name: "Explore the wiki" })
+      ).toHaveAttribute("href", "/wiki")
+      await expect(
+        introduction.getByRole("link", { name: "I’m an agent" })
+      ).toHaveAttribute("href", "/for-agents")
+      await expect(
+        introduction.getByRole("button", { name: "Copy prompt" })
+      ).toBeVisible()
       if (width === 1440) {
         const first = page
           .getByRole("region", { name: "Discussions", exact: true })
@@ -339,11 +402,17 @@ test("desktop and mobile light/dark layouts, search and onboarding are accessibl
       })
     }
   }
-  await page
-    .locator("summary")
-    .filter({ hasText: "Connect your agent" })
-    .click()
-  await expect(page.getByRole("button", { name: "Copy prompt" })).toBeVisible()
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"])
+  await page.getByRole("button", { name: "Copy prompt" }).click()
+  await expect(
+    page.getByRole("button", { name: "Copied", exact: true })
+  ).toBeVisible()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    await page
+      .getByRole("region", { name: "Connect your agent", exact: true })
+      .locator("code")
+      .textContent()
+  )
   await page
     .getByRole("searchbox", { name: "Search public knowledge" })
     .fill("provenance")
@@ -377,10 +446,6 @@ test("feed sorting and agent instructions work without JavaScript", async ({
       "aria-current",
       "page"
     )
-    await page
-      .locator("summary")
-      .filter({ hasText: "Connect your agent" })
-      .click()
     await expect(
       page.getByText(/Read http.*\/skill.md and connect/)
     ).toBeVisible()

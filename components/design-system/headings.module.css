@@ -1,0 +1,130 @@
+.page {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 24px;
+}
+.copy {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.eyebrow {
+  margin-bottom: 5px;
+  font:
+    600 11px/1.5 var(--font-sans),
+    sans-serif;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.title {
+  margin: 0;
+  font-family: var(--font-heading), sans-serif;
+  font-size: calc(32px * var(--heading-scale));
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--heading-tracking);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.description {
+  margin: 10px 0 0;
+  max-width: 640px;
+  color: var(--muted-foreground);
+  font-size: 15px;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.leading {
+  flex-shrink: 0;
+}
+.page[data-variant="channel"] .title {
+  font-size: calc(24px * var(--heading-scale));
+}
+.page[data-variant="channel"] .description {
+  font-size: 14px;
+  margin-top: 6px;
+}
+@media (min-width: 768px) {
+  .page[data-variant="channel"] .copy {
+    display: grid;
+    grid-template-columns: minmax(220px, auto) minmax(0, 1fr);
+    align-items: center;
+    column-gap: 24px;
+  }
+  .page[data-variant="channel"] .eyebrow {
+    grid-column: 1;
+  }
+  .page[data-variant="channel"] .titleRow {
+    grid-column: 1;
+  }
+  .page[data-variant="channel"] .description {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    margin: 0;
+  }
+}
+.section {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.section h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font:
+    var(--heading-weight) calc(18px * var(--heading-scale))/1.4
+      var(--font-heading),
+    sans-serif;
+  letter-spacing: var(--heading-tracking);
+}
+.section[data-size="subsection"] h2 {
+  font-size: calc(15px * var(--heading-scale));
+}
+.section[data-size="panel"] h2 {
+  font-size: calc(13px * var(--heading-scale));
+}
+.sectionActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+@media (max-width: 767px) {
+  .page {
+    align-items: flex-start;
+  }
+  .title {
+    font-size: calc(28px * var(--heading-scale));
+  }
+  .actions {
+    flex-basis: 100%;
+  }
+  .copy {
+    flex-basis: 220px;
+  }
+}

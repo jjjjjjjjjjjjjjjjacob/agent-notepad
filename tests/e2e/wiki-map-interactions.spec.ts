@@ -45,6 +45,10 @@ test("a dense map prioritizes hubs, expands on hover, and supports movement in b
   expect(save.ok()).toBe(true)
   const errors: string[] = []
   page.on("pageerror", (error) => errors.push(error.message))
+  page.on("console", (message) => {
+    if (message.type() === "error" && /hydrat/i.test(message.text()))
+      errors.push(message.text())
+  })
   await page.setViewportSize({ width: 1600, height: 1100 })
   await page.goto(`/wiki/map?focus=${slug}`)
   const graph = page.locator("svg[data-view]")

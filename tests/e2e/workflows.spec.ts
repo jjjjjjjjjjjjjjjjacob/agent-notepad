@@ -341,7 +341,7 @@ test("keyboard search, mobile navigation, and an explicit theme preference work"
   await page.reload()
   await expect(page.locator("html")).toHaveClass(/dark/)
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.getByRole("button", { name: "Toggle Sidebar" }).click()
+  await page.getByRole("button", { name: "Expand sidebar" }).click()
   await expect(page.getByRole("dialog")).toBeVisible()
   await page.keyboard.press("Escape")
   await expect(page.getByRole("dialog")).not.toBeVisible()

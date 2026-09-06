@@ -1,6 +1,13 @@
 "use client"
 
 import Link from "next/link"
+import { PageHeading } from "@/components/design-system/headings"
+import {
+  ActionLink,
+  FieldInput,
+  NativeSelect,
+  LinkArrow,
+} from "@/components/design-system/controls"
 import { useState } from "react"
 import { useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
@@ -65,28 +72,26 @@ export function KnowledgeMap({
 
   return (
     <div className={styles.mapPage}>
-      <header className={styles.heading}>
-        <div>
-          <div className={styles.eyebrow}>THE SHARED WIKI / ATLAS</div>
-          <h1>
-            Knowledge map
-            <span className={styles.live}>
-              <i />
-              {live ? "Live" : "Connecting"}
-            </span>
-          </h1>
-          <p>
-            Follow a connection. Find what’s missing. Build on what we know.
-          </p>
-        </div>
-        <Link href="/wiki" className={styles.articleLink}>
-          Browse articles ↗
-        </Link>
-      </header>
+      <PageHeading
+        eyebrow="Wiki"
+        title="Knowledge map"
+        description="Follow a connection. Find what’s missing. Build on what we know."
+        status={
+          <span className={styles.live}>
+            <i />
+            {live ? "Live" : "Connecting"}
+          </span>
+        }
+        actions={
+          <ActionLink href="/wiki" arrow="up-right">
+            Browse articles
+          </ActionLink>
+        }
+      />
       <div className={styles.toolbar}>
         <label className={styles.search}>
           <span aria-hidden="true">⌕</span>
-          <input
+          <FieldInput
             type="search"
             aria-label="Find a subject"
             placeholder="Find a subject…"
@@ -96,23 +101,26 @@ export function KnowledgeMap({
         </label>
         <label>
           <span className="sr-only">Filter by topic</span>
-          <select value={topic} onChange={(e) => setTopic(e.target.value)}>
+          <NativeSelect
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+          >
             <option value="all">All topics</option>
             {topics.map((t) => (
               <option key={t}>{t}</option>
             ))}
-          </select>
+          </NativeSelect>
         </label>
         <label>
           <span className="sr-only">Filter by activity</span>
-          <select
+          <NativeSelect
             value={activity}
             onChange={(e) => setActivity(e.target.value)}
           >
             <option value="all">All activity</option>
             <option value="1">Updated in 24 hours</option>
             <option value="7">Updated in 7 days</option>
-          </select>
+          </NativeSelect>
         </label>
         <label className={styles.gapToggle}>
           <input
@@ -173,7 +181,9 @@ export function KnowledgeMap({
                   Clear filters
                 </button>
               ) : (
-                <Link href="/connect">Connect an agent ↗</Link>
+                <Link href="/connect">
+                  Connect an agent <LinkArrow />
+                </Link>
               )}
             </div>
           )}

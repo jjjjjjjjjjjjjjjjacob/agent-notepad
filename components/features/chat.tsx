@@ -1,3 +1,11 @@
+import { PageHeading } from "@/components/design-system/headings"
+import {
+  ActionLink,
+  ActionButton,
+  FieldInput,
+  NativeSelect,
+} from "@/components/design-system/controls"
+import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { HashIcon, ArrowRightIcon } from "@phosphor-icons/react/dist/ssr"
 import type { FunctionArgs, FunctionReturnType } from "convex/server"
@@ -109,7 +117,7 @@ export async function ChannelDirectory({
         {community && <input type="hidden" name="view" value="chat" />}
         <label className={styles.searchField}>
           Search channels
-          <input
+          <FieldInput
             name="q"
             defaultValue={params.q}
             placeholder="Find a conversation…"
@@ -119,7 +127,7 @@ export async function ChannelDirectory({
         {!community && (
           <label>
             Community
-            <input
+            <FieldInput
               name="community"
               defaultValue={params.community}
               placeholder="All communities (slug)"
@@ -128,20 +136,20 @@ export async function ChannelDirectory({
         )}
         <label>
           Sort
-          <select name="order" defaultValue={params.order ?? "active"}>
+          <NativeSelect name="order" defaultValue={params.order ?? "active"}>
             <option value="active">Latest activity</option>
             <option value="new">Newest channels</option>
             <option value="name">Alphabetical</option>
-          </select>
+          </NativeSelect>
         </label>
         <label>
           Activity
-          <select name="window" defaultValue={params.window ?? "all"}>
+          <NativeSelect name="window" defaultValue={params.window ?? "all"}>
             <option value="all">Any time</option>
             <option value="24h">Past 24 hours</option>
             <option value="7d">Past week</option>
             <option value="30d">Past month</option>
-          </select>
+          </NativeSelect>
         </label>
         <label className={styles.checkbox}>
           <input
@@ -152,9 +160,7 @@ export async function ChannelDirectory({
           />
           Include empty channels
         </label>
-        <button className="action-button" type="submit">
-          Apply
-        </button>
+        <ActionButton type="submit">Apply</ActionButton>
       </form>
       {params.q && (
         <p className={styles.resultNote}>
@@ -198,27 +204,30 @@ export function ChatWorkspace({
 }) {
   return (
     <div className={styles.chat}>
-      <header className={styles.channelHeader}>
-        <span
-          className="identity-tile"
-          style={identityColor(space.parentId ?? space.id)}
-        >
-          <HashIcon size={24} />
-        </span>
-        <div>
-          {space.community && (
-            <Link
-              className={styles.communityLink}
-              href={`/communities/${space.community.slug}?view=chat`}
-            >
+      <PageHeading
+        variant="channel"
+        className={styles.channelHeader}
+        eyebrow={
+          space.community ? (
+            <Link href={`/communities/${space.community.slug}?view=chat`}>
               {space.community.name}
             </Link>
-          )}
-          <h1>#{space.name}</h1>
-        </div>
-        <p>{space.description}</p>
-        <span className={styles.publicBadge}>Public channel</span>
-      </header>
+          ) : (
+            "Communities"
+          )
+        }
+        title={`#${space.name}`}
+        description={space.description}
+        leading={
+          <span
+            className="identity-tile"
+            style={identityColor(space.parentId ?? space.id)}
+          >
+            <HashIcon size={24} />
+          </span>
+        }
+        status={<Badge variant="secondary">Public channel</Badge>}
+      />
       <section
         className={styles.conversation}
         aria-label="Channel conversation"
@@ -230,16 +239,16 @@ export function ChatWorkspace({
 }
 export function ChatDirectoryHeading() {
   return (
-    <header className="surface-heading">
-      <div>
-        <span className="eyebrow">Across communities</span>
-        <h1>Public channels</h1>
-        <p>Find a conversation. Follow what’s happening.</p>
-      </div>
-      <Link className="action-button secondary" href="/communities">
-        Explore communities →
-      </Link>
-    </header>
+    <PageHeading
+      eyebrow="Communities"
+      title="Chat"
+      description="Find a conversation. Follow what’s happening."
+      actions={
+        <ActionLink href="/communities" arrow="right">
+          Explore communities
+        </ActionLink>
+      }
+    />
   )
 }
 export { ConnectPrompt, styles as chatStyles }

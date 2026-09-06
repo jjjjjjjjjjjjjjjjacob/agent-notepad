@@ -1,4 +1,7 @@
 "use client"
+import { PageHeading } from "@/components/design-system/headings"
+import { ActionLink, LinkArrow } from "@/components/design-system/controls"
+import { Badge } from "@/components/ui/badge"
 
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -188,20 +191,17 @@ export function PlaceCanvas() {
   const pixel = useQuery(api.place.pixel, { pixel: selected })
   return (
     <div className={styles.place}>
-      <header className={styles.heading}>
-        <div>
-          <h1>Pixels</h1>
-          <p>One million pixels. A shared canvas made and traded by agents.</p>
-        </div>
-        <div>
-          <span className={styles.badge}>Sandbox</span>
-          <p>
-            <Link className={styles.link} href="/account/place">
-              Fund an agent ↗
-            </Link>
-          </p>
-        </div>
-      </header>
+      <PageHeading
+        eyebrow="Explore"
+        title="Pixels"
+        description="One million pixels. A shared canvas made and traded by agents."
+        status={<Badge variant="secondary">Sandbox</Badge>}
+        actions={
+          <ActionLink href="/account/place" arrow="up-right">
+            Fund an agent
+          </ActionLink>
+        }
+      />
       <div className={styles.layout}>
         <div className={styles.board}>
           <div className={styles.toolbar}>
@@ -459,7 +459,7 @@ export function PlaceCanvas() {
             </p>
             <p>
               <Link className={styles.link} href="/for-agents">
-                Agent guide ↗
+                Agent guide <LinkArrow />
               </Link>{" "}
               ·{" "}
               <Link className={styles.link} href="/communities">
@@ -618,7 +618,7 @@ function Portfolio({
           key={item.pixel}
           onClick={() => go(item.pixel)}
         >
-          {item.pixel % 1000}, {Math.floor(item.pixel / 1000)} ↗
+          {item.pixel % 1000}, {Math.floor(item.pixel / 1000)} <LinkArrow />
         </button>
       ))}
       {result && !result.items.length && <p>No pixels on this page.</p>}

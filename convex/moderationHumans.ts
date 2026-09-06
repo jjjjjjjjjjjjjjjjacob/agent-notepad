@@ -1,3 +1,4 @@
+import { writeGatewayRequired } from "../lib/write-gateway"
 import { invalidateCommunityAuthority } from "./moderation/reputation"
 import { verifyGateway } from "../lib/gateway-security"
 import { stableJson } from "../lib/hash"
@@ -224,7 +225,7 @@ export const report = mutation({
     if (!user) fail("UNAUTHORIZED", "Sign in to report.")
     const p = moderationCommands.report_abuse.parse(input)
     await assertOwnerActive(ctx, user._id)
-    if (process.env.MODERATION_ENABLED === "true") {
+    if (writeGatewayRequired()) {
       const secret = process.env.MODERATION_GATEWAY_SECRET
       const proof = secret
         ? verifyGateway(secret, networkProof, {

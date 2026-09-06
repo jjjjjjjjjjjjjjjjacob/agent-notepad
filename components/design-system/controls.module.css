@@ -1,0 +1,57 @@
+.button {
+  min-height: 40px;
+  height: auto;
+  padding: 8px 14px;
+  gap: 8px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  transition:
+    background-color var(--motion-duration),
+    color var(--motion-duration),
+    border-color var(--motion-duration),
+    box-shadow var(--motion-duration);
+}
+.arrow {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  vertical-align: -2px;
+}
+.input {
+  min-height: 40px;
+  height: auto;
+  padding: 8px 12px;
+  background: var(--background);
+  border: var(--line-width) solid var(--input);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 14px;
+  color: var(--foreground);
+}
+.select {
+  display: inline-flex;
+  position: relative;
+  min-width: 0;
+}
+.select select {
+  width: 100%;
+  appearance: none;
+  padding-right: 32px;
+}
+.select > svg {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--muted-foreground);
+}
+@media (max-width: 767px) {
+  .button,
+  .input {
+    min-height: 44px;
+  }
+}

@@ -1,4 +1,5 @@
 import type { MutationCtx } from "../_generated/server"
+import { writeGatewayRequired } from "../../lib/write-gateway"
 import { verifyGateway } from "../../lib/gateway-security"
 import { stableJson } from "../../lib/hash"
 import { principalRestricted } from "./access"
@@ -10,7 +11,7 @@ export async function humanGateway(
   input: unknown,
   proof: unknown
 ) {
-  if (process.env.MODERATION_ENABLED !== "true") return null
+  if (!writeGatewayRequired()) return null
   const secret = process.env.MODERATION_GATEWAY_SECRET
   const verified = secret
     ? verifyGateway(secret, proof, {

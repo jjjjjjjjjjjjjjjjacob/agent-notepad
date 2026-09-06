@@ -1,61 +1,81 @@
 .home {
+  position: relative;
+  isolation: isolate;
   width: 100%;
   max-width: var(--page-width);
   margin: 0 auto;
-  padding: 32px;
+  padding: var(--page-inset);
 }
 .hero {
-  padding: 6px 0 30px;
+  position: relative;
+  isolation: isolate;
+  padding: 12px 0 28px;
+  text-align: center;
 }
 .hero h1 {
+  max-width: 960px;
+  margin: 0 auto;
   font-family: var(--font-heading), sans-serif;
   font-size: 44px;
   line-height: 1.14;
   font-weight: 750;
   letter-spacing: -0.055em;
-  text-wrap: initial;
+  text-wrap: balance;
 }
 .hero h1 span {
-  display: block;
   color: var(--link-color);
 }
 .hero > p {
-  max-width: 580px;
-  margin-top: 14px;
+  max-width: 640px;
+  margin: 12px auto 0;
   color: var(--muted-foreground);
   font-size: 16px;
   line-height: 1.5;
 }
+.hero > p span {
+  display: block;
+  color: var(--link-color);
+}
 .heroActions {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 12px 24px;
-  margin-top: 20px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
   font-size: 14px;
 }
-.explore {
-  font-weight: 600;
-  color: var(--link-color);
-}
 .onboarding {
-  flex: 1;
-  min-width: 180px;
-}
-.onboarding > summary {
-  cursor: pointer;
-  color: var(--muted-foreground);
-  width: fit-content;
-}
-.onboarding > summary:hover {
-  color: var(--foreground);
-}
-.onboarding[open] {
-  flex-basis: 100%;
+  max-width: 720px;
+  margin: 20px auto 0;
+  text-align: left;
 }
 .onboarding > section {
-  margin-top: 12px;
-  max-width: 700px;
+  margin: 0;
+  gap: 12px;
+  box-shadow: none;
+}
+.onboarding > section > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+}
+.onboarding :global(.connect-prompt-code) {
+  padding: 12px;
+  border-radius: 4px;
+  background: var(--background);
+}
+.onboarding :global(.connect-prompt-code) code {
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--link-color);
+}
+.onboarding > section > a {
+  justify-self: end;
+  margin-top: 0;
 }
 .sectionHeading {
   display: flex;
@@ -63,15 +83,6 @@
   justify-content: space-between;
   gap: 12px;
   min-height: 30px;
-}
-.sectionHeading h2 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
-  font-family: var(--font-heading), sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.02em;
 }
 .sectionHeading > div {
   display: flex;
@@ -155,13 +166,6 @@
   gap: 10px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border);
-}
-.feedHeading h2 {
-  font-family: var(--font-heading), sans-serif;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  scroll-margin-top: 120px;
 }
 .sort {
   display: flex;
@@ -282,10 +286,7 @@
   flex-wrap: wrap;
   gap: 4px 8px;
 }
-.rail .sectionHeading h2 {
-  font-size: 13px;
-}
-.live {
+.rail .live {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -421,17 +422,31 @@
 }
 @media (max-width: 767px) {
   .home {
-    padding: 24px 16px;
+    padding: 24px var(--page-inset);
   }
   .hero {
-    padding-top: 0;
+    position: relative;
+    isolation: isolate;
+    padding-top: 8px;
     padding-bottom: 24px;
   }
   .hero h1 {
     font-size: 34px;
   }
+  .hero h1 span {
+    display: block;
+  }
   .hero > p {
     font-size: 15px;
+  }
+  .hero > p span {
+    margin-top: 4px;
+  }
+  .heroActions {
+    gap: 10px;
+  }
+  .onboarding {
+    margin-top: 20px;
   }
   .wikiGrid {
     grid-template-columns: minmax(0, 1fr);
@@ -464,4 +479,16 @@
   .score {
     width: 22px;
   }
+}
+
+.home > :not([data-slot="hero-particles"]) {
+  position: relative;
+  z-index: 1;
+}
+.sectionHeading,
+.feedHeading {
+  margin-bottom: 0;
+}
+.feedHeading h2 {
+  scroll-margin-top: 120px;
 }

@@ -11,11 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  InputGroup,
-  InputGroupAddon,
-} from "@/components/ui/input-group"
+import { InputGroup, InputGroupAddon } from "@/components/ui/input-group"
 import { MagnifyingGlassIcon, CheckIcon } from "@phosphor-icons/react"
+import styles from "./command.module.css"
 
 function Command({
   className,
@@ -72,11 +70,14 @@ function CommandInput({
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
     <div data-slot="command-input-wrapper" className="p-1 pb-0">
-      <InputGroup className="h-8! bg-input/20 dark:bg-input/30">
+      <InputGroup
+        className={cn("h-8! bg-input/20 dark:bg-input/30", styles.inputGroup)}
+      >
         <CommandPrimitive.Input
           data-slot="command-input"
           className={cn(
-            "w-full text-xs/relaxed outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
+            "h-full w-full min-w-0 flex-1 bg-transparent pr-2 text-xs/relaxed outline-none disabled:cursor-not-allowed disabled:opacity-50",
+            styles.input,
             className
           )}
           {...props}

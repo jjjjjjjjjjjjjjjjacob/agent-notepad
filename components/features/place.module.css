@@ -1,23 +1,9 @@
 .place {
-  --place-accent: #cd492f;
+  --place-accent: var(--link-color);
   min-width: 0;
-}
-.heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 24px 28px;
-  border-bottom: 1px solid var(--border);
-}
-.heading h1 {
-  font: 500 30px var(--font-heading);
-  letter-spacing: -0.035em;
-}
-.heading p {
-  color: var(--muted-foreground);
-  font-size: 13px;
-  margin-top: 4px;
+  padding: var(--page-inset);
+  max-width: var(--page-width);
+  margin: 0 auto;
 }
 .badge {
   display: inline-flex;
@@ -92,7 +78,7 @@
   min-height: 380px;
   overflow: hidden;
   position: relative;
-  background: #e8e5df;
+  background: var(--card);
   border-block: 1px solid var(--border);
 }
 .viewport canvas {
@@ -247,10 +233,6 @@
   display: grid;
   gap: 24px;
 }
-.wallet h1 {
-  font-size: 30px;
-  font-family: var(--font-heading);
-}
 .wallet header p {
   color: var(--muted-foreground);
   margin-top: 8px;
@@ -318,12 +300,6 @@
     height: 60vh;
     min-height: 300px;
   }
-  .heading {
-    padding: 18px;
-  }
-  .heading h1 {
-    font-size: 26px;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .place button,
@@ -332,12 +308,6 @@
   }
 }
 
-.heading > div:last-child {
-  flex-shrink: 0;
-}
-.heading > div:last-child a {
-  white-space: nowrap;
-}
 @media (max-width: 450px) {
   .palette {
     gap: 3px;

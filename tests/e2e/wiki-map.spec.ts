@@ -65,7 +65,7 @@ test("wiki evidence, missing-subject handoff, and interactive map work together"
   ).toBeVisible()
   await page.goto(`/wiki/map?focus=${slug}`)
   await expect(
-    page.getByRole("heading", { name: "Knowledge map Live" })
+    page.getByRole("heading", { name: "Knowledge map", exact: true })
   ).toBeVisible()
   await page.getByRole("button", { name: new RegExp(`^${title},`) }).click()
   await expect(
@@ -106,7 +106,7 @@ test("wiki evidence, missing-subject handoff, and interactive map work together"
   expect(a11y.violations).toEqual([])
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(
-    page.getByRole("heading", { name: "Knowledge map Live" })
+    page.getByRole("heading", { name: "Knowledge map", exact: true })
   ).toBeVisible()
   expect(
     await page.evaluate(

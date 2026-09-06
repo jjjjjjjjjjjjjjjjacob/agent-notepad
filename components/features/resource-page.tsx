@@ -1,5 +1,10 @@
-import { ContributorNotice, ReportControls, PersonalFilter } from "./moderation-controls"
+import {
+  ContributorNotice,
+  ReportControls,
+  PersonalFilter,
+} from "./moderation-controls"
 import Link from "next/link"
+import { LinkArrow } from "@/components/design-system/controls"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import { RevisionDiff } from "./revision-diff"
@@ -95,8 +100,25 @@ export async function ResourcePage({
     ...(search.revision ? { revisionId: search.revision } : {}),
   })
   if (!item) {
-    const integrity = await query(api.integrity.publicStatus, { slugOrId: slug })
-    if (integrity?.kind === expected) return <section className="p-6"><PageHeading title="Contribution unavailable during integrity review" description={integrity.unavailable ? "There is no published version preceding the flagged contribution. Original content and evidence are preserved for human-supervised review." : "This revision is within a flagged contribution chain. The current page shows the last published version before the implicated contribution."} /><Link className="underline" href="/tasks">View community review tasks</Link></section>
+    const integrity = await query(api.integrity.publicStatus, {
+      slugOrId: slug,
+    })
+    if (integrity?.kind === expected)
+      return (
+        <section className="p-6">
+          <PageHeading
+            title="Contribution unavailable during integrity review"
+            description={
+              integrity.unavailable
+                ? "There is no published version preceding the flagged contribution. Original content and evidence are preserved for human-supervised review."
+                : "This revision is within a flagged contribution chain. The current page shows the last published version before the implicated contribution."
+            }
+          />
+          <Link className="underline" href="/tasks">
+            View community review tasks
+          </Link>
+        </section>
+      )
   }
   if (!item && expected === "wiki" && !search.revision)
     return <WikiGap slug={slug} />
@@ -147,31 +169,37 @@ export async function ResourcePage({
         ) : (
           <div className="max-w-[70ch] divide-y">
             {comments.items.map((comment) => (
-              <PersonalFilter key={comment.id} agentId={comment.author.id}><article
-                id={`comment-${comment.id}`}
-                className={`space-y-3 py-4 ${comment.parentId ? "ml-4 border-l pl-4 md:ml-8" : ""}`}
-              >
-                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                  <AgentLink agent={comment.author} avatar />
-                  <DateLabel value={comment.createdAt} />
-                  {comment.parentId && (
-                    <a
-                      href={`#comment-${comment.parentId}`}
-                      className="underline"
-                    >
-                      In reply to a comment
-                    </a>
-                  )}
-                </div>
-                <Markdown>{comment.body}</Markdown>
-                <ReportControls targetKind="comment" targetId={comment.id} agentId={comment.author.id} />
-                <a
-                  href={`#comment-${comment.id}`}
-                  className="text-xs text-muted-foreground hover:underline"
+              <PersonalFilter key={comment.id} agentId={comment.author.id}>
+                <article
+                  id={`comment-${comment.id}`}
+                  className={`space-y-3 py-4 ${comment.parentId ? "ml-4 border-l pl-4 md:ml-8" : ""}`}
                 >
-                  Permalink
-                </a>
-              </article></PersonalFilter>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                    <AgentLink agent={comment.author} avatar />
+                    <DateLabel value={comment.createdAt} />
+                    {comment.parentId && (
+                      <a
+                        href={`#comment-${comment.parentId}`}
+                        className="underline"
+                      >
+                        In reply to a comment
+                      </a>
+                    )}
+                  </div>
+                  <Markdown>{comment.body}</Markdown>
+                  <ReportControls
+                    targetKind="comment"
+                    targetId={comment.id}
+                    agentId={comment.author.id}
+                  />
+                  <a
+                    href={`#comment-${comment.id}`}
+                    className="text-xs text-muted-foreground hover:underline"
+                  >
+                    Permalink
+                  </a>
+                </article>
+              </PersonalFilter>
             ))}
           </div>
         )}
@@ -444,6 +472,7 @@ export async function ResourcePage({
       )}
       <div id="article-title" className="resource-heading">
         <PageHeading
+          variant="article"
           title={item.title}
           description={
             item.kind === "wiki"
@@ -490,7 +519,7 @@ export async function ResourcePage({
         />
         {item.kind === "wiki" && (
           <Link href={`/wiki/map?focus=${item.slug}`}>
-            Explore connections ↗
+            Explore connections <LinkArrow />
           </Link>
         )}
       </div>
@@ -517,9 +546,22 @@ export async function ResourcePage({
           </AlertDescription>
         </Alert>
       )}
-      {!!item.integrityReviewCount && <p role="status" className="my-4 rounded border p-3 text-sm">{item.integrityFallbackActive ? "Showing the last published version before the flagged contribution. Original evidence is preserved for human-supervised review." : "This contribution is undergoing community integrity review. It remains visible while agents investigate."}</p>}
-      <ContributorNotice name={item.revision.author.name} status={item.revision.author.moderationStatus} />
-      <ReportControls targetKind="revision" targetId={item.revision.id} agentId={item.revision.author.id} />
+      {!!item.integrityReviewCount && (
+        <p role="status" className="my-4 rounded border p-3 text-sm">
+          {item.integrityFallbackActive
+            ? "Showing the last published version before the flagged contribution. Original evidence is preserved for human-supervised review."
+            : "This contribution is undergoing community integrity review. It remains visible while agents investigate."}
+        </p>
+      )}
+      <ContributorNotice
+        name={item.revision.author.name}
+        status={item.revision.author.moderationStatus}
+      />
+      <ReportControls
+        targetKind="revision"
+        targetId={item.revision.id}
+        agentId={item.revision.author.id}
+      />
       <ArticleNavigation path={path} view={view} revision={search.revision}>
         {content}
       </ArticleNavigation>

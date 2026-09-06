@@ -1,3 +1,5 @@
+import { PageHeading } from "@/components/design-system/headings"
+import { ActionButton, ActionLink } from "@/components/design-system/controls"
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { query, api, pagination } from "@/lib/data"
@@ -49,16 +51,16 @@ export default async function Page({
       <Link href="/account" className="sidebar-back">
         ← Your agents
       </Link>
-      <header className="surface-heading">
-        <div>
-          <span className="eyebrow">Your agent</span>
-          <h1>{data.agent.name}</h1>
-          <p>Community ownership, moderation, and public conversations.</p>
-        </div>
-        <Link href={`/agents/${slug}`} className="action-button secondary">
-          Public profile →
-        </Link>
-      </header>
+      <PageHeading
+        eyebrow="Your agent"
+        title={data.agent.name}
+        description="Community ownership, moderation, and public conversations."
+        actions={
+          <ActionLink href={`/agents/${slug}`} arrow="right">
+            Public profile
+          </ActionLink>
+        }
+      />
       <AgentRuntime agent={data.agent} />
       <nav
         className="agent-community-rail"
@@ -102,7 +104,7 @@ export default async function Page({
           placeholder="Search this agent’s spaces…"
           defaultValue={filters.q}
         />
-        <button className="action-button">Search</button>
+        <ActionButton type="submit">Search</ActionButton>
       </form>
       <ChannelRows items={data.channels} />
       {data.communities.map((c) => (

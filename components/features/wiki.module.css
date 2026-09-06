@@ -13,18 +13,11 @@
   + :is(div, p, nav, section, details) {
   margin-top: 24px;
 }
-.main a {
+.main a:not([data-slot="button"]) {
   color: var(--link-color);
 }
-.main a:hover {
+.main a:not([data-slot="button"]):hover {
   text-decoration: underline;
-}
-.main h1 {
-  font-family: var(--font-heading);
-  font-size: calc(2rem * var(--heading-scale));
-  line-height: 1.2;
-  font-weight: var(--heading-weight);
-  letter-spacing: var(--heading-tracking);
 }
 .main :global(.resource-heading) {
   border-bottom: var(--line-width) solid var(--border);
@@ -55,12 +48,41 @@
   padding: 20px;
   border-radius: var(--radius-lg);
 }
-.main :global(.article-sources) ol { list-style: none; padding: 0; counter-reset: sources; }
-.main :global(.article-sources) li { position: relative; padding: 14px 16px 14px 46px; border-top: 1px solid var(--border); counter-increment: sources; scroll-margin-top: 24px; }
-.main :global(.article-sources) li::before { content: counter(sources, decimal-leading-zero); position: absolute; left: 8px; top: 15px; color: var(--muted-foreground); font: 11px var(--font-mono); }
-.main :global(.article-sources) li:target { background: var(--accent); border-radius: var(--radius-sm); }
-.main :global(.source-domain) { display: block; color: var(--muted-foreground); font-size: 11px; }
-.main :global(.source-backlink) { position: absolute; right: 4px; top: 12px; padding: 4px; }
+.main :global(.article-sources) ol {
+  list-style: none;
+  padding: 0;
+  counter-reset: sources;
+}
+.main :global(.article-sources) li {
+  position: relative;
+  padding: 14px 16px 14px 46px;
+  border-top: 1px solid var(--border);
+  counter-increment: sources;
+  scroll-margin-top: 24px;
+}
+.main :global(.article-sources) li::before {
+  content: counter(sources, decimal-leading-zero);
+  position: absolute;
+  left: 8px;
+  top: 15px;
+  color: var(--muted-foreground);
+  font: 11px var(--font-mono);
+}
+.main :global(.article-sources) li:target {
+  background: var(--accent);
+  border-radius: var(--radius-sm);
+}
+.main :global(.source-domain) {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.main :global(.source-backlink) {
+  position: absolute;
+  right: 4px;
+  top: 12px;
+  padding: 4px;
+}
 .contents {
   order: 0;
   background: var(--muted);
@@ -96,9 +118,6 @@
   max-width: 480px;
 }
 .indexToolbar input {
-  border: var(--line-width) solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 8px 12px;
   flex: 1;
   min-width: 0;
 }
@@ -106,23 +125,6 @@
   display: flex;
   gap: 18px;
   font-size: 0.85rem;
-}
-.sectionHeading {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  justify-content: space-between;
-  border-bottom: var(--line-width) solid var(--border);
-  padding-bottom: 12px;
-}
-.sectionHeading h2 {
-  font-family: var(--font-heading);
-  font-size: 1.2rem;
-  font-weight: 600;
-}
-.sectionHeading span {
-  color: var(--muted-foreground);
-  font-size: 0.75rem;
 }
 .articleIndex > [data-slot="empty"] {
   margin-top: 24px;
@@ -205,8 +207,5 @@
   }
   .entries {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .sectionHeading {
-    flex-wrap: wrap;
   }
 }

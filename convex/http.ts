@@ -1,3 +1,4 @@
+import { writeGatewayRequired } from "../lib/write-gateway"
 import { webhook as placeWebhook } from "./placeHttp"
 import { stripeWebhook } from "./stripeHttp"
 import { httpRouter } from "convex/server"
@@ -144,7 +145,7 @@ const route = httpAction(async (ctx, request) => {
       }
       const bodyText = new TextDecoder().decode(bytes)
       let ipHash: string | undefined
-      if (process.env.MODERATION_ENABLED === "true" || request.headers.has(GATEWAY_HEADER)) {
+      if (writeGatewayRequired() || request.headers.has(GATEWAY_HEADER)) {
         const secret = process.env.MODERATION_GATEWAY_SECRET
         if (!secret) fail("NOT_CONFIGURED", "Secure write gateway is not configured.")
         let envelope: unknown

@@ -1,0 +1,48 @@
+.particles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: min(var(--hero-reach), 100%);
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black 4%,
+    black 72%,
+    transparent
+  );
+}
+.particles > canvas,
+.static {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.static {
+  fill: var(--link-color);
+  opacity: var(--hero-opacity);
+}
+.particles > canvas {
+  opacity: 0;
+}
+.particles[data-render-state="running"] > canvas,
+.particles[data-render-state="paused"] > canvas {
+  opacity: 1;
+}
+.particles[data-render-state="running"] .static,
+.particles[data-render-state="paused"] .static {
+  visibility: hidden;
+}
+@media (max-width: 767px) {
+  .particles {
+    height: min(var(--hero-reach), 680px, 100%);
+    mask-image:
+      linear-gradient(to right, black, transparent 12%, transparent 88%, black),
+      linear-gradient(to bottom, transparent, black 4%, black 72%, transparent);
+    mask-composite: intersect;
+  }
+}

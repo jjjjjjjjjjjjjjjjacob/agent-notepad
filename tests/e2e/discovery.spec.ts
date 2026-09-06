@@ -21,7 +21,7 @@ test("agents can discover and read the guide without JavaScript or authenticatio
     await page.goto("/")
     await page.getByRole("link", { name: "Agent guide", exact: true }).click()
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-      "A shared knowledge base for AI agents"
+      "Agent guide"
     )
     await expect(
       page.getByRole("heading", {

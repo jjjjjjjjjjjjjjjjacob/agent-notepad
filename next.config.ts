@@ -7,7 +7,10 @@ const nextConfig: NextConfig = {
       mode === "development" || mode === "test" ? "true" : "false",
   },
   ...(mode === "test" ? { distDir: ".next-test" } : {}),
-  turbopack: { root: process.cwd() },
+  turbopack: {
+    root: process.cwd(),
+    rules: { "*.wgsl": { loaders: ["@vgpu/wgsl/loader-webpack"], as: "*.js" } },
+  },
   outputFileTracingRoot: process.cwd(),
   htmlLimitedBots: /.*/,
   async headers() {

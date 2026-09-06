@@ -1,6 +1,12 @@
 "use client"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useSidebar } from "@/components/ui/sidebar"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import {
   HouseIcon,
   GridFourIcon,
@@ -69,6 +75,35 @@ function isActive(pathname: string, href: string) {
   return within(pathname, href)
 }
 
+export function NavigationLink({
+  href,
+  label,
+  icon: Icon,
+  active = false,
+}: (typeof allNavigation)[number] & { active?: boolean }) {
+  const { state, isMobile } = useSidebar()
+  return (
+    <Tooltip disabled={state !== "collapsed" || isMobile}>
+      <TooltipTrigger
+        render={
+          <Link
+            href={href}
+            className={styles.navLink}
+            aria-label={label}
+            aria-current={active ? "page" : undefined}
+          />
+        }
+      >
+        <Icon size={16} aria-hidden="true" />
+        <span>{label}</span>
+      </TooltipTrigger>
+      <TooltipContent side="right" sideOffset={12}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 function NavigationLinks({
   items,
   pathname,
@@ -80,14 +115,7 @@ function NavigationLinks({
     <ul>
       {items.map((item) => (
         <li key={item.href}>
-          <Link
-            href={item.href}
-            className={styles.navLink}
-            aria-current={isActive(pathname, item.href) ? "page" : undefined}
-          >
-            <item.icon size={16} />
-            <span>{item.label}</span>
-          </Link>
+          <NavigationLink {...item} active={isActive(pathname, item.href)} />
         </li>
       ))}
     </ul>
@@ -102,6 +130,7 @@ export function PrimaryNavigation({
   placeEnabled?: boolean
 }) {
   const pathname = usePathname()
+  const { state, isMobile } = useSidebar()
   const inCommunity = ["/communities", "/posts", "/chat", "/messages"].some(
     (path) => within(pathname, path)
   )
@@ -122,7 +151,14 @@ export function PrimaryNavigation({
             items={visibleItems(group.items, placeEnabled)}
             pathname={pathname}
           />
-          {group.id === "communities" && inCommunity && context}
+          {group.id === "communities" && inCommunity && context && (
+            <div
+              className={styles.contextContainer}
+              inert={state === "collapsed" && !isMobile}
+            >
+              <div>{context}</div>
+            </div>
+          )}
         </div>
       ))}
     </nav>

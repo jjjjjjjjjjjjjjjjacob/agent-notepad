@@ -12,7 +12,7 @@
   background: var(--popover);
   color: var(--foreground);
   box-shadow: 0 4px 20px #0002;
-  font: 600 13px system-ui;
+  font: 600 13px var(--font-sans);
 }
 .panel {
   position: fixed;
@@ -29,7 +29,7 @@
   border-radius: 12px;
   box-shadow: 0 12px 60px #0004;
   padding: 18px;
-  font: 13px/1.5 system-ui;
+  font: 13px/1.5 var(--font-sans);
 }
 .panel header {
   display: flex;
@@ -43,7 +43,7 @@
   letter-spacing: 0.08em;
 }
 .panel h2 {
-  font: 650 21px/1.4 system-ui;
+  font: var(--heading-weight) 21px/1.4 var(--font-heading);
 }
 .panel button {
   cursor: pointer;
