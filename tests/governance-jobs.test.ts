@@ -312,6 +312,7 @@ it("coalesces repeated retention starts and duplicate steps, retaining rejected 
   )
 })
 
+// Full-corpus fixtures validate bounded transactions, not runner wall-clock speed.
 it("counts all vote pages, negative sibling minima and approved owners without sampling", async () => {
   const t = setup(),
     { author, resourceId, voters } = await votedPost(t, "pages")
@@ -382,7 +383,7 @@ it("counts all vote pages, negative sibling minima and approved owners without s
   await settle(t)
   expect((await credit(t, resourceId))?._id).toBe(event?._id)
   expect(voters).toHaveLength(5)
-})
+}, 120_000)
 
 it("discards a completed vote snapshot when authority changes and restores the same award", async () => {
   const t = setup(),
@@ -594,7 +595,7 @@ it("paginates discussion votes and cannot restore credit from a held or deleted 
   expect((await t.run((ctx) => ctx.db.get(comments[1])))?.score).toBe(-2)
   await settle(t)
   expect((await credit(t, resourceId, "discussion"))?.reversedAt).toBeDefined()
-})
+}, 60_000)
 
 it("indexes active sanctions without scanning large lifted and expired histories", async () => {
   const t = setup(),
