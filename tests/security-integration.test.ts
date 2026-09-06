@@ -8,6 +8,8 @@ import { digest } from "../lib/hash"
 import { DAY } from "../lib/moderation-policy"
 import { recomputeCommunity } from "../convex/moderation/reputation"
 import { createCase } from "../convex/moderation/cases"
+import { closeRound } from "../convex/moderation/rounds"
+import { ModerationCapacityExceeded } from "../convex/moderation/authorship"
 import { setHold, liftCase } from "../convex/moderation/sanctions"
 
 const modules = import.meta.glob("../convex/**/*.ts")
@@ -270,3 +272,102 @@ it("retires large separated forensic/subject evidence without exposing partial i
     expect(c?.evidenceRetiringAt).toBeUndefined()
   }
 })
+
+it.each(["decision-failure", "success", "preflight-saturation"] as const)(
+  "keeps admission closure atomic through %s",
+  async (mode) => {
+    const t = setup(),
+      subject = await actor(t, `closure-subject-${mode}`)
+    const caseId = await caseFor(t, subject.agentId, subject.agentId)
+    const taskIds: Id<"tasks">[] = []
+    await t.run(async (ctx) => {
+      await ctx.db.patch(caseId, {
+        kind: "admission",
+        reason: "spam",
+        targetKind: "agent",
+        state: "voting",
+        deadline: Date.now() - 1,
+        ...(mode === "preflight-saturation"
+          ? { authorshipState: "incomplete" as const }
+          : {}),
+      })
+      for (let i = 0; i < (mode === "decision-failure" ? 33 : 1); i++)
+        await ctx.db.insert("moderationEvidence", {
+          caseId,
+          content: `Harmless legacy forensic row ${i}`,
+          fingerprint: `legacy-${i}`,
+          provenance: "Legacy fixture",
+        })
+    })
+    for (let i = 0; i < 3; i++) {
+      const juror = await actor(t, `closure-juror-${mode}-${i}`)
+      taskIds.push(
+        await t.run(async (ctx) => {
+          const taskId = await ctx.db.insert("tasks", {
+            committeeCaseId: caseId,
+            type: "committee_review",
+            topic: "moderation",
+            title: "Fixture admission",
+            description: "Fixture",
+            dedupeKey: `closure-${mode}-${i}`,
+            status: "submitted",
+            issueOpen: true,
+            random: 0,
+            updatedAt: Date.now(),
+          })
+          await ctx.db.insert("committeeSeats", {
+            caseId,
+            agentId: juror.agentId,
+            ownerId: juror.ownerId,
+            weight: 1,
+            taskId,
+            accepted: true,
+            declined: false,
+            vote: "accept",
+            rationale: "Harmless fixture vote",
+            votedAt: Date.now() - 1,
+          })
+          return taskId
+        })
+      )
+    }
+    const close = () =>
+      t.run(async (ctx) => closeRound(ctx, (await ctx.db.get(caseId))!))
+    if (mode === "decision-failure")
+      await expect(close()).rejects.toThrow(ModerationCapacityExceeded)
+    else await close()
+    const parent = (await t.run((ctx) => ctx.db.get(caseId)))!
+    const children = await t.run((ctx) =>
+      ctx.db
+        .query("moderationCases")
+        .withIndex("by_parent", (q) => q.eq("parentCaseId", caseId))
+        .collect()
+    )
+    const audits = await t.run((ctx) =>
+      ctx.db
+        .query("moderationAudit")
+        .withIndex("by_target", (q) => q.eq("targetId", caseId))
+        .collect()
+    )
+    if (mode === "success") {
+      expect(parent).toMatchObject({ state: "resolved", decision: "accept" })
+      expect(children).toHaveLength(1)
+      expect(audits.some((row) => row.action === "decision_accept")).toBe(true)
+    } else {
+      expect(parent.state).toBe(
+        mode === "decision-failure" ? "voting" : "escalated"
+      )
+      expect(parent.decision).toBeUndefined()
+      expect(parent.resolvedAt).toBeUndefined()
+      expect(children).toEqual([])
+      expect(audits.some((row) => row.action.startsWith("decision_"))).toBe(
+        false
+      )
+      if (mode === "decision-failure")
+        for (const id of taskIds)
+          expect((await t.run((ctx) => ctx.db.get(id)))?.status).toBe(
+            "submitted"
+          )
+    }
+  }
+)

@@ -271,25 +271,16 @@ async function ballotBounded(ctx: MutationCtx, agent: Doc<"agents">, caseId: Id<
   return { caseId, submitted: true }
 }
 export async function closeRound(ctx: MutationCtx, c: Doc<"moderationCases">) {
-  try { await closeRoundBounded(ctx, c, moderationReads(ctx)) }
-  catch (error) { if (!(error instanceof ModerationCapacityExceeded)) throw error; await escalateRound(ctx, c) }
-}
-async function closeRoundBounded(ctx: MutationCtx, c: Doc<"moderationCases">, reads: ModerationReads) {
   if (c.state !== "voting" || Date.now() < c.deadline) return
-  await caseLineage(reads, c)
-  const rows = (await reads.rows(ctx.db
-      .query("committeeSeats")
-      .withIndex("by_case", (q) => q.eq("caseId", c._id)), MAX_SEATS)).filter((s) => !s.declined)
-  if (rows.length > committeeSize(c.kind)) throw new ModerationCapacityExceeded()
-  const valid = []
-  for (const seat of rows)
-    valid.push({
-      weight: seat.weight,
-      vote: (await jurorEligible(reads, c, seat.agentId, seat.ownerId))
-        ? seat.vote
-        : undefined,
-    })
-  const result = ballotResult(committeeSize(c.kind), valid)
+  let result: ReturnType<typeof ballotResult>
+  try {
+    result = await closurePreflight(ctx, c, moderationReads(ctx))
+  } catch (error) {
+    if (!(error instanceof ModerationCapacityExceeded)) throw error
+    await escalateRound(ctx, c)
+    return
+  }
+  // Decision application must propagate errors so Convex rolls back every write.
   const settings = await ctx.db
     .query("moderationSettings")
     .withIndex("by_key", (q) => q.eq("key", "automation"))
@@ -322,4 +313,24 @@ async function closeRoundBounded(ctx: MutationCtx, c: Doc<"moderationCases">, re
         "No outcome met both thresholds. Missing or invalid ballots retain their denominator weight.",
     })
   await releaseSeats(ctx, (await ctx.db.get(c._id))!)
+}
+async function closurePreflight(
+  ctx: MutationCtx,
+  c: Doc<"moderationCases">,
+  reads: ModerationReads
+) {
+  await caseLineage(reads, c)
+  const rows = (await reads.rows(ctx.db
+      .query("committeeSeats")
+      .withIndex("by_case", (q) => q.eq("caseId", c._id)), MAX_SEATS)).filter((s) => !s.declined)
+  if (rows.length > committeeSize(c.kind)) throw new ModerationCapacityExceeded()
+  const valid = []
+  for (const seat of rows)
+    valid.push({
+      weight: seat.weight,
+      vote: (await jurorEligible(reads, c, seat.agentId, seat.ownerId))
+        ? seat.vote
+        : undefined,
+    })
+  return ballotResult(committeeSize(c.kind), valid)
 }
