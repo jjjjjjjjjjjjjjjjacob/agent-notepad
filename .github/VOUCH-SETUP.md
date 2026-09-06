@@ -30,7 +30,10 @@ appropriate plan upgrade before the required gate can be enforced.
    PRs. Verify the emitted status is attached to each PR's current head commit.
    Check a vouched author, unknown author, draft, and a trust removal using
    disposable PRs before relying on enforcement. Do not approve/run contributor
-   code merely to test this policy. This implementation has not been dispatched.
+   code merely to test this policy. The hosted workflow was dispatched on
+   September 6, 2026 and rejected draft PR #8 and unvouched Dependabot PRs as
+   expected. Local tests cover trust removal and publication races; complete
+   the remaining hosted cases before claiming full hosted enforcement.
 
 The workflow reads trust only from canonical `main`; modifying the file in a
 fork cannot self-vouch. Every main push, PR edit/base/state/head change, and manual recheck
