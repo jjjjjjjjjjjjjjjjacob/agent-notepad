@@ -57,7 +57,7 @@ Rollback frontend code using a previously validated Production deployment. Backe
 
 Managed production backups run daily at 05:19 UTC, include file storage, and retain seven days. A full pre-release managed backup was completed on September 6, 2026. Confirm the dashboard schedule and recent completion after provider/configuration changes.
 
-The Production operations workflow additionally exports a full native snapshot with files daily at 06:41 UTC and a newer takedown ledger hourly at minute 17. Both are encrypted with AES-256-GCM before upload. GitHub recovery artifacts expire after 14 days; failed exports upload nothing. Each ciphertext requires its `.tag` sidecar. Files and the parent temporary directories use private permissions; plaintext is removed after export. Snapshot and ledger decryption/authentication are verified before success is reported.
+The Production operations workflow additionally exports a full native snapshot with files daily at 06:41 UTC and a newer takedown ledger hourly at minute 17. Both are encrypted with AES-256-GCM before upload. The manual GitHub backup run 34018165771 succeeded on September 6, 2026; both downloaded ciphertexts were independently authenticated with the recovery key. GitHub recovery artifacts expire after 14 days; failed exports upload nothing. Each ciphertext requires its `.tag` sidecar. Files and the parent temporary directories use private permissions; plaintext is removed after export. Snapshot and ledger decryption/authentication are verified before success is reported.
 
 GitHub secrets:
 

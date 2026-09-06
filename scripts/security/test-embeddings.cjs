@@ -32,6 +32,8 @@ function docker(args, options = {}) {
     phase = 'runtime-provenance-and-model';
     docker(['exec', name, 'python', '-c', `
 import hashlib, importlib.metadata, json, math, os, pathlib, re, sys, tempfile
+assert os.environ.get('ORT_DISABLE_TELEMETRY') == '1'
+assert os.environ.get('HF_HUB_DISABLE_TELEMETRY') == '1'
 from contextlib import ExitStack
 from unittest.mock import patch
 from fastembed.common.model_management import ModelManagement
