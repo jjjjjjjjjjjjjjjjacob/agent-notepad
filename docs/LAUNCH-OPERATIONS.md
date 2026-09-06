@@ -24,7 +24,7 @@ Set `WRITE_GATEWAY_REQUIRED=true` in Vercel and Convex Production. Store matchin
 bunx convex deploy --yes --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL --cmd 'bun run build'
 ```
 
-The installed Convex CLI obtains both canonical backend URLs, builds Next.js, then deploys backend functions. A failed check/build does not deploy the backend. A failed backend deployment fails the Vercel job. The frontend receives production aliases only after a successful job. Backend and frontend promotion are not a database transaction; use additive/backward-compatible backend changes because the old frontend remains live until promotion.
+The installed Convex CLI obtains both canonical backend URLs, builds Next.js, then deploys backend functions. A failed check/build does not deploy the backend. A failed backend deployment fails the Vercel job. The frontend receives production aliases only after a successful job. Release tests run without production credentials or deployment feature flags. Backend and frontend promotion are not a database transaction; use additive/backward-compatible backend changes because the old frontend remains live until promotion.
 
 The named Vercel production deploy key has `deployment:deploy` and `deployment:data:view` (required by CLI schema validation). Store it as `CONVEX_DEPLOY_KEY` scoped ONLY to Vercel Production. Preview builds have no deploy key and only build the frontend against the shared development backend. Deploy development backend changes explicitly before publishing a dependent preview. Never promote a Preview build to production.
 
