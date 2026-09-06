@@ -12,6 +12,7 @@ From the repository root:
 # Store locally; do not commit this file.
 umask 077
 printf 'EMBEDDING_SERVICE_TOKEN=%s\n' "$(openssl rand -hex 32)" > services/embeddings/.env
+node scripts/security/verify-image.cjs
 docker compose --env-file services/embeddings/.env -f services/embeddings/compose.yaml up --build -d
 curl --fail http://127.0.0.1:8088/health
 docker compose --env-file services/embeddings/.env -f services/embeddings/compose.yaml exec embeddings python test_service.py
@@ -54,21 +55,60 @@ Regenerate from the repository root with the pinned, checksum-verified uv tool:
 ```sh
 node scripts/security/tool.cjs uv pip compile services/embeddings/requirements.in --python-version 3.12 --python-platform x86_64-manylinux_2_28 --generate-hashes --no-emit-index-url --output-file services/embeddings/requirements.txt
 node scripts/security/scan.cjs dependencies
+node scripts/security/verify-image.cjs
 docker build --platform linux/amd64 -t agent-notepad-embeddings:review services/embeddings
 node scripts/security/test-embeddings.cjs agent-notepad-embeddings:review
 node scripts/security/scan.cjs image agent-notepad-embeddings:review
 ```
 
-Review both direct and transitive changes. The base is pinned by its readable Python
-3.12.14 Debian 13 tag and multi-platform digest. To update it, resolve the official
-Python image index digest, verify its provenance, rebuild, scan the actual image, and
-rerun the real service tests. This does not authorize changing the model revision or
-preprocessing. The test runner creates a uniquely named container with no network,
-read-only storage, dropped capabilities, no-new-privileges, and an ephemeral token
-that is never printed; it removes only that container.
+Review both direct and transitive changes. The builder is the official Python 3.12.14 Debian 13 slim image pinned by digest;
+the final runtime is Distroless `cc-debian13:nonroot`, also pinned by digest. The build
+copies the unchanged Python interpreter, all 36 locked distributions, application,
+and model. It includes complete Debian libffi8, libbz2-1.0 and liblzma5 packages from
+the same builder. `stage_runtime.py` preserves their dpkg status records and writes
+package/source/version/architecture plus per-file hashes to
+`/usr/share/agent-notepad/runtime-packages.json`. Pip and ensurepip are omitted from
+the final runtime; removing installer tooling includes its code and metadata rather
+than concealing it from the scanner.
 
-The current slim image audit reports unfixed Debian advisories and fixable bundled
-pip advisories. CI keeps those findings visible and fails the image check; a compatible
-minimal runtime is under evaluation. See the repository security setup guide before
-activating the new checks. A severity label alone does not prove that an embedding
-request can reach the affected system utility or library behavior.
+This is a service-specific Python runtime. Optional standard-library extensions for
+curses, crypt, dbm/gdbm, readline, SQLite and UUID lack their native libraries. The
+embedding service and real model tests do not use those paths; new uses need a separate
+compatibility review and provenance-tracked packages. The original slim environment
+also lacked tkinter native libraries. Python remains 3.12.14 and model identity and
+preprocessing are unchanged.
+
+Before every local build and in CI, verify the final base's publisher signature:
+
+```sh
+node scripts/security/verify-image.cjs
+```
+
+The pinned Cosign 3.1.3 binary is downloaded from its official release and its recorded
+SHA-256 is checked before execution. The verifier uses Google's documented issuer
+`https://accounts.google.com` and identity
+`keyless@distroless.iam.gserviceaccount.com`, requires successful certificate/transparency
+verification, and checks the signed digest against the Dockerfile. Digest pinning alone
+does not verify the publisher. The [official Distroless verification instructions](https://github.com/GoogleContainerTools/distroless#how-do-i-verify-distroless-images)
+are the source of these identity constraints.
+
+To update, inspect the official Python and Distroless image indexes, review their source
+and package changes, verify the candidate Distroless digest using the same issuer and
+identity before adopting it, then update both Dockerfile pins and the builder digest
+record in `stage_runtime.py`. Verify updated Cosign/tool assets against official release
+metadata. Rebuild, inspect actual OS/Python inventories, run the real hardened service
+tests, and review every advisory. Do not update the advisory baseline automatically or
+change model/preprocessing while doing dependency maintenance.
+
+The reviewed image has 21 temporarily accepted Debian findings (14 medium, 7 low),
+expiring 2026-10-06 at 00:00 UTC. Every finding remains visible in scan output and the
+CI summary; none is represented as proven unreachable or a false positive. The image
+baseline cannot excuse Python dependencies, fixes that become available, new findings,
+high/critical or unknown severity, increased severity, or expired reviews. See the
+repository security setup guide for exact matching and renewal rules.
+
+The test runner creates a unique container with no networking, read-only storage,
+dropped capabilities, no-new-privileges, and an ephemeral token that is never printed.
+It validates the exact package set, copied file hashes and package records, absence
+of pip/ensurepip, and all existing real-vector/auth/batch/window tests. It removes only
+that container. This does not authorize changing the model revision or preprocessing.

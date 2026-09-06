@@ -25,6 +25,8 @@ test('dependency findings, absent graphs, and malformed results fail closed', ()
   assert.throws(() => noAdvisories({ Results: [{ Vulnerabilities: [{ VulnerabilityID: 'synthetic' }] }] }));
   for (const value of [null, {}, { Results: [] }]) assert.throws(() => noAdvisories(value, expected));
   assert.throws(() => lockedPackages('# empty'));
+  assert.throws(() => noAdvisories({ Results: [{ Type: 'pip', Packages: packages, Vulnerabilities: {} }] }, expected));
+  assert.throws(() => noAdvisories({ Results: [{ Type: 'python-pkg', Packages: [...packages, { Name: 'unlocked', Version: '1' }] }] }, expected, true));
 });
 test('application workflows have only read authority and immutable actions', () => {
   const fs = require('node:fs');

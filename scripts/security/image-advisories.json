@@ -1,0 +1,236 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "distro": "debian:13.6",
+      "package": "libbz2-1.0",
+      "version": "1.0.8-6",
+      "cve": "CVE-2026-42250",
+      "maximumSeverity": "MEDIUM",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2026-42250",
+      "rationale": "Temporary accepted residual risk. The reported issue concerns bzip2recover, which is absent from the runtime; the endpoint does not offer archive recovery. The library package remains inventoried, and transitive native reachability is not proven absent. No fixed trixie package version is reported.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2026-18374",
+      "maximumSeverity": "MEDIUM",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2026-18374",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2026-19499",
+      "maximumSeverity": "MEDIUM",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2026-19499",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent. The reviewed Debian tracker identifies trixie as vulnerable with minor/no-DSA status; unavailable CVEProject content is not a dismissal.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2026-19542",
+      "maximumSeverity": "MEDIUM",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2026-19542",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent. The reviewed Debian tracker identifies trixie as vulnerable with minor/no-DSA status; unavailable CVEProject content is not a dismissal.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2026-5435",
+      "maximumSeverity": "MEDIUM",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2026-5435",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2026-5450",
+      "maximumSeverity": "MEDIUM",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2026-5450",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2026-5928",
+      "maximumSeverity": "MEDIUM",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2026-5928",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2026-6238",
+      "maximumSeverity": "MEDIUM",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2026-6238",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2026-6368",
+      "maximumSeverity": "MEDIUM",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2026-6368",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2026-6791",
+      "maximumSeverity": "MEDIUM",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2026-6791",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2026-77117",
+      "maximumSeverity": "MEDIUM",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2026-77117",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent. The reviewed Debian tracker identifies trixie as vulnerable with minor/no-DSA status; unavailable CVEProject content is not a dismissal.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2026-80489",
+      "maximumSeverity": "MEDIUM",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2026-80489",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent. The reviewed Debian tracker identifies trixie as vulnerable with minor/no-DSA status; unavailable CVEProject content is not a dismissal.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2010-4756",
+      "maximumSeverity": "LOW",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2010-4756",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2018-20796",
+      "maximumSeverity": "LOW",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2018-20796",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2019-1010022",
+      "maximumSeverity": "LOW",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2019-1010022",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2019-1010023",
+      "maximumSeverity": "LOW",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2019-1010023",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2019-1010024",
+      "maximumSeverity": "LOW",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2019-1010024",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2019-1010025",
+      "maximumSeverity": "LOW",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2019-1010025",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "libc6",
+      "version": "2.41-12+deb13u3",
+      "cve": "CVE-2019-9192",
+      "maximumSeverity": "LOW",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2019-9192",
+      "rationale": "Temporary accepted residual risk for the reviewed offline nonroot embedding runtime. No fixed trixie package version is reported. The request API does not expose C format strings, shell expansion, ELF loading, or native code execution; transitive native reachability is not proven absent.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "zlib1g",
+      "version": "1:1.3.dfsg+really1.3.1-1+b1",
+      "cve": "CVE-2026-27171",
+      "maximumSeverity": "MEDIUM",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2026-27171",
+      "rationale": "Temporary accepted residual risk. The service accepts bounded JSON text and does not expose CRC-combination or gzip-writing operations; transitive native reachability is not proven absent. No fixed trixie package version is reported.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    },
+    {
+      "distro": "debian:13.6",
+      "package": "zlib1g",
+      "version": "1:1.3.dfsg+really1.3.1-1+b1",
+      "cve": "CVE-2026-85091",
+      "maximumSeverity": "MEDIUM",
+      "source": "https://security-tracker.debian.org/tracker/CVE-2026-85091",
+      "rationale": "Temporary accepted residual risk. The service accepts bounded JSON text and does not expose CRC-combination or gzip-writing operations; transitive native reachability is not proven absent. No fixed trixie package version is reported. Debian asks reviewers to check details, and affected-version prose conflicts; applicability remains uncertain rather than classified as a false positive.",
+      "reviewedAt": "2026-09-06",
+      "expiresAt": "2026-10-06"
+    }
+  ]
+}

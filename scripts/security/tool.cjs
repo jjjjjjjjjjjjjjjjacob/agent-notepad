@@ -20,6 +20,11 @@ async function install(name) {
     if (!response.ok) throw new Error('Security tool download failed');
     const bytes = Buffer.from(await response.arrayBuffer());
     verify(bytes, asset[1]);
+    if (spec.format === 'binary') {
+      const bin = path.join(dir, asset[2]);
+      await fs.writeFile(bin, bytes, { mode: 0o700 });
+      return { bin, dir };
+    }
     const archive = path.join(dir, 'tool.tar.gz');
     await fs.writeFile(archive, bytes, { mode: 0o600 });
     const extracted = spawnSync('tar', ['-xzf', archive, '-C', dir, asset[2]], { stdio: 'pipe' });

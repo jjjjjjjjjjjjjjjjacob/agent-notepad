@@ -25,9 +25,27 @@ function docker(args, options = {}) {
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     if (!ready) throw new Error('Offline startup failed');
+    docker(['exec', name, 'python', '-c', `
+import hashlib, importlib.metadata, json, os, pathlib, re, sys
+assert os.getuid() == 65532 and sys.version_info[:2] == (3, 12)
+assert not pathlib.Path('/usr/local/lib/python3.12/ensurepip').exists()
+normalize = lambda name: re.sub(r'[-_.]+', '-', name.lower())
+expected = {normalize(name): version for name, version in re.findall(r'^([a-zA-Z0-9_.-]+)==([^\\s\\\\]+)', pathlib.Path('/app/requirements.txt').read_text(), re.M)}
+actual = {normalize(item.metadata['Name']): item.version for item in importlib.metadata.distributions()}
+assert actual == expected and 'pip' not in actual
+manifest = json.loads(pathlib.Path('/usr/share/agent-notepad/runtime-packages.json').read_text())
+assert {item['name'] for item in manifest['packages']} == {'libffi8', 'libbz2-1.0', 'liblzma5'}
+for item in manifest['packages']:
+    status = pathlib.Path('/var/lib/dpkg/status.d', item['name']).read_text()
+    assert 'Version: ' + item['version'] in status
+    for record in item['files']:
+        file = pathlib.Path(record['path'])
+        if 'sha256' in record: assert hashlib.sha256(file.read_bytes()).hexdigest() == record['sha256']
+        else: assert str(file.readlink()) == record['symlink']
+`]);
     const output = docker(['exec', name, 'python', 'test_service.py']);
     // The service test prints no credentials; preserve only a fixed success summary.
     if (output.includes(token)) throw new Error('Unexpected credential in test output');
-    console.log('Embedding tests passed: offline startup, real vectors, auth, batch/model bounds, complete windows.');
+    console.log('Embedding tests passed: offline startup, exact package/provenance checks, no pip, real vectors, auth, batch/model bounds, complete windows.');
   } finally { spawnSync('docker', ['rm', '-f', name], { stdio: 'pipe', timeout: 30000 }); }
 })().catch(() => { console.error('Embedding image validation failed; no credentials or container logs printed.'); process.exitCode = 1; });

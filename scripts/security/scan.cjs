@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { install } = require('./tool.cjs');
+const { assessImage, summary } = require('./image-policy.cjs');
 
 function checked(command, args, options = {}) {
   const result = spawnSync(command, args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, timeout: 600000, ...options });
@@ -21,15 +22,19 @@ function lockedPackages(text) {
   if (!expected.size) throw new Error('Missing locked Python dependency graph');
   return expected;
 }
-function noAdvisories(report, expected, image = false) {
+function coverage(report, expected, image = false) {
   if (!report || !Array.isArray(report.Results)) throw new Error('Invalid vulnerability report');
+  if (report.Results.some(result => !result || (result.Vulnerabilities !== undefined && !Array.isArray(result.Vulnerabilities)) || (result.Packages !== undefined && !Array.isArray(result.Packages)))) throw new Error('Malformed dependency inventory');
   if (expected) {
     const results = report.Results.filter(r => r.Type === (image ? 'python-pkg' : 'pip'));
     const actual = new Map(results.flatMap(r => r.Packages ?? []).map(p => [p.Name.toLowerCase().replaceAll('_', '-').replaceAll('.', '-'), p.Version]));
-    if (!actual.size || [...expected].some(([name, version]) => actual.get(name) !== version) || (!image && actual.size !== expected.size)) {
+    if (!actual.size || [...expected].some(([name, version]) => actual.get(name) !== version) || actual.size !== expected.size) {
       throw new Error('Incomplete or inconsistent Python dependency coverage');
     }
   }
+}
+function noAdvisories(report, expected, image = false) {
+  coverage(report, expected, image);
   if (report.Results.some(r => r.Vulnerabilities?.length)) throw new Error('Dependency advisories require review');
 }
 async function scan(mode, image) {
@@ -60,15 +65,28 @@ async function scan(mode, image) {
       }
       tool = await install('trivy');
       const output = path.join(dir, 'dependencies.json');
-      const args = ['--scanners=vuln', '--exit-code=1', '--list-all-pkgs', '--format=json', `--output=${output}`, '--ignorefile=/dev/null'];
+      // Trivy errors still fail; findings are evaluated from the complete JSON below.
+      const args = ['--scanners=vuln', '--exit-code=0', '--list-all-pkgs', '--format=json', `--output=${output}`];
+      // Run outside the checkout so repository .trivyignore/config files cannot hide findings.
+      const trivyOptions = { cwd: dir, env: { ...Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('TRIVY_'))), TRIVY_CACHE_DIR: path.join(dir, 'cache') } };
       if (mode === 'image') {
         if (!image || !/^[a-zA-Z0-9][a-zA-Z0-9/_.:@-]+$/.test(image)) throw new Error('Invalid image reference');
         const saved = path.join(dir, 'image.tar');
         checked('docker', ['image', 'save', '--output', saved, image]);
-        checked(tool.bin, ['image', ...args, '--input', saved]);
-      } else checked(tool.bin, ['fs', ...args, 'services/embeddings']);
+        checked(tool.bin, ['image', ...args, '--input', saved], trivyOptions);
+      } else checked(tool.bin, ['fs', ...args, path.resolve('services/embeddings')], trivyOptions);
       const expected = lockedPackages(await fs.readFile('services/embeddings/requirements.txt', 'utf8'));
-      noAdvisories(JSON.parse(await fs.readFile(output, 'utf8')), expected, mode === 'image');
+      const report = JSON.parse(await fs.readFile(output, 'utf8'));
+      if (mode === 'image') {
+        let policy;
+        try { policy = JSON.parse(await fs.readFile(path.join(__dirname, 'image-advisories.json'), 'utf8')); } catch { policy = null; }
+        const assessment = assessImage(report, policy);
+        const visible = summary(assessment);
+        console.log(visible);
+        if (process.env.GITHUB_STEP_SUMMARY) await fs.appendFile(process.env.GITHUB_STEP_SUMMARY, visible + '\n');
+        coverage(report, expected, true);
+        if (assessment.policyError || assessment.rejected) throw new Error('Image findings require review');
+      } else noAdvisories(report, expected);
     } else throw new Error('Unknown security scan');
     console.log(`${mode}: security scan passed`);
   } finally {
@@ -80,4 +98,4 @@ if (require.main === module) scan(process.argv[2], process.argv[3]).catch(() => 
   console.error('Security scan failed: finding, invalid report, or tool/network error. No matched values were logged.');
   process.exitCode = 1;
 });
-module.exports = { checked, noAdvisories, lockedPackages };
+module.exports = { checked, noAdvisories, lockedPackages, coverage };

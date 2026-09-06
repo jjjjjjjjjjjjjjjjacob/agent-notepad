@@ -1,7 +1,7 @@
 # Repository security checks
 
 These files do not enable hosting features or change repository visibility. Jacob must
-review them and the outstanding embedding image advisories before activation.
+review them and the time-limited embedding image advisory baseline before activation.
 
 ## Hosted activation
 
@@ -51,9 +51,9 @@ node scripts/security/fixtures.cjs
 ```
 
 The tools manifest pins release assets and SHA-256 hashes for Gitleaks 8.30.1,
-Trivy 0.74.0, actionlint 1.7.12, and uv 0.12.10. Downloads are verified before execution;
+Trivy 0.74.0, actionlint 1.7.12, uv 0.12.10, and Cosign 3.1.3. Downloads are verified before execution;
 unsupported platforms, failed downloads, checksum mismatches, scanner errors, missing
-Python coverage, and findings fail the check. Supported local platforms are macOS arm64
+Python coverage, source findings, and unreviewed image findings fail the check. Supported local platforms are macOS arm64
 and Linux amd64. `actionlint -shellcheck=` validates Actions syntax without requiring a
 separate ShellCheck installation. All Actions use verified official commit SHAs.
 
@@ -71,18 +71,39 @@ Actions' full SHAs and tool checksums from official release metadata. Dependabot
 bypass Vouch or merge its own updates. Regenerate and inspect the Python lock after input
 updates using the embedding README; preserve the model revision and preprocessing.
 
-## Current verification and blocker
+## Image baseline and review
 
-The implementation checkpoint passed 209 application tests (one integration skip), 20
-Node tests, typecheck/lint/actionlint, both live scanner fixtures, and the real embedding
-service tests offline with read-only storage and dropped capabilities. All 36 locked
-Python packages were scanned and their resolution/hashes reproduced.
+The runtime uses a keyless-signature-verified, digest-pinned Distroless Debian 13
+nonroot base, Python 3.12.14 from the official pinned Python builder, and all 36
+locked distributions. Complete libffi8, libbz2-1.0 and liblzma5 package contents retain
+their dpkg records and per-file hashes. Pip and ensurepip are excluded. The signature
+step verifies the documented Google issuer and identity before each CI build; a digest
+alone establishes content identity, not publisher identity. See the embedding README
+for the exact update procedure and optional standard-library limitations.
 
-The pinned Python slim image contains unfixed Debian advisories and bundled pip
-advisories. Image checks intentionally remain failing until remediation or a reviewed
-policy refinement; no findings are suppressed. A smaller, signature-verified compatible
-runtime is being evaluated separately. The runtime Dockerfile has not yet been switched.
-Docker Desktop 27.5.1 also returned a missing-snapshot error for image history in local
-verification; saving the isolated image and scanning the archive worked. The image scan
-script therefore uses `docker image save` and Trivy `--input`, also verifying Python
-package coverage from the actual runtime image.
+[`scripts/security/image-advisories.json`](../scripts/security/image-advisories.json)
+contains the 21 reviewed residual findings (14 medium, 7 low), each keyed by exact
+Debian distribution version, package, package version, and CVE. Every entry includes
+its primary Debian source, rationale, maximum severity, review date, and expiry.
+The current review expires **2026-10-06 at 00:00 UTC**, exclusively. No finding is
+classified as proven unreachable or a false positive; native transitive reachability
+remains uncertain. The API does not offer archive recovery, C format strings, or shell
+expansion. Conflicting applicability details for CVE-2026-85091 are retained.
+
+The image scan prints every advisory and its decision and appends the same table to
+the CI summary. Trivy runs without ignore or severity filters in a fresh directory,
+with inherited Trivy configuration cleared. New, unknown-severity, high/critical,
+higher-than-reviewed, fixable, unreviewed, expired, and malformed entries fail the check.
+Source and Python-package scans cannot use the image baseline. Duplicate records,
+invalid dates, future reviews, and review periods over 30 days fail validation. Even an
+expired unused entry requires removal or review. The baseline is never refreshed
+implicitly: Jacob must assess primary advisories, update/remediate dependencies where
+possible, review the exact diff, and rerun scans/tests before any renewal.
+
+The isolated verification passed the full application suite, Node policy/tool tests,
+typecheck/lint/actionlint, both live scanner fixtures, and the real embedding service
+tests without network access. Exact runtime package versions and copied file hashes
+are checked by the service test runner. Runtime image scanning retains both OS and
+Python inventory. Docker Desktop 27.5.1 returned a missing-snapshot error for image
+history, so the portable image scanner uses `docker image save` and Trivy `--input`.
+No unrelated Docker objects are stopped or removed by these checks.

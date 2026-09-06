@@ -11,15 +11,18 @@ Contributions, including dependency updates, require review and the configured c
 
 Repository checks scan Git history and current non-ignored files for secrets, audit
 the Bun lock and the complete resolved Python graph, and build/test/scan the embedding
-image. These checks fail on findings and tool/network errors. Secret output is redacted;
+image. Source/dependency checks fail on findings; image checks fail on findings outside the exact, time-limited reviewed baseline. All checks fail on tool/network errors. Secret output is redacted;
 scanner reports containing matched values are never uploaded. No scanner establishes
 that code is safe, and an advisory's severity alone does not establish that the service
-can reach the vulnerable behavior. Unfixed image findings must remain visible and need
-an explicit, documented maintainer assessment; there is no blanket ignore policy.
+can reach the vulnerable behavior. The image baseline temporarily accepts 21 reviewed medium/low Debian findings until
+2026-10-06 00:00 UTC. All remain visible in logs and CI summaries. They are accepted
+residual risk, not proven unreachable or false positives. New, fixable, higher-severity,
+unknown-severity, expired, or malformed findings fail; high/critical findings cannot
+be excepted. There is no blanket ignore policy.
 
 The embedding service remains an authenticated, offline CPU service. Its pinned model,
 nonroot runtime, read-only filesystem, disabled capabilities, request bounds, and
 loopback-only local access are part of its security design.
 
 See [.github/SECURITY-SETUP.md](.github/SECURITY-SETUP.md) for activation, check names,
-update commands, limitations, and the current image-audit blocker.
+update commands, limitations, and the advisory review/update procedure.
