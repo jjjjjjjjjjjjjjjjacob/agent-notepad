@@ -1,0 +1,97 @@
+name: Vouch contributor policy
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, edited, closed]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Serialize refreshes and never cancel a run while it is invalidating statuses.
+concurrency:
+  group: vouch-policy
+  cancel-in-progress: false
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    if: github.repository == 'jjjjjjjjjjjjjjjjacob/agent-notepad'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    outputs:
+      matrix: ${{ steps.snapshot.outputs.matrix }}
+      any: ${{ steps.snapshot.outputs.any }}
+    steps:
+      - id: snapshot
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            if (context.eventName === 'workflow_dispatch' &&
+                (context.actor !== 'jjjjjjjjjjjjjjjjacob' || context.ref !== 'refs/heads/main')) {
+              throw new Error('Only Jacob may manually recheck from main');
+            }
+            const repo = context.repo;
+            const eventHead = context.payload.pull_request?.head?.sha;
+            if (eventHead) {
+              await github.rest.repos.createCommitStatus({ ...repo, sha: eventHead, state: 'pending',
+                context: 'Vouch / trusted contributor', description: 'Refreshing PR author and head policy' });
+            }
+            const prs = await github.paginate(github.rest.pulls.list, { ...repo, state: 'open', base: 'main', per_page: 100 });
+            for (const sha of new Set(prs.map(pr => pr.head.sha))) {
+              await github.rest.repos.createCommitStatus({ ...repo, sha, state: 'pending',
+                context: 'Vouch / trusted contributor', description: 'Checking canonical contributor trust' });
+            }
+            // Leave every head pending if a repository outgrows matrix capacity.
+            if (prs.length > 256) throw new Error('More than 256 open PRs: all pending; expand refresh batching');
+            const base = (await github.rest.repos.getBranch({ ...repo, branch: 'main' })).data.commit.sha;
+            const include = prs.map(pr => ({ number: pr.number, sha: pr.head.sha, author: pr.user.login, base }));
+            core.setOutput('matrix', JSON.stringify({ include }));
+            core.setOutput('any', include.length > 0 ? 'true' : 'false');
+  check:
+    needs: prepare
+    if: needs.prepare.outputs.any == 'true'
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    steps:
+      # Explicit canonical repository and immutable main snapshot; no PR checkout.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: jjjjjjjjjjjjjjjjacob/agent-notepad
+          ref: ${{ matrix.base }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - id: vouch
+        continue-on-error: true
+        uses: mitchellh/vouch/action/check-user@d66fa29a64600490892131ad87597c30c91fcac4 # v1.5.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          user: ${{ matrix.author }}
+          repo: jjjjjjjjjjjjjjjjacob/agent-notepad
+          vouched-repo: jjjjjjjjjjjjjjjjacob/agent-notepad
+          vouched-file: .github/VOUCHED.td
+          allow-fail: 'true'
+      - if: always()
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          VOUCH_SNAPSHOT: ${{ toJSON(matrix) }}
+          VOUCH_STATUS: ${{ steps.vouch.outputs.status }}
+        with:
+          script: |
+            const { finalize } = require('./.github/scripts/vouch-gate.cjs');
+            await finalize({ github, context, core,
+              snapshot: JSON.parse(process.env.VOUCH_SNAPSHOT),
+              actionStatus: process.env.VOUCH_STATUS });
