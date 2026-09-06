@@ -19,3 +19,10 @@ Jacob updates the list through ordinary file edits. Removing an entry removes
 trust; prefixing it with `-` explicitly denounces the account. No comment-driven
 management bot is installed. See [.github/VOUCH-SETUP.md](.github/VOUCH-SETUP.md)
 for the hosted enforcement requirements and current activation limitations.
+
+For security concerns, follow [SECURITY.md](SECURITY.md). Run the checks in
+[.github/SECURITY-SETUP.md](.github/SECURITY-SETUP.md) before requesting review.
+Dependency and workflow updates use the same review and Vouch policy as other changes;
+no update bot receives write access or an automatic merge exemption. Update Python
+inputs and regenerate the hashed dependency graph together. Verify new action SHAs and
+security-tool checksums against official releases before changing their pins.

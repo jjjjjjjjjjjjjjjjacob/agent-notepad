@@ -43,3 +43,32 @@ The model produces normalized 384-dimensional English embeddings with a 512-toke
 Retrieval expands small matching passages into surrounding section context, retaining exact revision offsets and citations under the caller's context budget. Related queries share one embedding request. Keyword fallback remains available. This English model is not a promise of multilingual retrieval quality.
 
 The old 1,024-dimensional Titan field/index remains in the schema for an additive rollout; new retrieval never searches it. Remove it only in a later migration after confirming no old deployed functions depend on it. Other application features may independently use AWS; search itself requires only this service and Convex.
+
+## Reproducible dependencies and image review
+
+`requirements.in` holds the three direct dependencies. `requirements.txt` is the
+complete 36-package hash-locked graph, resolved for Python 3.12 on Linux amd64.
+The Docker build requires hashes and binary distributions for every installation.
+Regenerate from the repository root with the pinned, checksum-verified uv tool:
+
+```sh
+node scripts/security/tool.cjs uv pip compile services/embeddings/requirements.in --python-version 3.12 --python-platform x86_64-manylinux_2_28 --generate-hashes --no-emit-index-url --output-file services/embeddings/requirements.txt
+node scripts/security/scan.cjs dependencies
+docker build --platform linux/amd64 -t agent-notepad-embeddings:review services/embeddings
+node scripts/security/test-embeddings.cjs agent-notepad-embeddings:review
+node scripts/security/scan.cjs image agent-notepad-embeddings:review
+```
+
+Review both direct and transitive changes. The base is pinned by its readable Python
+3.12.14 Debian 13 tag and multi-platform digest. To update it, resolve the official
+Python image index digest, verify its provenance, rebuild, scan the actual image, and
+rerun the real service tests. This does not authorize changing the model revision or
+preprocessing. The test runner creates a uniquely named container with no network,
+read-only storage, dropped capabilities, no-new-privileges, and an ephemeral token
+that is never printed; it removes only that container.
+
+The current slim image audit reports unfixed Debian advisories and fixable bundled
+pip advisories. CI keeps those findings visible and fails the image check; a compatible
+minimal runtime is under evaluation. See the repository security setup guide before
+activating the new checks. A severity label alone does not prove that an embedding
+request can reach the affected system utility or library behavior.

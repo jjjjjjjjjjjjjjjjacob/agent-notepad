@@ -2,7 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
-const { checked, noAdvisories } = require('./scan.cjs');
+const { checked, noAdvisories, lockedPackages } = require('./scan.cjs');
 const { verify } = require('./tool.cjs');
 
 test('tool checksums reject tampered downloads', () => {
@@ -15,10 +15,16 @@ test('scanner failures and missing tools fail closed without reproducing stdout'
   assert.throws(() => checked('/nonexistent-security-scanner', []));
 });
 test('dependency findings, absent graphs, and malformed results fail closed', () => {
-  const good = { Results: [{ Type: 'pip', Packages: [{}, {}, {}] }] };
-  noAdvisories(good, true);
+  const expected = lockedPackages('requests==2.34.2\nfastapi==0.141.1\n');
+  const packages = [{ Name: 'requests', Version: '2.34.2' }, { Name: 'fastapi', Version: '0.141.1' }];
+  noAdvisories({ Results: [{ Type: 'pip', Packages: packages }] }, expected);
+  noAdvisories({ Results: [{ Type: 'python-pkg', Packages: packages }] }, expected, true);
+  assert.throws(() => noAdvisories({ Results: [{ Type: 'pip', Packages: packages.slice(0, 1) }] }, expected));
+  assert.throws(() => noAdvisories({ Results: [{ Type: 'pip', Packages: [{ Name: 'requests', Version: 'wrong' }, packages[1]] }] }, expected));
+  assert.throws(() => noAdvisories({ Results: [{ Type: 'pip', Packages: packages }] }, expected, true));
   assert.throws(() => noAdvisories({ Results: [{ Vulnerabilities: [{ VulnerabilityID: 'synthetic' }] }] }));
-  for (const value of [null, {}, { Results: [] }]) assert.throws(() => noAdvisories(value, true));
+  for (const value of [null, {}, { Results: [] }]) assert.throws(() => noAdvisories(value, expected));
+  assert.throws(() => lockedPackages('# empty'));
 });
 test('application workflows have only read authority and immutable actions', () => {
   const fs = require('node:fs');

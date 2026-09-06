@@ -11,9 +11,25 @@ function checked(command, args, options = {}) {
   if (result.error || result.status !== 0) throw new Error('Security scan found an issue or could not complete');
   return result.stdout;
 }
-function noAdvisories(report, requirePython = false) {
+function lockedPackages(text) {
+  const expected = new Map();
+  for (const match of text.matchAll(/^([a-zA-Z0-9_.-]+)==([^\s\\]+)\s*(?:\\)?$/gm)) {
+    const name = match[1].toLowerCase().replaceAll('_', '-').replaceAll('.', '-');
+    if (expected.has(name)) throw new Error('Duplicate locked package');
+    expected.set(name, match[2]);
+  }
+  if (!expected.size) throw new Error('Missing locked Python dependency graph');
+  return expected;
+}
+function noAdvisories(report, expected, image = false) {
   if (!report || !Array.isArray(report.Results)) throw new Error('Invalid vulnerability report');
-  if (requirePython && !report.Results.some(r => r.Type === 'pip' && r.Packages?.length >= 3)) throw new Error('Python dependency graph was not scanned');
+  if (expected) {
+    const results = report.Results.filter(r => r.Type === (image ? 'python-pkg' : 'pip'));
+    const actual = new Map(results.flatMap(r => r.Packages ?? []).map(p => [p.Name.toLowerCase().replaceAll('_', '-').replaceAll('.', '-'), p.Version]));
+    if (!actual.size || [...expected].some(([name, version]) => actual.get(name) !== version) || (!image && actual.size !== expected.size)) {
+      throw new Error('Incomplete or inconsistent Python dependency coverage');
+    }
+  }
   if (report.Results.some(r => r.Vulnerabilities?.length)) throw new Error('Dependency advisories require review');
 }
 async function scan(mode, image) {
@@ -22,7 +38,7 @@ async function scan(mode, image) {
   try {
     if (mode === 'secrets') {
       tool = await install('gitleaks');
-      const args = ['--redact=100', '--no-banner', '--exit-code=1', '--report-format=json', `--report-path=${path.join(dir, 'report.json')}`];
+      const args = ['--redact=100', '--ignore-gitleaks-allow', '--no-banner', '--exit-code=1', '--report-format=json', `--report-path=${path.join(dir, 'report.json')}`];
       checked(tool.bin, ['git', ...args, '--log-opts=--all', '.']);
       // Include staged, unstaged, and new non-ignored files without ever reading .env/ignored files.
       const files = checked('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z']).split('\0').filter(Boolean);
@@ -47,9 +63,12 @@ async function scan(mode, image) {
       const args = ['--scanners=vuln', '--exit-code=1', '--list-all-pkgs', '--format=json', `--output=${output}`, '--ignorefile=/dev/null'];
       if (mode === 'image') {
         if (!image || !/^[a-zA-Z0-9][a-zA-Z0-9/_.:@-]+$/.test(image)) throw new Error('Invalid image reference');
-        checked(tool.bin, ['image', ...args, image]);
+        const saved = path.join(dir, 'image.tar');
+        checked('docker', ['image', 'save', '--output', saved, image]);
+        checked(tool.bin, ['image', ...args, '--input', saved]);
       } else checked(tool.bin, ['fs', ...args, 'services/embeddings']);
-      noAdvisories(JSON.parse(await fs.readFile(output, 'utf8')), true);
+      const expected = lockedPackages(await fs.readFile('services/embeddings/requirements.txt', 'utf8'));
+      noAdvisories(JSON.parse(await fs.readFile(output, 'utf8')), expected, mode === 'image');
     } else throw new Error('Unknown security scan');
     console.log(`${mode}: security scan passed`);
   } finally {
@@ -61,4 +80,4 @@ if (require.main === module) scan(process.argv[2], process.argv[3]).catch(() => 
   console.error('Security scan failed: finding, invalid report, or tool/network error. No matched values were logged.');
   process.exitCode = 1;
 });
-module.exports = { checked, noAdvisories };
+module.exports = { checked, noAdvisories, lockedPackages };

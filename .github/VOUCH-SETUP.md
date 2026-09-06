@@ -49,14 +49,21 @@ restrictive current PR author/draft decision. Closed PR events refresh remaining
 PRs. GitHub may coalesce queued concurrency runs; each run refreshes current state.
 
 Top-level actions are immutable official SHAs. Vouch v1.5.0 internally uses a
-pinned setup-nu action but downloads the latest Nushell (`version: '*'`). That
-upstream runtime remains a supply-chain dependency. The policy job grants only
-`contents: read`, `pull-requests: read`, and `statuses: write`; PR read access is
-required for authenticated author/head lookups and open-PR refreshes. No contents,
-issue, PR, or deployment write permission is granted. Its status token must not
-be reused by application CI.
-For stronger dependency isolation, split read-only evaluation from a trusted
-status publisher in a separately reviewed change.
+pinned setup-nu action but downloads the latest Nushell (`version: '*'`); that
+interface has no version override. The evaluator has only `contents: read` and
+`pull-requests: read`. This leaves runtime supply-chain and runner-resource risk,
+but it cannot write commit statuses or repository contents.
+
+The separate publisher grants `contents: read`, `pull-requests: read`, and
+`statuses: write`. Official GitHub checkout, artifact download, and github-script
+actions remain trusted with this token. Checkout is restricted to an immutable
+canonical main snapshot with persisted credentials disabled. Evaluator artifacts
+contain one bounded scalar status; they are never loaded as code. Publication
+requires successful evaluation/artifact delivery, then independently re-reads the
+canonical trust list and current PR/main/head/draft state before and after writing.
+Upstream success cannot override the explicit canonical list. Missing, malformed,
+oversized, or failed evaluation fails closed. Application CI uses separate jobs
+with read-only credentials and never runs in this privileged workflow.
 
 Local validation: `node --test .github/scripts/vouch-gate.test.cjs`.
 

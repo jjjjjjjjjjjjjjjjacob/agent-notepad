@@ -13,13 +13,18 @@ const { install } = require('./tool.cjs');
     const gitleaks = await install('gitleaks'); tools.push(gitleaks);
     const secret = ['gh', 'p_'].join('') + randomBytes(18).toString('hex');
     const input = path.join(dir, 'secret'); await fs.mkdir(input);
-    await fs.writeFile(path.join(input, 'example.txt'), `token=${secret}\n`, { mode: 0o600 });
+    await fs.writeFile(path.join(input, 'example.txt'), `token=${secret} # gitleaks:allow\n`, { mode: 0o600 });
     const output = path.join(dir, 'redacted.json');
-    const result = spawnSync(gitleaks.bin, ['dir', '--redact=100', '--no-banner', '--report-format=json', `--report-path=${output}`, input], { encoding: 'utf8' });
-    assert.equal(result.status, 1);
-    const report = await fs.readFile(output, 'utf8');
-    assert.ok(JSON.parse(report).length > 0);
-    assert.ok(![report, result.stdout, result.stderr].some(text => text.includes(secret)));
+    for (const args of [['init', '-q'], ['add', '.'], ['-c', 'user.name=Security fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'Synthetic scanner fixture']]) {
+      assert.equal(spawnSync('git', args, { cwd: input, stdio: 'pipe' }).status, 0);
+    }
+    for (const mode of ['dir', 'git']) {
+      const result = spawnSync(gitleaks.bin, [mode, '--redact=100', '--ignore-gitleaks-allow', '--no-banner', '--report-format=json', `--report-path=${output}`, input], { encoding: 'utf8' });
+      assert.equal(result.status, 1);
+      const report = await fs.readFile(output, 'utf8');
+      assert.ok(JSON.parse(report).length > 0);
+      assert.ok(![report, result.stdout, result.stderr].some(text => text.includes(secret)));
+    }
     const trivy = await install('trivy'); tools.push(trivy);
     const dependencies = path.join(dir, 'dependencies'); await fs.mkdir(dependencies);
     await fs.writeFile(path.join(dependencies, 'requirements.txt'), 'requests==2.19.1\n');
