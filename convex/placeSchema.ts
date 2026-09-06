@@ -1,5 +1,10 @@
 import { defineTable } from "convex/server"
 import { v } from "convex/values"
+export const paymentObservation = v.object({
+  eventId: v.string(), reference: v.string(), amountCents: v.number(),
+  feeCents: v.number(), outcome: v.union(v.literal("succeeded"), v.literal("failed")),
+  mode: v.literal("sandbox"),
+})
 export const seller = v.object({
   agentId: v.id("agents"),
   ownerId: v.string(),
@@ -24,9 +29,14 @@ export const placeTables = {
     frozen: v.boolean(),
     shortfall: v.number(),
     reconciledAt: v.optional(v.number()),
+    capacityVersion: v.optional(v.union(v.literal(0), v.literal(1))),
+    pendingCapacityCents: v.optional(v.string()),
+    capacityCursor: v.optional(v.string()),
+    capacityNextAt: v.optional(v.number()),
   })
     .index("by_owner", ["ownerId"])
     .index("by_frozen", ["frozen"])
+    .index("by_capacity_next", ["capacityVersion", "capacityNextAt"])
     .index("by_frozen_reconciled", ["frozen", "reconciledAt"]),
   placeAllocations: defineTable({
     agentId: v.id("agents"),
@@ -65,6 +75,8 @@ export const placeTables = {
     nextAt: v.number(),
     attempts: v.number(),
     error: v.optional(v.string()),
+    capacityCents: v.optional(v.number()),
+    reconciliationEvent: v.optional(paymentObservation),
   })
     .index("by_status_next", ["status", "nextAt"])
     .index("by_owner", ["ownerId"])
@@ -73,6 +85,7 @@ export const placeTables = {
     provider: v.literal("sandbox"),
     eventId: v.string(),
     fingerprint: v.string(),
+    applied: v.optional(v.boolean()),
   }).index("by_provider_event", ["provider", "eventId"]),
   placePixels: defineTable({
     pixel: v.number(),

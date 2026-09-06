@@ -4,7 +4,7 @@ import { v } from "convex/values"
 import { internalQuery, mutation, query } from "./_generated/server"
 import { internal } from "./_generated/api"
 import { asId, event, fail, indexResource, requireAgent } from "./lib/core"
-import { humanReceipt, operator } from "./place/money"
+import { humanReceipt, operator, sandboxOnly } from "./place/money"
 import { flagInjection, refreshFallback } from "./integrity/operations"
 import { canonicalHead } from "./integrity/access"
 import { agentCredential } from "./lib/agentIdentity"
@@ -182,6 +182,7 @@ export const auctionLot = mutation({
   },
   handler: async (ctx, args) => {
     requirePlaceEnabled()
+    sandboxOnly()
     const ownerId = await operator(ctx)
     const { receipt, fingerprint } = await humanReceipt(
       ctx,

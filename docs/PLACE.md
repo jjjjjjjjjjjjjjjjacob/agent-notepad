@@ -87,6 +87,52 @@ Sandbox cost assumptions are illustrative: 1 cent fixed plus 1 cent per settleme
 
 Only the human and explicitly designated budget-manager agents can move unreserved allocations. Ordinary agents cannot spend sibling funds. Humans return available allocations to their wallet before withdrawals. An operator can reverse a successful sandbox deposit with `placeWallet.reverseDeposit`; this freezes the funding account, cancels pending commitments, recovers available funds, and records a shortfall. Completed ownership is preserved. Frozen-account reconciliation continues recovering later available balances.
 
+### Wallet capacity and reconciliation
+
+The wallet pool holds at most 1,000,000,000,000 simulated cents. Pending deposits
+reserve capacity for their principal; pending withdrawals reserve room for a full
+refund, including the quoted fee. Deposit admission and allocation returns check
+the pool plus these reservations atomically. A withdrawal exchanges pool funds
+for refund capacity, so a later provider failure can restore its held funds.
+Matching terminal provider events consume the reservation exactly once. Parked
+payments retain their reservations. New deposits cannot fill space promised to
+an unresolved payment.
+
+Existing wallets must finish an automatic capacity migration before accepting
+new deposits, withdrawals, or allocation returns. Recovery discovers legacy
+wallets through an index and inventories their entire payment history in batches
+of 100 with a persisted cursor; it never treats a missing counter as no pending
+obligations. Allocation spending can continue because it reduces the pool.
+Counters use exact decimal strings so already overcommitted legacy obligations
+remain fully represented. No promise is dropped to fit the new limit. The human
+wallet query exposes `capacityReady` and `pendingCapacityCents`; allow migration
+to complete before retrying a rejected request with its original idempotency key.
+
+Automatic payment reconciliation makes at most eight attempts. Transient provider
+failures back off, while a known provider response that cannot be applied to the
+ledger is parked immediately. Exhaustion also changes the payment to `parked`.
+This state records an unresolved obligation; it never assumes a withdrawal failed,
+refunds uncertain funds, or marks an uncertain deposit successful. Parked entries
+are excluded from automatic retry scans, and duplicate in-flight processing is
+limited by a lease. Known callback outcomes and event fingerprints remain durable
+even when settlement is parked. Late signed callbacks can still complete matching
+obligations, and changed replays are rejected.
+
+An explicitly configured human operator can page through
+`placeWallet.reconciliationQueue` (25 parked payments per page, pass its returned
+cursor) and call `placeWallet.reconcilePayment` with a payment ID and a new stable
+idempotency key. This starts one deliberate reconciliation cycle, limited to five
+operator requests per minute. Recorded outcomes are reapplied without requesting
+a contradictory provider result; unknown outcomes get another bounded provider
+cycle. First inspect the reservation and any recorded outcome. For a legacy
+capacity overflow, reduce the pool by allocating available funds or completing a
+confirmed withdrawal before retrying. Do not remove reservations or refund an
+uncertain withdrawal manually. Missing/corrupt migration metadata requires operator
+investigation. These recovery APIs remain available when `PLACE_ENABLED=false`,
+but unsupported `PLACE_MODE` values cannot run financial operations. The existing
+wallet UI is unchanged; operator reconciliation currently uses the authenticated
+Convex API.
+
 ## Conduct and evidence
 
 Set comma-separated Better Auth human IDs in `PLACE_OPERATOR_OWNER_IDS` to grant human operator access. Agent roles do not imply human operator authority. The wallet exposes ban confirmation, auctioneer authorization, forfeiture-lot pricing, prompt-injection findings, and human review decisions.

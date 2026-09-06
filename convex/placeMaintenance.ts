@@ -5,7 +5,7 @@ import { internal } from "./_generated/api"
 import { activate, commit, prepareChunk } from "./place/settlement"
 import { auction, pixelRecord, terminal } from "./place/ownership"
 import { beginPreparation, cancelDeal } from "./place/deals"
-import { account, journal, sandboxOnly } from "./place/money"
+import { account, beginCapacityMigration, journal, sandboxOnly } from "./place/money"
 
 export const advance = internalMutation({
   args: { dealId: v.id("placeDeals") },
@@ -223,6 +223,12 @@ export const recover = internalMutation({
   args: {},
   handler: async (ctx) => {
     sandboxOnly()
+    // Persist progress before scheduling so old accounts cannot monopolize recovery.
+    const legacy = await ctx.db.query("placeAccounts")
+      .withIndex("by_capacity_next", q => q.eq("capacityVersion", undefined)).take(50)
+    const migrating = await ctx.db.query("placeAccounts")
+      .withIndex("by_capacity_next", q => q.eq("capacityVersion", 0).lte("capacityNextAt", Date.now())).take(50)
+    for (const bank of [...legacy, ...migrating]) await beginCapacityMigration(ctx, bank)
     for (const status of [
       "draft",
       "awaiting_approval",

@@ -9,6 +9,8 @@ import {
 import { internal } from "./_generated/api"
 import {
   account,
+  assertPoolCredit,
+  beginCapacityMigration,
   ensureAccount,
   ensureAllocation,
   human,
@@ -16,6 +18,8 @@ import {
   isOperator,
   journal,
   operator,
+  paymentCapacity,
+  pendingCapacity,
   reallocate,
   sandboxOnly,
 } from "./place/money"
@@ -23,6 +27,32 @@ import { fail, rateLimit } from "./lib/core"
 import { sandboxProvider, type PaymentEvent } from "../lib/place-provider"
 import { digest, stableJson } from "../lib/hash"
 import { money } from "../lib/place"
+import { MAX_MONEY } from "../lib/place"
+import { paymentObservation } from "./placeSchema"
+import type { Doc } from "./_generated/dataModel"
+import type { MutationCtx } from "./_generated/server"
+
+const MAX_AUTOMATIC_ATTEMPTS = 8
+const terminalPayment = (status: string) => ["succeeded", "failed"].includes(status)
+async function parkPayment(ctx: MutationCtx, payment: Doc<"placePayments">, event?: PaymentEvent) {
+  if (terminalPayment(payment.status)) return
+  let observation: PaymentEvent | undefined
+  if (event && event.reference === payment.reference && event.amountCents === payment.amountCents &&
+      event.feeCents === payment.feeCents && (!payment.reconciliationEvent || payment.reconciliationEvent.outcome === event.outcome)) {
+    const fingerprint = digest(stableJson(event))
+    const seen = await ctx.db.query("placeProviderEvents")
+      .withIndex("by_provider_event", q => q.eq("provider", "sandbox").eq("eventId", event.eventId)).unique()
+    if (!seen) {
+      await ctx.db.insert("placeProviderEvents", { provider: "sandbox", eventId: event.eventId, fingerprint, applied: false })
+      observation = event
+    } else if (seen.fingerprint === fingerprint && seen.applied === false) observation = event
+  }
+  await ctx.db.patch(payment._id, {
+    status: "parked", nextAt: Number.MAX_SAFE_INTEGER,
+    error: "Automatic reconciliation stopped. The obligation remains reserved; a human operator must reconcile it.",
+    ...(observation && !payment.reconciliationEvent ? { reconciliationEvent: observation } : {}),
+  })
+}
 
 export const current = query({
   args: {},
@@ -44,6 +74,8 @@ export const current = query({
       liveEnabled: false,
       operator: isOperator(ownerId),
       unallocated: funds?.unallocated ?? 0,
+      capacityReady: !funds || funds.capacityVersion === 1,
+      pendingCapacityCents: funds?.pendingCapacityCents ?? null,
       frozen: funds?.frozen ?? false,
       shortfall: funds?.shortfall ?? 0,
       allocations,
@@ -112,6 +144,9 @@ export const manage = mutation({
       const quoted = sandboxProvider.quote(args.operation, cents)
       if (args.quotedFeeCents !== quoted.feeCents)
         fail("CONFLICT", "Confirm the current fee quote before submitting.")
+      const capacityCents = args.operation === "deposit" ? cents : quoted.totalCents
+      const capacity = pendingCapacity(bank)
+      if (args.operation === "deposit") assertPoolCredit(bank, cents)
       if (args.operation === "withdrawal") {
         if (bank.unallocated < quoted.totalCents)
           fail(
@@ -132,6 +167,7 @@ export const manage = mutation({
           [ownerId]
         )
       }
+      await ctx.db.patch(bank._id, { pendingCapacityCents: (capacity + BigInt(capacityCents)).toString() })
       const paymentId = await ctx.db.insert("placePayments", {
         ownerId,
         kind: args.operation,
@@ -141,6 +177,7 @@ export const manage = mutation({
         reference,
         nextAt: Date.now(),
         attempts: 0,
+        capacityCents,
       })
       await ctx.scheduler.runAfter(0, internal.placeWallet.process, {
         paymentId,
@@ -164,6 +201,7 @@ export const manage = mutation({
         const cents = money(args.amountCents ?? 0)
         if (cents < 1 || funds.available < cents)
           fail("CONFLICT", "Only available funds may be returned.")
+        assertPoolCredit(bank, cents)
         await ctx.db.patch(funds._id, { available: funds.available - cents })
         await ctx.db.patch(bank._id, {
           unallocated: money(bank.unallocated + cents),
@@ -206,11 +244,21 @@ export const process = internalAction({
   handler: async (ctx, args) => {
     const payment = await ctx.runMutation(internal.placeWallet.start, args)
     if (!payment) return
+    let event = payment.reconciliationEvent
+    if (!event) {
+      try {
+        event = await sandboxProvider.reconcile(payment)
+      } catch {
+        await ctx.runMutation(internal.placeWallet.retry, args)
+        return
+      }
+    }
     try {
-      const event = await sandboxProvider.reconcile(payment)
       await ctx.runMutation(internal.placeWallet.applyEvent, { event })
     } catch {
-      await ctx.runMutation(internal.placeWallet.retry, args)
+      // A confirmed provider response with a ledger failure is not an uncertain
+      // provider request. Preserve that response and stop automatic work.
+      await ctx.runMutation(internal.placeWallet.park, { ...args, event })
     }
   },
 })
@@ -221,6 +269,16 @@ export const start = internalMutation({
     const payment = await ctx.db.get(paymentId)
     if (!payment || !["pending", "processing"].includes(payment.status))
       return null
+    if (payment.nextAt > Date.now()) return null
+    const bank = await ensureAccount(ctx, payment.ownerId)
+    if (bank.capacityVersion !== 1) {
+      await beginCapacityMigration(ctx, bank)
+      return null
+    }
+    if (payment.attempts >= MAX_AUTOMATIC_ATTEMPTS) {
+      await parkPayment(ctx, payment)
+      return null
+    }
     await ctx.db.patch(paymentId, {
       status: "processing",
       attempts: payment.attempts + 1,
@@ -234,6 +292,10 @@ export const retry = internalMutation({
   handler: async (ctx, { paymentId }) => {
     const payment = await ctx.db.get(paymentId)
     if (!payment || payment.status !== "processing") return
+    if (payment.attempts >= MAX_AUTOMATIC_ATTEMPTS) {
+      await parkPayment(ctx, payment)
+      return
+    }
     const delay = Math.min(3600_000, 1000 * 2 ** Math.min(payment.attempts, 12))
     await ctx.db.patch(paymentId, {
       status: "pending",
@@ -245,16 +307,86 @@ export const retry = internalMutation({
     })
   },
 })
+export const park = internalMutation({
+  args: { paymentId: v.id("placePayments"), event: v.optional(paymentObservation) },
+  handler: async (ctx, { paymentId, event }) => {
+    const payment = await ctx.db.get(paymentId)
+    if (payment) await parkPayment(ctx, payment, event)
+  },
+})
+
+// Old wallets are unavailable for new credits until every historical payment
+// has been inventoried. Credits/callback settlement cannot race this cursor.
+export const migrateCapacity = internalMutation({
+  args: { accountId: v.id("placeAccounts") },
+  handler: async (ctx, { accountId }) => {
+    sandboxOnly()
+    const bank = await ctx.db.get(accountId)
+    if (!bank || bank.capacityVersion === 1) return
+    if (bank.capacityVersion === undefined) {
+      await beginCapacityMigration(ctx, bank)
+      return
+    }
+    if (bank.pendingCapacityCents === undefined || !/^\d+$/.test(bank.pendingCapacityCents))
+      fail("CONFLICT", "Capacity migration metadata is incomplete; operator repair is required.")
+    let capacity = BigInt(bank.pendingCapacityCents)
+    const page = await ctx.db.query("placePayments")
+      .withIndex("by_owner", q => q.eq("ownerId", bank.ownerId))
+      .paginate({ cursor: bank.capacityCursor ?? null, numItems: 100 })
+    for (const payment of page.page) {
+      if (terminalPayment(payment.status) || payment.kind === "reversal") continue
+      const cents = paymentCapacity(payment)
+      capacity += BigInt(cents)
+      await ctx.db.patch(payment._id, { capacityCents: cents })
+    }
+    await ctx.db.patch(bank._id, {
+      pendingCapacityCents: capacity.toString(),
+      capacityVersion: page.isDone ? 1 : 0,
+      capacityCursor: page.isDone ? undefined : page.continueCursor,
+      capacityNextAt: page.isDone ? undefined : Date.now() + 60_000,
+    })
+    if (!page.isDone)
+      await ctx.scheduler.runAfter(0, internal.placeWallet.migrateCapacity, { accountId })
+  },
+})
+
+export const reconcilePayment = mutation({
+  args: { paymentId: v.id("placePayments"), idempotencyKey: v.string() },
+  handler: async (ctx, args) => {
+    // Recovery remains available when the public feature is disabled.
+    sandboxOnly()
+    const ownerId = await operator(ctx)
+    const { receipt, fingerprint } = await humanReceipt(ctx, ownerId, args.idempotencyKey,
+      { operation: "reconcile_payment", ...args })
+    if (receipt) return receipt.result
+    await rateLimit(ctx, `place:reconcile:${ownerId}`, 5)
+    const payment = await ctx.db.get(args.paymentId)
+    if (!payment || payment.status !== "parked")
+      fail("CONFLICT", "Choose a parked payment requiring reconciliation.")
+    pendingCapacity(await ensureAccount(ctx, payment.ownerId))
+    await ctx.db.patch(payment._id, { status: "pending", attempts: 0, nextAt: Date.now(), error: undefined })
+    await ctx.scheduler.runAfter(0, internal.placeWallet.process, { paymentId: payment._id })
+    const result = { paymentId: payment._id, status: "pending" }
+    await ctx.db.insert("placeHumanReceipts", { ownerId, key: args.idempotencyKey, fingerprint, result })
+    return result
+  },
+})
+
+export const reconciliationQueue = query({
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    sandboxOnly()
+    await operator(ctx)
+    const page = await ctx.db.query("placePayments")
+      .withIndex("by_status_next", q => q.eq("status", "parked"))
+      .paginate({ cursor: args.cursor ?? null, numItems: 25 })
+    return { payments: page.page, cursor: page.isDone ? null : page.continueCursor }
+  },
+})
+
 export const applyEvent = internalMutation({
   args: {
-    event: v.object({
-      eventId: v.string(),
-      reference: v.string(),
-      amountCents: v.number(),
-      feeCents: v.number(),
-      outcome: v.union(v.literal("succeeded"), v.literal("failed")),
-      mode: v.literal("sandbox"),
-    }),
+    event: paymentObservation,
   },
   handler: async (ctx, { event }: { event: PaymentEvent }) => {
     sandboxOnly()
@@ -268,7 +400,7 @@ export const applyEvent = internalMutation({
     if (seen) {
       if (seen.fingerprint !== fingerprint)
         fail("CONFLICT", "Provider event changed on replay.")
-      return
+      if (seen.applied !== false) return
     }
     const payment = await ctx.db
       .query("placePayments")
@@ -281,12 +413,30 @@ export const applyEvent = internalMutation({
       payment.kind === "reversal"
     )
       fail("CONFLICT", "Provider event does not match a requested payment.")
+    if (payment.reconciliationEvent &&
+        (payment.reconciliationEvent.outcome !== event.outcome ||
+         (payment.reconciliationEvent.eventId === event.eventId && digest(stableJson(payment.reconciliationEvent)) !== fingerprint)))
+      fail("CONFLICT", "Provider event conflicts with the recorded reconciliation outcome.")
     if (["succeeded", "failed"].includes(payment.status)) {
       if (payment.status !== event.outcome)
         fail("CONFLICT", "Conflicting terminal provider event.")
     } else {
       const bank = await ensureAccount(ctx, payment.ownerId)
       const total = payment.amountCents + payment.feeCents
+      const capacityCents = paymentCapacity(payment)
+      if (bank.capacityVersion !== 1) {
+        await beginCapacityMigration(ctx, bank)
+        await parkPayment(ctx, payment, event)
+        return
+      }
+      const capacity = pendingCapacity(bank)
+      const credit = (payment.kind === "deposit" && event.outcome === "succeeded") ? payment.amountCents :
+        (payment.kind === "withdrawal" && event.outcome === "failed") ? total : 0
+      if (payment.capacityCents !== capacityCents || capacity < BigInt(capacityCents) ||
+          BigInt(bank.unallocated) + BigInt(credit) > BigInt(MAX_MONEY)) {
+        await parkPayment(ctx, payment, event)
+        return
+      }
       if (payment.kind === "deposit" && event.outcome === "succeeded") {
         await ctx.db.patch(bank._id, {
           unallocated: money(bank.unallocated + payment.amountCents),
@@ -329,12 +479,14 @@ export const applyEvent = internalMutation({
       await ctx.db.patch(payment._id, {
         status: event.outcome,
         eventId: event.eventId,
+        reconciliationEvent: undefined,
+        error: undefined,
       })
+      await ctx.db.patch(bank._id, { pendingCapacityCents: (capacity - BigInt(capacityCents)).toString() })
     }
-    await ctx.db.insert("placeProviderEvents", {
-      provider: "sandbox",
-      eventId: event.eventId,
-      fingerprint,
+    if (seen) await ctx.db.patch(seen._id, { applied: true })
+    else await ctx.db.insert("placeProviderEvents", {
+      provider: "sandbox", eventId: event.eventId, fingerprint, applied: true,
     })
   },
 })

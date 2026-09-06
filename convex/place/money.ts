@@ -2,8 +2,9 @@ import type { MutationCtx, QueryCtx } from "../_generated/server"
 import type { Doc, Id } from "../_generated/dataModel"
 import { authComponent } from "../auth"
 import { fail } from "../lib/core"
-import { money, SANDBOX_COSTS } from "../../lib/place"
+import { MAX_MONEY, money, SANDBOX_COSTS } from "../../lib/place"
 import { digest, stableJson } from "../../lib/hash"
+import { internal } from "../_generated/api"
 
 export function sandboxOnly() {
   if (process.env.PLACE_MODE && process.env.PLACE_MODE !== "sandbox")
@@ -56,8 +57,34 @@ export async function ensureAccount(ctx: MutationCtx, ownerId: string) {
     unallocated: 0,
     frozen: false,
     shortfall: 0,
+    capacityVersion: 1,
+    pendingCapacityCents: "0",
   })
   return (await ctx.db.get(id))!
+}
+/** Exact accounting also preserves legacy obligations already above MAX_MONEY. */
+export function pendingCapacity(bank: Doc<"placeAccounts">) {
+  if (bank.capacityVersion !== 1 || bank.pendingCapacityCents === undefined ||
+      !/^\d+$/.test(bank.pendingCapacityCents))
+    fail("CONFLICT", "Wallet capacity is being reconciled. Retry after migration completes.")
+  return BigInt(bank.pendingCapacityCents)
+}
+export function assertPoolCredit(bank: Doc<"placeAccounts">, cents: number) {
+  money(cents)
+  if (BigInt(bank.unallocated) + pendingCapacity(bank) + BigInt(cents) > BigInt(MAX_MONEY))
+    fail("CONFLICT", "Wallet capacity is reserved for pending deposits or withdrawal refunds.")
+}
+export function paymentCapacity(payment: Pick<Doc<"placePayments">, "kind" | "amountCents" | "feeCents">) {
+  return money(payment.kind === "deposit" ? payment.amountCents :
+    payment.kind === "withdrawal" ? payment.amountCents + payment.feeCents : 0)
+}
+export async function beginCapacityMigration(ctx: MutationCtx, bank: Doc<"placeAccounts">) {
+  if (bank.capacityVersion === 1 || (bank.capacityNextAt ?? 0) > Date.now()) return
+  await ctx.db.patch(bank._id, {
+    ...(bank.capacityVersion === undefined ? { capacityVersion: 0 as const, pendingCapacityCents: "0", capacityCursor: undefined } : {}),
+    capacityNextAt: Date.now() + 60_000,
+  })
+  await ctx.scheduler.runAfter(0, internal.placeWallet.migrateCapacity, { accountId: bank._id })
 }
 export async function allocation(ctx: QueryCtx, agentId: Id<"agents">) {
   return ctx.db
