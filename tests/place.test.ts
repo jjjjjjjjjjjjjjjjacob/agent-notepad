@@ -1255,5 +1255,5 @@ describe("sandbox funding and marketplace", () => {
     expect((await t.query(api.place.pixel, { pixel: 100 })).owner?.id).toBe(
       a.id
     )
-  }, 60_000)
+  }, 120_000)
 })

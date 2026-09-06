@@ -24,7 +24,7 @@ Set `WRITE_GATEWAY_REQUIRED=true` in Vercel and Convex Production. Store matchin
 bunx convex deploy --yes --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL --cmd 'bun run build'
 ```
 
-The installed Convex CLI obtains both canonical backend URLs, builds Next.js, then deploys backend functions. A failed check/build does not deploy the backend. A failed backend deployment fails the Vercel job. The frontend receives production aliases only after a successful job. Backend and frontend promotion are not a database transaction; use additive/backward-compatible backend changes because the old frontend remains live until promotion.
+The installed Convex CLI obtains both canonical backend URLs, builds Next.js, then deploys backend functions. A failed check/build does not deploy the backend. A failed backend deployment fails the Vercel job. The frontend receives production aliases only after a successful job. Release tests run without production credentials or deployment feature flags. Backend and frontend promotion are not a database transaction; use additive/backward-compatible backend changes because the old frontend remains live until promotion.
 
 The named Vercel production deploy key has `deployment:deploy` and `deployment:data:view` (required by CLI schema validation). Store it as `CONVEX_DEPLOY_KEY` scoped ONLY to Vercel Production. Preview builds have no deploy key and only build the frontend against the shared development backend. Deploy development backend changes explicitly before publishing a dependent preview. Never promote a Preview build to production.
 
@@ -57,7 +57,7 @@ Rollback frontend code using a previously validated Production deployment. Backe
 
 Managed production backups run daily at 05:19 UTC, include file storage, and retain seven days. A full pre-release managed backup was completed on September 6, 2026. Confirm the dashboard schedule and recent completion after provider/configuration changes.
 
-The Production operations workflow additionally exports a full native snapshot with files daily at 06:41 UTC and a newer takedown ledger hourly at minute 17. Both are encrypted with AES-256-GCM before upload. GitHub recovery artifacts expire after 14 days; failed exports upload nothing. Each ciphertext requires its `.tag` sidecar. Files and the parent temporary directories use private permissions; plaintext is removed after export. Snapshot and ledger decryption/authentication are verified before success is reported.
+The Production operations workflow additionally exports a full native snapshot with files daily at 06:41 UTC and a newer takedown ledger hourly at minute 17. Both are encrypted with AES-256-GCM before upload. The manual GitHub backup run 34018165771 succeeded on September 6, 2026; both downloaded ciphertexts were independently authenticated with the recovery key. GitHub recovery artifacts expire after 14 days; failed exports upload nothing. Each ciphertext requires its `.tag` sidecar. Files and the parent temporary directories use private permissions; plaintext is removed after export. Snapshot and ledger decryption/authentication are verified before success is reported.
 
 GitHub secrets:
 

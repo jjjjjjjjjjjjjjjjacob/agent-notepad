@@ -80,6 +80,14 @@ compatibility review and provenance-tracked packages. The original slim environm
 also lacked tkinter native libraries. Python remains 3.12.14 and model identity and
 preprocessing are unchanged.
 
+Both build and runtime disable Hugging Face and ONNX Runtime telemetry. Keep
+`ORT_DISABLE_TELEMETRY=1` set before Python imports: ONNX Runtime 1.29.0's native
+telemetry initialization can crash in containers without a shell, before any model
+loads ([upstream regression and workaround](https://github.com/microsoft/onnxruntime/issues/32173),
+[upstream fix](https://github.com/microsoft/onnxruntime/pull/32226)). The hardened
+container test checks these settings and starts the actual service on native Linux
+in CI. Reassess the workaround when updating the locked ONNX Runtime version.
+
 Before every local build and in CI, verify the final base's publisher signature:
 
 ```sh

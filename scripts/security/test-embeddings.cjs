@@ -5,6 +5,7 @@ const { spawnSync } = require('node:child_process');
 const image = process.argv[2];
 const name = `agent-notepad-test-${randomBytes(8).toString('hex')}`;
 const token = randomBytes(32).toString('hex');
+let phase = 'start-container';
 function docker(args, options = {}) {
   const result = spawnSync('docker', args, { encoding: 'utf8', timeout: 180000, ...options });
   if (result.status !== 0) throw new Error('Embedding container check failed');
@@ -18,15 +19,21 @@ function docker(args, options = {}) {
       '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges',
       '--tmpfs', '/tmp:rw,noexec,nosuid,size=64m', '--memory=2g', '--cpus=2',
       '-e', 'EMBEDDING_SERVICE_TOKEN', image], { env: { ...process.env, EMBEDDING_SERVICE_TOKEN: token } });
+    phase = 'offline-startup';
     let ready = false;
     for (let n = 0; n < 60; n++) {
       const result = spawnSync('docker', ['exec', name, 'python', '-c', "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"], { stdio: 'pipe', timeout: 5000 });
       if (result.status === 0) { ready = true; break; }
+      const status = spawnSync('docker', ['inspect', '--format', '{{.State.Running}}', name], { encoding: 'utf8', timeout: 5000 });
+      if (status.stdout?.trim() === 'false') break;
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     if (!ready) throw new Error('Offline startup failed');
+    phase = 'runtime-provenance-and-model';
     docker(['exec', name, 'python', '-c', `
 import hashlib, importlib.metadata, json, math, os, pathlib, re, sys, tempfile
+assert os.environ.get('ORT_DISABLE_TELEMETRY') == '1'
+assert os.environ.get('HF_HUB_DISABLE_TELEMETRY') == '1'
 from contextlib import ExitStack
 from unittest.mock import patch
 from fastembed.common.model_management import ModelManagement
@@ -67,9 +74,27 @@ with ExitStack() as stack:
     for guard in guards:
         guard.assert_not_called()
 `]);
+    phase = 'http-service-tests';
     const output = docker(['exec', name, 'python', 'test_service.py']);
     // The service test prints no credentials; preserve only a fixed success summary.
     if (output.includes(token)) throw new Error('Unexpected credential in test output');
     console.log('Embedding tests passed: offline startup, exact package/provenance checks, no pip, download/archive bypass, missing-cache rejection, real vectors, auth, batch/model bounds, complete windows.');
+  } catch (error) {
+    // Report fixed diagnostic categories only, never provider output or credentials.
+    const state = spawnSync('docker', ['inspect', '--format', '{{.State.ExitCode}} {{.State.OOMKilled}}', name], { encoding: 'utf8', timeout: 10000 });
+    const logs = spawnSync('docker', ['logs', '--tail', '100', name], { encoding: 'utf8', timeout: 10000, maxBuffer: 1024 * 1024 });
+    const output = `${logs.stdout ?? ''}\n${logs.stderr ?? ''}`;
+    const markers = ['PermissionError', 'ModuleNotFoundError', 'FileNotFoundError', 'ImportError', 'LocalEntryNotFoundError', 'Read-only file system', 'Operation not permitted', 'Illegal instruction', 'Segmentation fault', 'Fatal Python error', 'cannot open shared object file'].filter(value => output.includes(value));
+    console.error(JSON.stringify({ phase, container: /^\d+ (true|false)\s*$/.test(state.stdout ?? '') ? state.stdout.trim() : 'unavailable', markers }));
+    if (phase === 'offline-startup') {
+      for (const [module, code] of [['python', 'import sys'], ['ssl', 'import ssl'], ['fastapi', 'import fastapi'], ['numpy', 'import numpy'], ['onnxruntime', 'import onnxruntime'], ['engine', 'from engine import Engine; Engine()']]) {
+        const probe = `${name}-${module}`;
+        try {
+          const result = spawnSync('docker', ['run', '--name', probe, '--platform', 'linux/amd64', '--network=none', '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--tmpfs', '/tmp:rw,noexec,nosuid,size=64m', '--memory=2g', '--cpus=2', '--entrypoint', '/usr/local/bin/python', image, '-c', code], { encoding: 'utf8', timeout: 30000 });
+          console.error(JSON.stringify({ startupProbe: module, exitCode: result.status, timedOut: result.error?.code === 'ETIMEDOUT' }));
+        } finally { spawnSync('docker', ['rm', '-f', probe], { stdio: 'pipe', timeout: 10000 }); }
+      }
+    }
+    throw error;
   } finally { spawnSync('docker', ['rm', '-f', name], { stdio: 'pipe', timeout: 30000 }); }
 })().catch(() => { console.error('Embedding image validation failed; no credentials or container logs printed.'); process.exitCode = 1; });
