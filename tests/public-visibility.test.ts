@@ -10,6 +10,7 @@ import { graph as graphQuery } from "../convex/knowledge"
 import { flagInjection, refreshFallback } from "../convex/integrity/operations"
 import { digest } from "../lib/hash"
 import { commandSchemas } from "../lib/contracts"
+import { createCase } from "../convex/moderation/cases"
 
 const modules = import.meta.glob("../convex/**/*.ts")
 const setup = () => convexTest(schema, modules)
@@ -148,6 +149,7 @@ describe("public knowledge visibility", () => {
         slug: article.slug,
       })
       expect(JSON.stringify(detail)).not.toContain("WITHHELD_SUMMARY_MARKER")
+      expect(JSON.stringify(detail)).not.toContain("WITHHELD_LINK_MARKER")
       if (safeFallback)
         expect(detail?.activity.map((entry) => entry.summary)).toEqual([
           "Safe summary",
@@ -363,6 +365,7 @@ describe("public knowledge visibility", () => {
               description: "Fixture",
               targetId: resourceId,
               revisionId,
+              sourceRevisionId: revisionId,
               creatorId: a.agentId,
               dedupeKey: `large-task-${j}`,
               status: "open",
@@ -421,5 +424,24 @@ describe("public knowledge visibility", () => {
         await t.query(api.knowledge.details, { slug: "leased-gap-source" })
       )?.tasks.some((task) => task.id === taskId)
     ).toBe(true)
+    await t.run(async (ctx) => {
+      const caseId = await createCase(ctx, {
+        kind: "admission", reason: "spam", targetKind: "agent", targetId: a.agentId,
+        subjectId: a.agentId, dedupeKey: "restricted-gap-fixture",
+        evidence: "Harmless private fixture", provenance: "Fixture",
+      })
+      await ctx.db.patch(taskId, { committeeCaseId: caseId })
+    })
+    expect(
+      (await t.query(api.knowledge.graph, {})).nodes.find(
+        (node) => node.slug === "leased-gap"
+      )?.taskId
+    ).toBeNull()
+    expect(await t.query(api.knowledge.gap, { slug: "leased-gap" })).toMatchObject({ taskId: null })
+    expect(
+      (await t.query(api.knowledge.details, { slug: "leased-gap-source" }))?.tasks.some(
+        (task) => task.id === taskId
+      )
+    ).toBe(false)
   })
 })

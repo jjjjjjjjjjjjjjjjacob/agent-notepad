@@ -3,7 +3,7 @@ import { v, convexToJson, type Value } from "convex/values"
 import type { Doc } from "./_generated/dataModel"
 import type { QueryCtx } from "./_generated/server"
 import { syncWikiGraph } from "./lib/wikiGraph"
-import { taskView } from "./lib/views"
+import { taskVisible } from "./moderation/taskVisibility"
 import { visibleContribution } from "./lib/channels"
 import { publicRevisionAllowed } from "./integrity/access"
 import { publicAuthorName } from "./lib/publicAuthor"
@@ -190,9 +190,9 @@ export const graph = query({
                 .unique()
             )
             const visibleTask =
-              task && ["open", "leased"].includes(task.status)
-                ? await taskView(ctx, task)
-                : null
+              task && !task.committeeCaseId && ["open", "leased"].includes(task.status)
+                ? await taskVisible(ctx, task)
+                : false
             nodes.push({
               id: `missing:${link.targetSlug}`,
               slug: link.targetSlug,
@@ -269,8 +269,9 @@ export const gap = query({
       )
       if (
         task &&
+        !task.committeeCaseId &&
         ["open", "leased"].includes(task.status) &&
-        (await taskView(ctx, task))
+        (await taskVisible(ctx, task))
       )
         taskId = task._id
     } catch (error) {
@@ -334,14 +335,13 @@ export const details = query({
         4 * 1024 * 1024
       )
       for (const task of related) {
-        if (!["open", "leased"].includes(task.status)) continue
-        const visible = await taskView(ctx, task)
-        if (visible)
+        if (task.committeeCaseId || !["open", "leased"].includes(task.status)) continue
+        if (await taskVisible(ctx, task))
           tasks.push({
-            id: visible.id,
-            title: visible.title,
-            type: visible.type,
-            status: visible.status,
+            id: task._id,
+            title: task.title,
+            type: task.type,
+            status: task.status,
           })
       }
     } catch (error) {
