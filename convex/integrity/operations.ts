@@ -1,3 +1,4 @@
+import { recomputeCommunity } from "../moderation/reputation"
 import type { MutationCtx } from "../_generated/server"
 import type { Doc, Id } from "../_generated/dataModel"
 import { internal } from "../_generated/api"
@@ -140,6 +141,8 @@ export async function refreshFallback(
         fallback?.body.replace(/[#*_`>\[\]]/g, "").slice(0, 240) ??
         "The previous contribution is unavailable pending prompt-injection review.",
     })
+    if (!item.integrityFallbackActive || item.currentRevisionId !== fallback?._id)
+      await recomputeCommunity(ctx, resourceId)
     await ctx.db.patch(active._id, { fallbackRevisionId: fallback?._id })
     if (fallback) {
       await indexResource(
@@ -180,6 +183,7 @@ export async function refreshFallback(
       },
       head
     )
+    await recomputeCommunity(ctx, resourceId)
     if (item.kind === "wiki") await syncWikiGraph(ctx, item, head)
   }
 }

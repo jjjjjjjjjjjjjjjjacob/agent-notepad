@@ -18,6 +18,69 @@ export const targetKind = v.union(
   v.literal("report")
 )
 export const moderationTables = {
+  communityReputationState: defineTable({
+    key: v.string(),
+    authorityVersion: v.number(),
+    graphVersion: v.number(),
+    sweepRunning: v.boolean(),
+    sweepStep: v.number(),
+    sweepNextAt: v.number(),
+    sweepPasses: v.number(),
+    sweepCursor: v.optional(v.string()),
+    sweepAuthority: v.number(),
+    sweepGraph: v.number(),
+  }).index("by_key", ["key"]),
+  communityRecomputeJobs: defineTable({
+    resourceId: v.id("resources"),
+    generation: v.number(),
+    step: v.number(),
+    running: v.boolean(),
+    phase: v.string(),
+    inputVersion: v.number(),
+    authorityVersion: v.number(),
+    graphVersion: v.number(),
+    authorOwnerId: v.optional(v.string()),
+    revisionId: v.optional(v.id("revisions")),
+    nextAt: v.number(),
+    restarts: v.number(),
+    lastCompletedAt: v.optional(v.number()),
+    cursor: v.optional(v.string()),
+    commentsCursor: v.optional(v.string()),
+    commentsDone: v.boolean(),
+    commentIds: v.array(v.id("comments")),
+    commentIndex: v.number(),
+    ringOwners: v.array(v.string()),
+    ringSaturated: v.boolean(),
+    net: v.number(),
+    participants: v.number(),
+    supporters: v.number(),
+    pages: v.number(),
+  })
+    .index("by_resource", ["resourceId"])
+    .index("by_running_next", ["running", "nextAt"]),
+  communityRecomputeOwners: defineTable({
+    jobId: v.id("communityRecomputeJobs"),
+    ownerId: v.string(),
+    vote: v.optional(v.number()),
+    participant: v.boolean(),
+    supporter: v.boolean(),
+  }).index("by_job_owner", ["jobId", "ownerId"]),
+  governanceRetentionJobs: defineTable({
+    name: v.union(v.literal("network"), v.literal("evidence")),
+    generation: v.number(),
+    step: v.number(),
+    phase: v.number(),
+    cutoff: v.number(),
+    running: v.boolean(),
+    nextAt: v.number(),
+    pages: v.number(),
+    deleted: v.number(),
+    lastBatchSize: v.number(),
+    cursor: v.optional(v.string()),
+    caseId: v.optional(v.id("moderationCases")),
+    caseCursor: v.optional(v.string()),
+    outerDone: v.optional(v.boolean()),
+  }).index("by_name", ["name"]),
   approvedOwners: defineTable({
     ownerId: v.string(),
     approved: v.boolean(),
@@ -65,7 +128,9 @@ export const moderationTables = {
     updatedAt: v.number(),
   })
     .index("by_pair", ["fromOwner", "toOwner"])
-    .index("by_source", ["sourceId"]),
+    .index("by_source", ["sourceId"])
+    .index("by_source_from_to", ["sourceId", "fromOwner", "toOwner"])
+    .index("by_active_from_updated", ["active", "fromOwner", "updatedAt"]),
   personalBlocks: defineTable({
     principal: v.string(),
     agentId: v.id("agents"),
@@ -76,6 +141,7 @@ export const moderationTables = {
     commentId: v.id("comments"),
     agentId: v.id("agents"),
     value: v.number(),
+    updatedAt: v.optional(v.number()),
   })
     .index("by_comment_agent", ["commentId", "agentId"])
     .index("by_agent", ["agentId"]),
@@ -145,6 +211,7 @@ export const moderationTables = {
     holdExtendedAt: v.optional(v.number()),
     overturnedAt: v.optional(v.number()),
     evidencePurgedAt: v.optional(v.number()),
+    evidenceRetiringAt: v.optional(v.number()),
   })
     .index("by_dedupe", ["dedupeKey"])
     .index("by_state", ["state"])
@@ -152,7 +219,8 @@ export const moderationTables = {
     .index("by_owner", ["subjectOwnerId"])
     .index("by_target", ["targetId"])
     .index("by_resource", ["resourceId"])
-    .index("by_parent", ["parentCaseId"]),
+    .index("by_parent", ["parentCaseId"])
+    .index("by_parent_state_resolved", ["parentCaseId", "state", "resolvedAt"]),
   moderationEvidence: defineTable({
     caseId: v.id("moderationCases"),
     content: v.string(),
@@ -188,6 +256,8 @@ export const moderationTables = {
     liftedAt: v.optional(v.number()),
   })
     .index("by_principal", ["principal"])
+    .index("by_principal_active_expiry", ["principal", "liftedAt", "expiresAt"])
+    .index("by_case_expiry", ["caseId", "expiresAt"])
     .index("by_case", ["caseId"]),
   contentHolds: defineTable({
     caseId: v.id("moderationCases"),

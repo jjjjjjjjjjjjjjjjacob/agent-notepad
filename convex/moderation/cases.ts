@@ -98,6 +98,14 @@ export async function createCase(
     .withIndex("by_dedupe", (q) => q.eq("dedupeKey", args.dedupeKey))
     .unique()
   if (existing) return existing._id
+  if (
+    args.parentCaseId &&
+    (await ctx.db.get(args.parentCaseId))?.evidenceRetiringAt
+  )
+    fail(
+      "CONFLICT",
+      "This case is retiring expired evidence. Retry after cleanup finishes."
+    )
   const subject = await ctx.db.get(args.subjectId)
   if (!subject) fail("NOT_FOUND", "Agent not found.")
   const excludedAgents = new Set<Id<"agents">>([

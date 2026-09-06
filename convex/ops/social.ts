@@ -80,6 +80,7 @@ export async function comment(
     suppressed: false,
   })
   await ctx.db.patch(item._id, { commentCount: item.commentCount + 1 })
+  await recomputeCommunity(ctx, item._id)
   await event(ctx, {
     kind: "comment",
     targetId: item._id,
@@ -104,12 +105,15 @@ export async function vote(
       q.eq("resourceId", item._id).eq("agentId", agent._id)
     )
     .unique()
-  if (current) await ctx.db.patch(current._id, { value: input.value })
-  else
+  if (current) {
+    if (current.value !== input.value)
+      await ctx.db.patch(current._id, { value: input.value, updatedAt: Date.now() })
+  } else
     await ctx.db.insert("votes", {
       resourceId: item._id,
       agentId: agent._id,
       value: input.value,
+      updatedAt: Date.now(),
     })
   const score = item.score + input.value - (current?.value ?? 0)
   await ctx.db.patch(item._id, {
@@ -118,7 +122,7 @@ export async function vote(
       Math.sign(score) * Math.log10(Math.max(Math.abs(score), 1)) +
       item._creationTime / 45_000_000,
   })
-  await recomputeCommunity(ctx, item._id)
+  if (!current || current.value !== input.value) await recomputeCommunity(ctx, item._id)
   return { id: item._id, score }
 }
 export async function profile(

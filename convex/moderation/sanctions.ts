@@ -3,6 +3,7 @@ import type { Doc, Id } from "../_generated/dataModel"
 import { internal } from "../_generated/api"
 import { DAY } from "../../lib/moderation-policy"
 import { hasHold, audit } from "./access"
+import { invalidateCommunityAuthority, invalidateCommunityTarget } from "./reputation"
 
 export async function addSanction(
   ctx: MutationCtx,
@@ -21,13 +22,16 @@ export async function addSanction(
       )
     )
     .first()
-  if (!existing)
+  if (!existing) {
     await ctx.db.insert("sanctions", {
       caseId,
       principal,
       provisional,
       ...(expiresAt ? { expiresAt } : {}),
     })
+    if (principal.startsWith("agent:") || principal.startsWith("owner:"))
+      await invalidateCommunityAuthority(ctx)
+  }
 }
 export async function cancelAgentWork(ctx: MutationCtx, agentId: Id<"agents">) {
   for (const status of ["waiting", "active"] as const) {
@@ -81,6 +85,7 @@ export async function setHold(
   const row = await heldRecord(ctx, targetId)
   if (row) {
     await ctx.db.patch(row._id, { quarantined: true })
+    if (!row.quarantined) await invalidateCommunityTarget(ctx, targetId)
     if ("contentType" in row)
       await ctx.scheduler.runAfter(0, internal.moderationFiles.privatize, {
         fileId: row._id,
@@ -142,25 +147,31 @@ export async function impose(
   await quarantineCase(ctx, c)
 }
 export async function liftCase(ctx: MutationCtx, c: Doc<"moderationCases">) {
+  let authorityChanged = false
   for (const sanction of await ctx.db
     .query("sanctions")
     .withIndex("by_case", (q) => q.eq("caseId", c._id))
     .collect())
-    if (!sanction.liftedAt)
+    if (!sanction.liftedAt) {
       await ctx.db.patch(sanction._id, { liftedAt: Date.now() })
+      authorityChanged ||= sanction.principal.startsWith("agent:") || sanction.principal.startsWith("owner:")
+    }
+  if (authorityChanged) await invalidateCommunityAuthority(ctx)
   for (const hold of await ctx.db
     .query("contentHolds")
     .withIndex("by_case", (q) => q.eq("caseId", c._id))
     .collect()) {
     if (!hold.liftedAt) await ctx.db.patch(hold._id, { liftedAt: Date.now() })
     const row = await heldRecord(ctx, hold.targetId)
-    if (row && !(await hasHold(ctx, hold.targetId)))
+    if (row && !(await hasHold(ctx, hold.targetId))) {
       await ctx.db.patch(row._id, {
         quarantined: false,
         ...("scanStatus" in row && row.scanStatus === "quarantined"
           ? { scanStatus: "clear" as const }
           : {}),
       })
+      if (row.quarantined) await invalidateCommunityTarget(ctx, hold.targetId)
+    }
   }
   if (c.resourceId)
     await ctx.scheduler.runAfter(0, internal.governance.reindex, {

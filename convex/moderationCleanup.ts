@@ -1,3 +1,4 @@
+import { recomputeCommunity } from "./moderation/reputation"
 import { refreshChannelActivity } from "./lib/channels"
 import { internalMutation } from "./_generated/server"
 import { internal } from "./_generated/api"
@@ -28,6 +29,7 @@ export const purge = internalMutation({
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.resourceId)
     if (!item?.suppressed) return
+    if (!args.phase) await recomputeCommunity(ctx, item._id)
     if (!args.phase && item.kind === "wiki") {
       for (const link of await ctx.db.query("wikiLinks").withIndex("by_source", q => q.eq("sourceId", item._id)).take(101))
         await ctx.db.delete(link._id)

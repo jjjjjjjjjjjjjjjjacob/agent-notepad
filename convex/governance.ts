@@ -14,6 +14,7 @@ import { cancelAgentWork } from "./moderation/sanctions"
 import { openQualityCase } from "./moderation/cases"
 import { recomputeCommunity, reverseSource } from "./moderation/reputation"
 import { indexResource, metric } from "./lib/core"
+import { startRetention, retireEvidencePage } from "./governanceRetention"
 
 export const freezeRoster = internalMutation({
   args: {},
@@ -320,68 +321,21 @@ export const recordNetwork = internalMutation({
 export const retention = internalMutation({
   args: {},
   handler: async (ctx) => {
-    for (const table of [
-      "networkObservations",
-      "gatewayNonces",
-      "appealLinkTokens",
-    ] as const) {
-      const rows = await ctx.db
-        .query(table)
-        .withIndex("by_expiry", (q) => q.lte("expiresAt", Date.now()))
-        .take(100)
-      for (const row of rows) await ctx.db.delete(row._id)
-    }
-    await ctx.scheduler.runAfter(0, internal.governance.retireEvidence, {})
+    await startRetention(ctx, "network")
+    await startRetention(ctx, "evidence")
   },
 })
 export const retireEvidence = internalMutation({
-  args: { cursor: v.optional(v.string()) },
-  handler: async (ctx, { cursor }) => {
-    const page = await ctx.db
-      .query("moderationCases")
-      .withIndex("by_state", (q) => q.eq("state", "resolved"))
-      .paginate({ cursor: cursor ?? null, numItems: 30 })
-    for (const c of page.page) {
-      if (
-        !c.resolvedAt ||
-        c.resolvedAt + 90 * DAY > Date.now() ||
-        c.evidencePurgedAt
-      )
-        continue
-      const children = await ctx.db
-        .query("moderationCases")
-        .withIndex("by_parent", (q) => q.eq("parentCaseId", c._id))
-        .collect()
-      if (
-        children.some(
-          (child) =>
-            child.state !== "resolved" ||
-            (child.resolvedAt ?? Date.now()) + 90 * DAY > Date.now()
-        )
-      )
-        continue
-      for (const evidence of await ctx.db
-        .query("moderationEvidence")
-        .withIndex("by_case", (q) => q.eq("caseId", c._id))
-        .collect())
-        await ctx.db.delete(evidence._id)
-      await ctx.db.patch(c._id, {
-        ipHash: undefined,
-        evidencePurgedAt: Date.now(),
-      })
-      for (const sanction of await ctx.db
-        .query("sanctions")
-        .withIndex("by_case", (q) => q.eq("caseId", c._id))
-        .collect())
-        if (
-          sanction.principal.startsWith("ip:") &&
-          (sanction.expiresAt ?? Infinity) <= Date.now()
-        )
-          await ctx.db.delete(sanction._id)
+  args: {
+    cursor: v.optional(v.string()),
+    generation: v.optional(v.number()),
+    step: v.optional(v.number()),
+  },
+  handler: async (ctx, { generation, step }) => {
+    if (generation === undefined || step === undefined) {
+      await startRetention(ctx, "evidence")
+      return
     }
-    if (!page.isDone)
-      await ctx.scheduler.runAfter(0, internal.governance.retireEvidence, {
-        cursor: page.continueCursor,
-      })
+    await retireEvidencePage(ctx, generation, step)
   },
 })

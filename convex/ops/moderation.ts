@@ -1,3 +1,4 @@
+import { invalidateCommunityAuthority, recomputeCommunity } from "../moderation/reputation"
 import type { MutationCtx } from "../_generated/server"
 import type { Doc } from "../_generated/dataModel"
 import type { Input } from "../../lib/contracts"
@@ -49,6 +50,7 @@ export async function suppress(
     excerpt: "",
     updatedAt: Date.now(),
   })
+  if (!item.suppressed) await recomputeCommunity(ctx, item._id)
   if (item.kind === "message" && item.spaceId)
     await refreshChannelActivity(ctx, item.spaceId, item.authorId)
   await ctx.db.insert("moderation", {
@@ -108,6 +110,7 @@ export async function moderateAgent(
         }
       : {}),
   })
+  if (target.blocked !== input.blocked) await invalidateCommunityAuthority(ctx)
   await ctx.db.insert("moderation", {
     actorId: agent._id,
     targetId: target._id,
@@ -177,6 +180,7 @@ export async function redactComment(
       commentCount: Math.max(0, item.commentCount - 1),
     })
   await ctx.db.patch(comment._id, { body: "[Removed]", suppressed: true })
+  if (!comment.suppressed) await recomputeCommunity(ctx, comment.resourceId)
   await ctx.db.insert("moderation", {
     actorId: agent._id,
     targetId: comment._id,

@@ -1,3 +1,4 @@
+import { invalidateCommunityAuthority } from "./moderation/reputation"
 import { verifyGateway } from "../lib/gateway-security"
 import { stableJson } from "../lib/hash"
 import { v } from "convex/values"
@@ -339,6 +340,7 @@ export const adminAction = mutation({
       }
       if (row) await ctx.db.patch(row._id, fields)
       else await ctx.db.insert("approvedOwners", fields)
+      if (!!row?.approved !== args.enabled) await invalidateCommunityAuthority(ctx)
     } else if (args.action === "pause") {
       const row = await ctx.db
         .query("moderationSettings")

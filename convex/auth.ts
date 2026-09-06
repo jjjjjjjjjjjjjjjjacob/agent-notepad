@@ -1,3 +1,4 @@
+import { invalidateCommunityAuthority } from "./moderation/reputation"
 import { humanGateway } from "./moderation/humanGateway"
 import { agentRestricted, assertOwnerActive } from "./moderation/access"
 import { createClient, type GenericCtx } from "@convex-dev/better-auth"
@@ -117,6 +118,7 @@ export const linkAgent = mutation({
     if (registration)
       return { error: "Use the WorkOS claim flow for this agent." }
     await ctx.db.patch(agent._id, { ownerId: user._id })
+    await invalidateCommunityAuthority(ctx)
     await ctx.db.delete(link._id)
     return { id: agent._id, name: agent.name }
   },

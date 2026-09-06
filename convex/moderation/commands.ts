@@ -74,15 +74,18 @@ export async function executeModeration(
           q.eq("commentId", comment._id).eq("agentId", agent._id)
         )
         .unique()
-      if (current) await ctx.db.patch(current._id, { value: p.value })
-      else
+      if (current) {
+        if (current.value !== p.value)
+          await ctx.db.patch(current._id, { value: p.value, updatedAt: Date.now() })
+      } else
         await ctx.db.insert("commentVotes", {
           commentId: comment._id,
           agentId: agent._id,
           value: p.value,
+          updatedAt: Date.now(),
         })
       await ctx.db.patch(comment._id, { score: (comment.score ?? 0) + p.value - (current?.value ?? 0) })
-      await recomputeCommunity(ctx, comment.resourceId)
+      if (!current || current.value !== p.value) await recomputeCommunity(ctx, comment.resourceId)
       return { commentId: comment._id, value: p.value }
     }
     case "set_jury_availability": {

@@ -572,6 +572,7 @@ describe("reputation fraud controls", () => {
       )
     }
     await t.run((ctx) => recomputeCommunity(ctx, paper.id))
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers())
     expect(
       (await t.run((ctx) => ctx.db.query("reputationEvents").collect())).length
     ).toBe(0)
@@ -586,6 +587,7 @@ describe("reputation fraud controls", () => {
       )
     }
     await t.run((ctx) => recomputeCommunity(ctx, paper.id))
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers())
     expect(
       (await t.run((ctx) => ctx.db.query("reputationEvents").collect())).length
     ).toBe(1)
@@ -949,6 +951,7 @@ describe("admission and reputation reversals", () => {
       ctx.db.insert("votes", { resourceId: pa.id, agentId: b._id, value: 1 })
     )
     await t.run((ctx) => recomputeCommunity(ctx, pa.id))
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers())
     const first = await t.run((ctx) =>
       ctx.db
         .query("reputationEvents")
@@ -962,7 +965,9 @@ describe("admission and reputation reversals", () => {
       ctx.db.insert("votes", { resourceId: pb.id, agentId: a._id, value: 1 })
     )
     await t.run((ctx) => recomputeCommunity(ctx, pb.id))
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers())
     await t.run((ctx) => recomputeCommunity(ctx, pa.id))
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers())
     expect(
       (await t.run((ctx) => ctx.db.get(first!._id)))?.reversedAt
     ).toBeDefined()
@@ -1055,6 +1060,7 @@ describe("admission and reputation reversals", () => {
         )
       )
     await t.run((ctx) => recomputeCommunity(ctx, paper.id))
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers())
     const event = await t.run((ctx) =>
       ctx.db
         .query("reputationEvents")
@@ -1066,11 +1072,13 @@ describe("admission and reputation reversals", () => {
     expect(event?.points).toBe(1)
     await t.run((ctx) => ctx.db.patch(votes[0], { value: 0 }))
     await t.run((ctx) => recomputeCommunity(ctx, paper.id))
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers())
     expect(
       (await t.run((ctx) => ctx.db.get(event!._id)))?.reversedAt
     ).toBeDefined()
     await t.run((ctx) => ctx.db.patch(votes[0], { value: 1 }))
     await t.run((ctx) => recomputeCommunity(ctx, paper.id))
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers())
     const restored = await t.run((ctx) => ctx.db.get(event!._id))
     expect(restored?.reversedAt).toBeUndefined()
     expect(restored?.maturesAt).toBe(event?.maturesAt)
@@ -1112,4 +1120,18 @@ it("rejects unsigned human ownership linking and signed linking from a banned ne
   expect(
     await t.run((ctx) => ctx.db.query("gatewayNonces").collect())
   ).toHaveLength(1)
+})
+
+it("invalidates community eligibility only when a human approval actually changes", async () => {
+  const t = setup(), admin = await human(t), owner = await human(t)
+  vi.stubEnv("MODERATION_ADMIN_USER_IDS", admin.id)
+  const input = { action: "approve_owner" as const, targetId: owner.id, enabled: true, reason: "Fixture approval with documented independent evidence." }
+  await admin.client.mutation(api.moderationHumans.adminAction, input)
+  const before = await t.run((ctx) => ctx.db.query("communityReputationState").unique())
+  expect(before?.authorityVersion).toBe(1)
+  await admin.client.mutation(api.moderationHumans.adminAction, input)
+  expect(await t.run((ctx) => ctx.db.query("communityReputationState").unique())).toEqual(before)
+  await admin.client.mutation(api.moderationHumans.adminAction, { ...input, enabled: false })
+  expect((await t.run((ctx) => ctx.db.query("communityReputationState").unique()))?.authorityVersion).toBe(2)
+  await t.finishAllScheduledFunctions(() => vi.runAllTimers())
 })

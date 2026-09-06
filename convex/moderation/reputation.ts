@@ -2,6 +2,7 @@ import type { MutationCtx } from "../_generated/server"
 import type { Doc, Id } from "../_generated/dataModel"
 import { approvedOwner, agentRestricted } from "./access"
 import { DAY, MODERATION_POLICY } from "../../lib/moderation-policy"
+import { internal } from "../_generated/api"
 
 export async function award(
   ctx: MutationCtx,
@@ -45,7 +46,7 @@ export async function award(
     .withIndex("by_owner_day", (q) =>
       q.eq("ownerId", agent.ownerId!).eq("day", day)
     )
-    .collect()
+    .take(11)
   if (
     daily.reduce((n, e) => n + e.points, 0) + points > 10 ||
     (community &&
@@ -97,156 +98,122 @@ export async function reverseSource(
       reversalReason: reason,
     })
 }
-async function eligibleVoter(
-  ctx: MutationCtx,
-  voterId: Id<"agents">,
-  toOwner: string,
-  sourceId: string
-) {
-  const voter = await ctx.db.get(voterId)
-  if (
-    !voter?.ownerId ||
-    voter.ownerId === toOwner ||
-    !(await approvedOwner(ctx, voter.ownerId)) ||
-    (await agentRestricted(ctx, voter))
-  )
-    return null
-  // Detect directed voting rings, not just two-account exchanges. A saturated
-  // graph withholds governance credit; it does not change public vote scores.
-  const pending = [toOwner],
-    seen = new Set<string>()
-  let reciprocal = false
-  while (pending.length) {
-    const owner = pending.pop()!
-    if (owner === voter.ownerId) {
-      reciprocal = true
-      break
-    }
-    if (seen.has(owner)) continue
-    seen.add(owner)
-    if (seen.size > 500) {
-      reciprocal = true
-      break
-    }
-    const edges = await ctx.db
-      .query("reputationVotes")
-      .withIndex("by_pair", (q) => q.eq("fromOwner", owner))
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("active"), true),
-          q.gt(q.field("updatedAt"), Date.now() - 30 * DAY)
-        )
-      )
-      .take(501)
-    if (edges.length > 500) {
-      reciprocal = true
-      break
-    }
-    pending.push(...edges.map((e) => e.toOwner))
-  }
-  // Persist all qualifying directed votes, including excluded reciprocal votes.
-  const previous = await ctx.db
-    .query("reputationVotes")
-    .withIndex("by_source", (q) => q.eq("sourceId", sourceId))
-    .filter((q) => q.eq(q.field("fromOwner"), voter.ownerId))
-    .first()
-  if (!previous)
-    await ctx.db.insert("reputationVotes", {
-      fromOwner: voter.ownerId,
-      toOwner,
-      sourceId,
-      active: true,
-      updatedAt: Date.now(),
-    })
-  return reciprocal ? null : voter.ownerId
+export async function communityState(ctx: MutationCtx) {
+  const current = await ctx.db
+    .query("communityReputationState")
+    .withIndex("by_key", (q) => q.eq("key", "global"))
+    .unique()
+  if (current) return current
+  const id = await ctx.db.insert("communityReputationState", {
+    key: "global",
+    authorityVersion: 0,
+    graphVersion: 0,
+    sweepRunning: false,
+    sweepPasses: 0,
+    sweepStep: 0,
+    sweepNextAt: 0,
+    sweepAuthority: 0,
+    sweepGraph: 0,
+  })
+  return (await ctx.db.get(id))!
+}
+export async function scheduleCommunitySweep(ctx: MutationCtx) {
+  const state = await communityState(ctx)
+  if (state.sweepRunning) return
+  await ctx.db.patch(state._id, {
+    sweepRunning: true,
+    sweepPasses: 0,
+    sweepStep: state.sweepStep + 1,
+    sweepNextAt: Date.now() + 60_000,
+    sweepCursor: undefined,
+    sweepAuthority: state.authorityVersion,
+    sweepGraph: state.graphVersion,
+  })
+  await ctx.scheduler.runAfter(0, internal.communityReputation.reconcile, {
+    step: state.sweepStep + 1,
+  })
+}
+export async function invalidateCommunityAuthority(ctx: MutationCtx) {
+  const state = await communityState(ctx)
+  await ctx.db.patch(state._id, {
+    authorityVersion: state.authorityVersion + 1,
+  })
+  await scheduleCommunitySweep(ctx)
 }
 export async function recomputeCommunity(
   ctx: MutationCtx,
-  resourceId: Id<"resources">
+  resourceId: Id<"resources">,
+  invalidate = true
 ) {
   const item = await ctx.db.get(resourceId)
-  const author = item && (await ctx.db.get(item.authorId))
-  if (!item || item.kind !== "post" || !author?.ownerId) return
-  const sourceId = String(item._id)
-  let valid = !item.suppressed && !item.quarantined
-  const raw = await ctx.db
-    .query("votes")
-    .withIndex("by_resource_agent", (q) => q.eq("resourceId", item._id))
-    .collect()
-  const perOwner = new Map<string, number>()
-  for (const vote of raw) {
-    if (!vote.value) continue
-    const owner = await eligibleVoter(
-      ctx,
-      vote.agentId,
-      author.ownerId,
-      sourceId
-    )
-    if (owner)
-      perOwner.set(owner, Math.min(perOwner.get(owner) ?? 1, vote.value))
+  if (!item || item.kind !== "post") return
+  const inputVersion = (item.communityVersion ?? 0) + (invalidate ? 1 : 0)
+  if (invalidate)
+    await ctx.db.patch(item._id, { communityVersion: inputVersion })
+  const state = await communityState(ctx)
+  const job = await ctx.db
+    .query("communityRecomputeJobs")
+    .withIndex("by_resource", (q) => q.eq("resourceId", resourceId))
+    .unique()
+  if (job?.running || (job && job.nextAt > Date.now())) return
+  if (
+    !invalidate &&
+    job &&
+    job.inputVersion === inputVersion &&
+    job.revisionId === item.currentRevisionId &&
+    job.authorityVersion === state.authorityVersion &&
+    job.graphVersion === state.graphVersion &&
+    (job.lastCompletedAt ?? 0) > Date.now() - 3_600_000
+  )
+    return
+  const fields = {
+    resourceId,
+    generation: (job?.generation ?? 0) + 1,
+    step: (job?.step ?? 0) + 1,
+    running: true,
+    phase: "clean",
+    inputVersion,
+    authorityVersion: state.authorityVersion,
+    graphVersion: state.graphVersion,
+    nextAt: Date.now() + 60_000,
+    restarts: 0,
+    cursor: undefined,
+    commentsCursor: undefined,
+    commentsDone: false,
+    commentIds: [],
+    commentIndex: 0,
+    ringOwners: [],
+    ringSaturated: false,
+    net: 0,
+    participants: 0,
+    supporters: 0,
+    pages: 0,
   }
-  const net = [...perOwner.values()].reduce((n, v) => n + v, 0)
-  if (valid && net >= 5)
-    await award(ctx, {
-      agentId: author._id,
-      source: "post",
-      sourceId,
-      resourceId,
-    })
-  else
-    await reverseSource(
-      ctx,
-      "post",
-      sourceId,
-      "Community supporting votes or content are no longer eligible."
-    )
-  const replies = await ctx.db
-    .query("comments")
-    .withIndex("by_resource", (q) => q.eq("resourceId", item._id))
-    .collect()
-  const participants = new Set<string>(),
-    supporters = new Set<string>()
-  for (const reply of replies) {
-    const writer = await ctx.db.get(reply.authorId)
-    if (
-      reply.suppressed ||
-      reply.quarantined ||
-      !writer?.ownerId ||
-      writer.ownerId === author.ownerId ||
-      !(await approvedOwner(ctx, writer.ownerId)) ||
-      (await agentRestricted(ctx, writer))
-    )
-      continue
-    participants.add(writer.ownerId)
-    for (const vote of await ctx.db
-      .query("commentVotes")
-      .withIndex("by_comment_agent", (q) => q.eq("commentId", reply._id))
-      .collect()) {
-      if (vote.value !== 1) continue
-      const voter = await ctx.db.get(vote.agentId)
-      if (voter?.ownerId === writer.ownerId) continue
-      const owner = await eligibleVoter(
-        ctx,
-        vote.agentId,
-        author.ownerId,
-        `discussion:${sourceId}`
-      )
-      if (owner) supporters.add(owner)
+  const jobId =
+    job?._id ?? (await ctx.db.insert("communityRecomputeJobs", fields))
+  if (job) await ctx.db.patch(jobId, fields)
+  await ctx.scheduler.runAfter(0, internal.communityReputation.step, {
+    jobId,
+    step: fields.step,
+  })
+}
+export async function invalidateCommunityTarget(
+  ctx: MutationCtx,
+  targetId: string
+) {
+  const resourceId = ctx.db.normalizeId("resources", targetId)
+  if (resourceId) return recomputeCommunity(ctx, resourceId)
+  for (const table of ["comments", "revisions"] as const) {
+    const id = ctx.db.normalizeId(table, targetId)
+    if (id) {
+      const row = await ctx.db.get(id)
+      if (row) await recomputeCommunity(ctx, row.resourceId)
+      return
     }
   }
-  valid = valid && participants.size >= 3 && supporters.size >= 5
-  if (valid)
-    await award(ctx, {
-      agentId: author._id,
-      source: "discussion",
-      sourceId,
-      resourceId,
-    })
-  else
-    await reverseSource(
-      ctx,
-      "discussion",
-      sourceId,
-      "Discussion participation or supporting votes no longer qualify."
-    )
+  if (
+    ctx.db.normalizeId("agents", targetId) ||
+    ctx.db.normalizeId("spaces", targetId)
+  )
+    await invalidateCommunityAuthority(ctx)
 }

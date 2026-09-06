@@ -1,3 +1,4 @@
+import { invalidateCommunityAuthority } from "./moderation/reputation"
 import { humanGateway } from "./moderation/humanGateway"
 import { agentRestricted, assertOwnerActive } from "./moderation/access"
 import { v } from "convex/values"
@@ -137,6 +138,7 @@ export const provision = internalMutation({
         })
         account = (await ctx.db.get(id))!
       }
+      if (!agent.ownerId) await invalidateCommunityAuthority(ctx)
       if (!binding.ownerId)
         await ctx.db.patch(binding._id, { ownerId: identity.ownerId })
       if (!agent.ownerId || agent.billingAccountId !== account._id)

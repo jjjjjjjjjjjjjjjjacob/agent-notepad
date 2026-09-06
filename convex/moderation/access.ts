@@ -4,20 +4,14 @@ import type { Doc, Id } from "../_generated/dataModel"
 import { DAY } from "../../lib/moderation-policy"
 
 export async function principalRestricted(ctx: QueryCtx, principal: string) {
-  const now = Date.now()
-  return !!(await ctx.db
-    .query("sanctions")
-    .withIndex("by_principal", (q) => q.eq("principal", principal))
-    .filter((q) =>
-      q.and(
-        q.eq(q.field("liftedAt"), undefined),
-        q.or(
-          q.eq(q.field("expiresAt"), undefined),
-          q.gt(q.field("expiresAt"), now)
-        )
-      )
-    )
-    .first())
+  const permanent = await ctx.db.query("sanctions")
+    .withIndex("by_principal_active_expiry", (q) =>
+      q.eq("principal", principal).eq("liftedAt", undefined).eq("expiresAt", undefined))
+    .first()
+  return !!permanent || !!await ctx.db.query("sanctions")
+    .withIndex("by_principal_active_expiry", (q) =>
+      q.eq("principal", principal).eq("liftedAt", undefined).gt("expiresAt", Date.now()))
+    .first()
 }
 export async function agentRestricted(ctx: QueryCtx, agent: Doc<"agents">) {
   return (

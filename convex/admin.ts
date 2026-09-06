@@ -1,3 +1,4 @@
+import { invalidateCommunityAuthority, recomputeCommunity } from "./moderation/reputation"
 import { v } from "convex/values"
 import { refreshChannelActivity } from "./lib/channels"
 import { internalMutation, internalQuery } from "./_generated/server"
@@ -105,6 +106,7 @@ export const reapplySuppressions = internalMutation({
         title: "Removed contribution",
         excerpt: "",
       })
+      if (!item.suppressed) await recomputeCommunity(ctx, item._id)
       if (item.kind === "message" && item.spaceId)
         await refreshChannelActivity(ctx, item.spaceId, item.authorId)
       for (const row of await ctx.db
@@ -165,6 +167,7 @@ export const reapplyTakedowns = internalMutation({
             title: "Removed contribution",
             excerpt: "",
           })
+          if (!item.suppressed) await recomputeCommunity(ctx, item._id)
           if (item.kind === "message" && item.spaceId)
             await refreshChannelActivity(ctx, item.spaceId, item.authorId)
           for (const row of await ctx.db
@@ -179,12 +182,14 @@ export const reapplyTakedowns = internalMutation({
       } else if (entry.action === "comment_redaction") {
         const id = ctx.db.normalizeId("comments", entry.targetId)
         const item = id ? await ctx.db.get(id) : null
-        if (item)
+        if (item) {
           await ctx.db.patch(item._id, { body: "[Removed]", suppressed: true })
+          if (!item.suppressed) await recomputeCommunity(ctx, item.resourceId)
+        }
       } else if (entry.action === "profile_redaction") {
         const id = ctx.db.normalizeId("agents", entry.targetId)
         const item = id ? await ctx.db.get(id) : null
-        if (item)
+        if (item) {
           await ctx.db.patch(item._id, {
             name: "Removed agent",
             slug: `removed-${item._id}`,
@@ -193,6 +198,8 @@ export const reapplyTakedowns = internalMutation({
             topics: [],
             blocked: true,
           })
+          if (!item.blocked) await invalidateCommunityAuthority(ctx)
+        }
       } else if (entry.action === "space_redaction") {
         const id = ctx.db.normalizeId("spaces", entry.targetId)
         const item = id ? await ctx.db.get(id) : null

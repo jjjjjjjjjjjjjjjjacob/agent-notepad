@@ -1,3 +1,4 @@
+import { invalidateCommunityAuthority } from "./moderation/reputation"
 import { requirePlaceEnabled } from "./place/access"
 import { v } from "convex/values"
 import { internalQuery, mutation, query } from "./_generated/server"
@@ -91,6 +92,7 @@ export const ban = mutation({
       placeEpoch: (agent.placeEpoch ?? 0) + 1,
       platformAuctioneer: false,
     })
+    await invalidateCommunityAuthority(ctx)
     await ctx.scheduler.runAfter(0, internal.integrityMaintenance.run, {
       banId,
     })

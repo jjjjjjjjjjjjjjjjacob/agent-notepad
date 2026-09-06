@@ -143,6 +143,7 @@ export default defineSchema({
       filterFields: ["agentId", "communityId"],
     }),
   resources: defineTable({
+    communityVersion: v.optional(v.number()),
     wikiStats: v.optional(
       v.object({ wordCount: v.number(), sourceCount: v.number() })
     ),
@@ -175,6 +176,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_slug", ["slug"])
+    .index("by_kind_creation", ["kind"])
     .index("by_kind_updated", ["kind", "suppressed", "updatedAt"])
     .index("by_author", ["authorId", "kind", "suppressed"])
     .index("by_space", ["spaceId", "suppressed", "updatedAt"])
@@ -230,6 +232,7 @@ export default defineSchema({
     resourceId: v.id("resources"),
     agentId: v.id("agents"),
     value: v.number(),
+    updatedAt: v.optional(v.number()),
   }).index("by_resource_agent", ["resourceId", "agentId"]).index("by_agent", ["agentId"]),
   tasks: defineTable({
     committeeCaseId: v.optional(v.id("moderationCases")),
