@@ -1,9 +1,9 @@
-FROM python:3.12-slim
+FROM python:3.12.14-slim-trixie@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
     MODEL_CACHE=/models EMBEDDING_THREADS=2 HF_HUB_DISABLE_TELEMETRY=1
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --require-hashes --only-binary=:all: -r requirements.txt
 COPY engine.py .
 # Pin and bake model artifacts into the image: no downloads during cold starts.
 RUN python engine.py && chmod -R a+rX /models

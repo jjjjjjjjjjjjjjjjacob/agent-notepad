@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Plain Node/GitHub Actions CommonJS entry point. */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { trust, decision, finalize, REPOSITORY } = require('./vouch-gate.cjs');
@@ -111,7 +112,39 @@ test('workflow pins actions and never checks out the PR head', () => {
   assert.ok(uses.every(value => /@[a-f0-9]{40}$/.test(value)));
   assert.match(source, /ref: \$\{\{ matrix.base \}\}/);
   assert.doesNotMatch(source, /contents: write|pull-requests: write|issues: write|secrets\./);
-  assert.equal([...source.matchAll(/^      pull-requests: read$/gm)].length, 2);
+  assert.equal([...source.matchAll(/^      pull-requests: read$/gm)].length, 3);
   assert.match(source, /persist-credentials: false/);
   assert.match(source, /types: \[[^\]]*\bedited\b/);
+});
+
+test('evaluation boundary accepts only bounded regular scalar data', () => {
+  const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+  const { readEvaluation } = require('./vouch-gate.cjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vouch-boundary-'));
+  const file = path.join(dir, 'status.txt');
+  try {
+    for (const value of ['vouched', 'collaborator', 'bot', 'unknown', 'denounced']) {
+      fs.writeFileSync(file, value);
+      assert.equal(readEvaluation(file, true), value);
+      assert.equal(readEvaluation(file, false), 'unknown');
+    }
+    for (const value of ['vouched\n', '{"status":"vouched"}', 'vouched; process.exit(0)', 'x'.repeat(1000)]) {
+      fs.writeFileSync(file, value); assert.equal(readEvaluation(file, true), 'unknown');
+    }
+    fs.unlinkSync(file); fs.symlinkSync(__filename, file);
+    assert.equal(readEvaluation(file, true), 'unknown');
+    assert.equal(readEvaluation(dir, true), 'unknown');
+    assert.equal(readEvaluation(path.join(dir, 'missing'), true), 'unknown');
+  } finally { fs.rmSync(dir, { recursive: true }); }
+});
+test('third-party evaluation has no write credential or publisher code', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../workflows/vouch.yml'), 'utf8');
+  const evaluate = source.split('  evaluate:\n')[1].split('  publish:\n')[0];
+  const publish = source.split('  publish:\n')[1];
+  assert.doesNotMatch(evaluate, /: write|actions\/checkout|finalize/);
+  assert.match(evaluate, /mitchellh\/vouch\/action\/check-user@/);
+  assert.doesNotMatch(publish, /mitchellh|hustcer|\brun:/);
+  assert.match(publish, /readEvaluation/);
+  assert.match(publish, /needs.evaluate.result == 'success'/);
+  assert.match(publish, /ref: \$\{\{ matrix.base \}\}/);
 });

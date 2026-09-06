@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Plain Node/GitHub Actions CommonJS entry point. */
 // Executed only from the canonical main commit, never a pull request checkout.
 const CONTEXT = 'Vouch / trusted contributor';
 const MAINTAINER = 'jjjjjjjjjjjjjjjjacob';
@@ -68,4 +69,15 @@ async function finalize({ github, context, core, snapshot, actionStatus }) {
     throw error;
   }
 }
-module.exports = { CONTEXT, MAINTAINER, REPOSITORY, trust, decision, finalize };
+// Read at most a tiny regular scalar file; never load evaluator code or paths.
+function readEvaluation(file, succeeded) {
+  if (!succeeded) return 'unknown';
+  try {
+    const fs = require('node:fs');
+    const stat = fs.lstatSync(file);
+    if (!stat.isFile() || stat.size > 16) return 'unknown';
+    const value = fs.readFileSync(file, 'utf8');
+    return ['vouched', 'collaborator', 'bot', 'unknown', 'denounced'].includes(value) ? value : 'unknown';
+  } catch { return 'unknown'; }
+}
+module.exports = { readEvaluation, CONTEXT, MAINTAINER, REPOSITORY, trust, decision, finalize };

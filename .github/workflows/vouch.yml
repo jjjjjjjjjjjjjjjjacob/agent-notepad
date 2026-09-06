@@ -52,7 +52,7 @@ jobs:
             const include = prs.map(pr => ({ number: pr.number, sha: pr.head.sha, author: pr.user.login, base }));
             core.setOutput('matrix', JSON.stringify({ include }));
             core.setOutput('any', include.length > 0 ? 'true' : 'false');
-  check:
+  evaluate:
     needs: prepare
     if: needs.prepare.outputs.any == 'true'
     strategy:
@@ -64,15 +64,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-      statuses: write
     steps:
-      # Explicit canonical repository and immutable main snapshot; no PR checkout.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          repository: jjjjjjjjjjjjjjjjacob/agent-notepad
-          ref: ${{ matrix.base }}
-          persist-credentials: false
-          sparse-checkout: .github/scripts
       - id: vouch
         continue-on-error: true
         uses: mitchellh/vouch/action/check-user@d66fa29a64600490892131ad87597c30c91fcac4 # v1.5.0
@@ -84,14 +76,56 @@ jobs:
           vouched-repo: jjjjjjjjjjjjjjjjacob/agent-notepad
           vouched-file: .github/VOUCHED.td
           allow-fail: 'true'
+      - name: Write narrow evaluation result
+        if: always()
+        env:
+          VOUCH_STATUS: ${{ steps.vouch.outputs.status }}
+        run: |
+          mkdir result
+          node -e "const s=process.env.VOUCH_STATUS; require('fs').writeFileSync('result/status.txt', ['vouched','collaborator','bot','unknown','denounced'].includes(s) ? s : 'unknown')"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: vouch-${{ matrix.number }}-${{ matrix.sha }}
+          path: result/status.txt
+          if-no-files-found: error
+          retention-days: 1
+  publish:
+    needs: [prepare, evaluate]
+    if: always() && needs.prepare.result == 'success' && needs.prepare.outputs.any == 'true'
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    steps:
+      # Trusted canonical code only. Evaluator output is data, never code.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: jjjjjjjjjjjjjjjjacob/agent-notepad
+          ref: ${{ matrix.base }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        id: result
+        continue-on-error: true
+        with:
+          name: vouch-${{ matrix.number }}-${{ matrix.sha }}
+          path: ${{ runner.temp }}/vouch-result
       - if: always()
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           VOUCH_SNAPSHOT: ${{ toJSON(matrix) }}
-          VOUCH_STATUS: ${{ steps.vouch.outputs.status }}
+          EVALUATION_OK: ${{ needs.evaluate.result == 'success' && steps.result.outcome == 'success' }}
+          VOUCH_RESULT_FILE: ${{ runner.temp }}/vouch-result/status.txt
         with:
           script: |
-            const { finalize } = require('./.github/scripts/vouch-gate.cjs');
+            const { finalize, readEvaluation } = require('./.github/scripts/vouch-gate.cjs');
+            const actionStatus = readEvaluation(process.env.VOUCH_RESULT_FILE, process.env.EVALUATION_OK === 'true');
             await finalize({ github, context, core,
-              snapshot: JSON.parse(process.env.VOUCH_SNAPSHOT),
-              actionStatus: process.env.VOUCH_STATUS });
+              snapshot: JSON.parse(process.env.VOUCH_SNAPSHOT), actionStatus });
