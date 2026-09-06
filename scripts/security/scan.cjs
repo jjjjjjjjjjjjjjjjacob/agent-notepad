@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Plain Node/GitHub Actions CommonJS entry point. */
 // Do not print tool stdout/stderr: secret scanners may include matched values.
 const fs = require('node:fs/promises');
+const { constants } = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
@@ -11,6 +12,56 @@ function checked(command, args, options = {}) {
   const result = spawnSync(command, args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, timeout: 600000, ...options });
   if (result.error || result.status !== 0) throw new Error('Security scan found an issue or could not complete');
   return result.stdout;
+}
+function safePath(file) {
+  if (!file || path.isAbsolute(file) || file.includes('\\') || file.includes('\0') || file.includes('\ufffd') || file.split('/').some(part => !part || part === '.' || part === '..')) {
+    throw new Error('Invalid scan path');
+  }
+  return file;
+}
+function indexEntries(text) {
+  const seen = new Set();
+  return text.split('\0').filter(Boolean).map(row => {
+    const match = /^([0-7]{6}) ([a-f0-9]{40}|[a-f0-9]{64}) ([0-3])\t([\s\S]+)$/.exec(row);
+    if (!match || match[3] !== '0' || !['100644', '100755', '120000', '160000'].includes(match[1])) throw new Error('Unsupported or unmerged Git index entry');
+    const file = safePath(match[4]);
+    if (seen.has(file)) throw new Error('Duplicate Git index path');
+    seen.add(file);
+    return { mode: match[1], oid: match[2], file };
+  });
+}
+async function materializeIndex(root, destination) {
+  const entries = indexEntries(checked('git', ['ls-files', '--stage', '-z'], { cwd: root }));
+  await fs.mkdir(destination);
+  for (const entry of entries) {
+    // Gitlinks name commits, not source blobs. Symlink blobs are scanned as plain text.
+    if (entry.mode === '160000') continue;
+    const bytes = checked('git', ['cat-file', 'blob', entry.oid], { cwd: root, encoding: null });
+    const target = path.join(destination, entry.file);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(target, bytes, { flag: 'wx', mode: 0o600 });
+  }
+}
+async function materializeWorktree(root, destination) {
+  const files = checked('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { cwd: root }).split('\0').filter(Boolean);
+  await fs.mkdir(destination);
+  for (const file of new Set(files)) {
+    const parts = safePath(file).split('/');
+    let source = root, readable = true;
+    for (let i = 0; i < parts.length; i++) {
+      source = path.join(source, parts[i]);
+      const stat = await fs.lstat(source).catch(error => { if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return null; throw error; });
+      if (!stat || (i < parts.length - 1 ? !stat.isDirectory() : !stat.isFile())) { readable = false; break; }
+    }
+    if (!readable) continue;
+    const handle = await fs.open(source, constants.O_RDONLY | constants.O_NOFOLLOW);
+    try {
+      if (!(await handle.stat()).isFile()) throw new Error('Working-tree file changed during scan');
+      const target = path.join(destination, file);
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      await fs.writeFile(target, await handle.readFile(), { flag: 'wx', mode: 0o600 });
+    } finally { await handle.close(); }
+  }
 }
 function lockedPackages(text) {
   const expected = new Map();
@@ -45,18 +96,12 @@ async function scan(mode, image) {
       tool = await install('gitleaks');
       const args = ['--redact=100', '--ignore-gitleaks-allow', '--no-banner', '--exit-code=1', '--report-format=json', `--report-path=${path.join(dir, 'report.json')}`];
       checked(tool.bin, ['git', ...args, '--log-opts=--all', '.']);
-      // Include staged, unstaged, and new non-ignored files without ever reading .env/ignored files.
-      const files = checked('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z']).split('\0').filter(Boolean);
+      const root = await fs.realpath('.');
+      const index = path.join(dir, 'index');
+      await materializeIndex(root, index);
+      checked(tool.bin, ['dir', ...args, index]);
       const current = path.join(dir, 'current');
-      await fs.mkdir(current);
-      for (const file of new Set(files)) {
-        const stat = await fs.lstat(file).catch(() => null);
-        if (!stat?.isFile()) continue;
-        const destination = path.join(current, file);
-        if (!destination.startsWith(current + path.sep)) throw new Error('Invalid tracked path');
-        await fs.mkdir(path.dirname(destination), { recursive: true });
-        await fs.copyFile(file, destination);
-      }
+      await materializeWorktree(root, current);
       checked(tool.bin, ['dir', ...args, current]);
     } else if (mode === 'dependencies' || mode === 'image') {
       if (mode === 'dependencies') {
@@ -98,4 +143,4 @@ if (require.main === module) scan(process.argv[2], process.argv[3]).catch(() => 
   console.error('Security scan failed: finding, invalid report, or tool/network error. No matched values were logged.');
   process.exitCode = 1;
 });
-module.exports = { checked, noAdvisories, lockedPackages, coverage };
+module.exports = { checked, noAdvisories, lockedPackages, coverage, indexEntries, materializeIndex, materializeWorktree };

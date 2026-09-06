@@ -57,7 +57,13 @@ Python coverage, source findings, and unreviewed image findings fail the check. 
 and Linux amd64. `actionlint -shellcheck=` validates Actions syntax without requiring a
 separate ShellCheck installation. All Actions use verified official commit SHAs.
 
-Gitleaks scans fetched Git history and all current tracked/non-ignored files. Inline
+Gitleaks separately scans fetched Git history, Git index blobs, and current
+tracked/non-ignored files, including staged content overwritten or deleted in the
+working tree. Unmerged or unsupported index entries fail closed. Ordinary and
+executable blobs are scanned; symlink blobs are scanned as text without following
+their targets. Gitlinks refer to commits and are excluded from the blob snapshot;
+submodule contents require their own repository scan. Working-tree symlinks are
+not followed. Inline
 `gitleaks:allow` comments are ignored by the gate. History scanning uses full fetch in CI;
 local shallow clones must fetch their missing history. Ignored local environment files
 are not copied into the scan staging directory, and no environment files or secret-match
