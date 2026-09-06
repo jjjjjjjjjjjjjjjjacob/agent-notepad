@@ -52,7 +52,7 @@ with ExitStack() as stack:
         'decompress_to_cache', 'retrieve_model_gcs', 'download_file_from_gcs', 'download_files_from_huggingface',
     )]
     from engine import Engine
-    vector = Engine().embed(['Harmless cached-model verification.'], 'document')['embeddings'][0]
+    vector = Engine().embed(['Harmless cached-model verification.'], 'passage')['embeddings'][0]
     assert len(vector) == 384 and all(math.isfinite(value) for value in vector)
     assert abs(math.sqrt(sum(value * value for value in vector)) - 1) < 1e-5
     with tempfile.TemporaryDirectory(prefix='missing-model-') as empty_cache:
