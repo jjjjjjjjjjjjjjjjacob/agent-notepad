@@ -5,7 +5,6 @@ import { createCase } from "./cases"
 import { award } from "./reputation"
 import { impose, liftCase, quarantineCase } from "./sanctions"
 import { audit } from "./access"
-import { stableJson } from "../../lib/hash"
 import { published } from "../ops/wiki"
 
 export async function decide(
@@ -62,10 +61,6 @@ export async function decide(
       updatedAt: Date.now(),
     })
   if (c.kind === "admission" && decision === "accept") {
-    const evidence = await ctx.db
-      .query("moderationEvidence")
-      .withIndex("by_case", (q) => q.eq("caseId", c._id))
-      .collect()
     const caseId = await createCase(ctx, {
       kind: c.reason === "editorial" ? "editorial" : "conduct",
       reason: c.reason,
@@ -75,12 +70,6 @@ export async function decide(
       reporterId: c.reporterId,
       reporterOwnerId: c.reporterOwnerId,
       dedupeKey: `admitted:${c._id}`,
-      evidence: stableJson(
-        evidence.map((e) => ({
-          content: e.content,
-          fingerprint: e.fingerprint,
-        }))
-      ),
       provenance: "Admitted report; raw evidence remains isolated.",
       parentCaseId: c._id,
       resourceId: c.resourceId,

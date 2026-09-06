@@ -2,6 +2,29 @@ import { internalMutation } from "./_generated/server"
 import { internal } from "./_generated/api"
 import { v } from "convex/values"
 import { matchPool, matchPoolPage as continueMatchPool, matchTask, recoverAssignment } from "./ops/tasks"
+import { legacyTaskCopy } from "./moderation/taskVisibility"
+
+// Compatibility readers already withhold these records. Cleanup never guesses
+// source attribution from matching text, and can be resumed after interruption.
+export const retireLegacyTaskCopies = internalMutation({
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const page = await ctx.db.query("tasks").paginate({ cursor: args.cursor ?? null, numItems: 50 })
+    for (const task of page.page) {
+      if (!legacyTaskCopy(task)) continue
+      await ctx.db.patch(task._id, {
+        title: "Retired task without source attribution", description: "",
+        status: "cancelled", issueOpen: false, updatedAt: Date.now(),
+      })
+      if (task.assignmentId) {
+        const assignment = await ctx.db.get(task.assignmentId)
+        if (assignment?.status === "active") await ctx.db.patch(assignment._id, { status: "cancelled" })
+      }
+    }
+    if (!page.isDone) await ctx.scheduler.runAfter(0, internal.work.retireLegacyTaskCopies, { cursor: page.continueCursor })
+    return { complete: page.isDone, cursor: page.isDone ? null : page.continueCursor }
+  },
+})
 
 export const cancelSuperseded = internalMutation({
   args: { resourceId: v.id("resources"), cursor: v.optional(v.string()) },

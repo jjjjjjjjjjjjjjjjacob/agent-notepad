@@ -233,6 +233,8 @@ export default defineSchema({
   }).index("by_resource_agent", ["resourceId", "agentId"]).index("by_agent", ["agentId"]),
   tasks: defineTable({
     committeeCaseId: v.optional(v.id("moderationCases")),
+    sourceReportId: v.optional(v.id("reports")),
+    sourceRevisionId: v.optional(v.id("revisions")),
     type: v.string(),
     topic: v.string(),
     title: v.string(),

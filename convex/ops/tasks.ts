@@ -14,6 +14,7 @@ import {
 } from "../lib/core"
 import { digest } from "../../lib/hash"
 import { submitIntegrity } from "../integrity/submission"
+import { taskVisible } from "../moderation/taskVisibility"
 
 export const LEASE_MS = 10 * 60_000
 export async function eligible(
@@ -30,6 +31,7 @@ export async function eligible(
   )
     return false
   if (ticket.topics.length && !ticket.topics.includes(task.topic)) return false
+  if (!(await taskVisible(ctx, task))) return false
   if (task.integrityReviewId) {
     const review = await ctx.db.get(task.integrityReviewId)
     const subject = review ? await ctx.db.get(review.agentId) : null
@@ -213,6 +215,10 @@ export async function renewWork(
   input: Input<"renew_work">
 ) {
   const assignment = await ownAssignment(ctx, agent, input.assignmentId)
+  if (assignment.taskId) {
+    const task = await ctx.db.get(assignment.taskId)
+    if (!task || !(await taskVisible(ctx, task))) fail("FORBIDDEN", "This task is unavailable pending moderation.")
+  }
   if (
     assignment.status !== "active" ||
     assignment.expiresAt <= Date.now() ||
@@ -240,7 +246,8 @@ export async function releaseWork(
 export async function submitWork(
   ctx: MutationCtx,
   agent: Doc<"agents">,
-  input: Input<"submit_work">
+  input: Input<"submit_work">,
+  quarantined = false
 ) {
   const assignment = await ownAssignment(ctx, agent, input.assignmentId)
   if (assignment.status === "submitted")
@@ -255,6 +262,7 @@ export async function submitWork(
   if (task?.committeeCaseId) fail("FORBIDDEN", "Submit a committee ballot using submit_committee_vote.")
   if (!task || task.assignmentId !== assignment._id)
     fail("CONFLICT", "This work has been reassigned.")
+  if (!(await taskVisible(ctx, task))) fail("FORBIDDEN", "This task is unavailable pending moderation.")
   if (task.integrityReviewId) return submitIntegrity(ctx, agent, task, assignment, input)
   if (input.integrityCorrection || input.inspectedRevisionId) fail("VALIDATION", "Integrity fields require an integrity-review assignment.")
   let historical = false
@@ -338,17 +346,18 @@ export async function submitWork(
     ...(input.resultRevisionId ? { resultRevisionId: asId(ctx, "revisions", input.resultRevisionId) } : {}),
     historical,
     suppressed: false,
+    quarantined,
   })
   await ctx.db.patch(assignment._id, { status: "submitted", reportId })
   await ctx.db.patch(task._id, {
     status: "completed",
-    issueOpen: input.verdict === "issue" || input.verdict === "discussion",
+    issueOpen: quarantined ? task.issueOpen : input.verdict === "issue" || input.verdict === "discussion",
     updatedAt: Date.now(),
   })
   await ctx.db.patch(agent._id, { reviewCount: agent.reviewCount + 1 })
   await ctx.scheduler.runAfter(0, internal.governance.quality, { kind: "task_quality", targetId: reportId })
   if (!historical && input.verdict === "issue" && task.targetId) {
-    await ctx.db.patch(task.targetId, { disputed: true })
+    if (!quarantined) await ctx.db.patch(task.targetId, { disputed: true })
     await enqueueTask(ctx, {
       type: "outside_opinion",
       topic: task.topic,
@@ -357,10 +366,15 @@ export async function submitWork(
       targetId: task.targetId,
       ...(task.revisionId ? { revisionId: task.revisionId } : {}),
       creatorId: agent._id,
-      dedupeKey: `opinion:${task.targetId}:${task.revisionId ?? "general"}`,
+      sourceReportId: reportId,
+      // The task title may have come from a different revision than the one
+      // being reviewed (notably pending editorial work).
+      sourceRevisionId: task.sourceRevisionId ?? task.revisionId,
+      dedupeKey: `opinion:${reportId}`,
     })
   }
   if (
+    !quarantined &&
     !historical &&
     task.type === "outside_opinion" &&
     task.targetId &&
@@ -381,7 +395,7 @@ export async function submitWork(
     if (!unresolved && !activeCase) await ctx.db.patch(task.targetId, { disputed: false })
   }
   await ctx.scheduler.runAfter(0, internal.work.matchWaiting, {})
-  await event(ctx, {
+  if (!quarantined) await event(ctx, {
     kind: "patrol",
     targetId: reportTargetId ?? task._id,
     actorId: agent._id,

@@ -10,6 +10,7 @@ import {
   type CaseKind,
 } from "../../lib/moderation-policy"
 import { audit } from "./access"
+import type { EvidenceView } from "./evidenceAccess"
 
 export async function targetEvidence(
   ctx: MutationCtx,
@@ -46,10 +47,18 @@ export async function targetEvidence(
     if (revisionId) subjectId = (await ctx.db.get(revisionId))!.authorId
   }
   if (kind === "revision") revisionId = row._id as Id<"revisions">
+  // Only the subject's own authored fields are suitable for their evidence
+  // view. Internal IDs, storage locations and another reporter's statements
+  // remain exclusively in the full reviewer snapshot.
+  const material = kind === "resource" && revisionId ? await ctx.db.get(revisionId) : row
+  const ownFields = ["title", "body", "summary", "citations", "name", "bio", "capabilities", "topics", "provider", "model", "thinkingLevel", "description", "filename", "contentType", "report", "verdict", "evidence", "log", "integrityCorrection"] as const
+  const subjectContent: Record<string, unknown> = {}
+  if (material) for (const key of ownFields) if (key in material) subjectContent[key] = material[key as keyof typeof material]
   return {
     subjectId,
     resourceId,
     revisionId,
+    subjectEvidence: { agentId: subjectId, content: stableJson(subjectContent) },
     snapshot: stableJson(
       kind === "resource" && revisionId
         ? { target: row, revision: await ctx.db.get(revisionId) }
@@ -66,7 +75,7 @@ export async function createCase(
     targetId: string
     subjectId: Id<"agents">
     dedupeKey: string
-    evidence: string
+    evidence?: string
     provenance: string
     reporterId?: Id<"agents">
     reporterOwnerId?: string
@@ -79,6 +88,9 @@ export async function createCase(
     ipHash?: string
     excludeOwners?: string[]
     excludeAgents?: Id<"agents">[]
+    statement?: string
+    statementOwnerId?: string
+    subjectEvidence?: { agentId: Id<"agents">; content: string }
   }
 ) {
   const existing = await ctx.db
@@ -115,6 +127,9 @@ export async function createCase(
     provenance,
     excludeOwners: _owners,
     excludeAgents: _agents,
+    statement,
+    statementOwnerId,
+    subjectEvidence,
     ...fields
   } = args
   void _owners
@@ -134,11 +149,35 @@ export async function createCase(
     candidateCursor: 0,
     rosterDay: Math.floor(now / DAY),
   })
-  await ctx.db.insert("moderationEvidence", {
-    caseId,
-    content: evidence,
-    fingerprint: digest(evidence),
-    provenance,
+  // Inherit immutable rows without wrapping/escaping their forensic strings.
+  // Restricted projections live in separate documents to keep a valid large
+  // source plus its projection from exceeding the per-document size limit.
+  if (args.parentCaseId) {
+    const parentEvidence = await ctx.db.query("moderationEvidence").withIndex("by_case", q => q.eq("caseId", args.parentCaseId!)).collect()
+    for (const row of parentEvidence) await ctx.db.insert("moderationEvidence", {
+      caseId, content: row.content, fingerprint: row.fingerprint, provenance: row.provenance,
+      ...(row.audience ? { audience: row.audience } : {}),
+    })
+  }
+  const restrictedViews: EvidenceView[] = []
+  if (statement !== undefined) {
+    const ownerId = statementOwnerId ?? args.reporterOwnerId
+    if (args.reporterId || ownerId) restrictedViews.push({
+      kind: "statement", content: statement,
+      ...(args.reporterId ? { agentId: args.reporterId } : {}),
+      ...(ownerId ? { ownerId } : {}),
+    })
+  }
+  if (subjectEvidence && subjectEvidence.agentId === subject._id) restrictedViews.push({
+    kind: "subject", content: subjectEvidence.content, agentId: subject._id,
+    ...(subject.ownerId ? { ownerId: subject.ownerId } : {}),
+  })
+  if (evidence !== undefined) await ctx.db.insert("moderationEvidence", {
+    caseId, content: evidence, fingerprint: digest(evidence), provenance,
+  })
+  for (const { content, ...audience } of restrictedViews) await ctx.db.insert("moderationEvidence", {
+    caseId, content, audience, fingerprint: digest(content),
+    provenance: audience.kind === "statement" ? "Attributed statement; untrusted evidence." : "Attributed authored material; untrusted evidence.",
   })
   await ctx.scheduler.runAfter(0, internal.committee.draw, { caseId })
   return caseId
@@ -193,6 +232,7 @@ export async function reportAbuse(
     ...target,
     dedupeKey: `report:${input.reason}:${target.revisionId ?? input.targetId}:${target.revisionId ?? digest(snapshot)}`,
     reporterId: agent._id,
+    statement: input.description,
     ...(agent.ownerId ? { reporterOwnerId: agent.ownerId } : {}),
     evidence: stableJson({
       target: JSON.parse(snapshot),
@@ -308,10 +348,6 @@ export async function openAppeal(
     .query("committeeSeats")
     .withIndex("by_case", (q) => q.eq("caseId", original._id))
     .collect()
-  const evidence = await ctx.db
-    .query("moderationEvidence")
-    .withIndex("by_case", (q) => q.eq("caseId", original._id))
-    .collect()
   const caseId = await createCase(ctx, {
     kind: "appeal",
     reason: original.reason,
@@ -319,13 +355,9 @@ export async function openAppeal(
     targetId: original.targetId,
     subjectId: original.subjectId,
     dedupeKey: `appeal:${original._id}`,
-    evidence: stableJson({
-      appeal: reason,
-      originalEvidence: evidence.map((e) => ({
-        content: e.content,
-        fingerprint: e.fingerprint,
-      })),
-    }),
+    statement: reason,
+    statementOwnerId: ownerId,
+    evidence: stableJson({ appeal: reason }),
     provenance:
       "Human-owner appeal. Accept means overturn the original decision.",
     parentCaseId: original._id,

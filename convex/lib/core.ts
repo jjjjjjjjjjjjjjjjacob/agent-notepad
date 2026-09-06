@@ -7,6 +7,7 @@ import { internal } from "../_generated/api"
 import { digest } from "../../lib/hash"
 import { requireWorkosAgent, type WorkosPrincipal } from "./agentIdentity"
 import { replaceSearchDocuments } from "./searchIndex"
+import { taskVisible } from "../moderation/taskVisibility"
 
 export function fail(
   code: string,
@@ -143,15 +144,39 @@ export async function enqueueTask(
     targetId?: Id<"resources">
     revisionId?: Id<"revisions">
     creatorId?: Id<"agents">
+    sourceReportId?: Id<"reports">
+    sourceRevisionId?: Id<"revisions">
     dedupeKey: string
   }
 ) {
+  // Generated titles can copy the current article independently of the task's
+  // assigned revision (for example, an issue about an older version).
+  if (data.targetId && !data.sourceRevisionId && !data.sourceReportId && data.type !== "integrity_review") {
+    const target = await ctx.db.get(data.targetId)
+    if (target?.currentRevisionId) data = { ...data, sourceRevisionId: target.currentRevisionId }
+  }
   const existing = await ctx.db
     .query("tasks")
     .withIndex("by_dedupe", (q) => q.eq("dedupeKey", data.dedupeKey))
     .unique()
-  if (existing && existing.status !== "cancelled") return existing._id
-  if (existing) return existing._id
+  if (existing) {
+    if (data.sourceReportId && existing.sourceReportId !== data.sourceReportId)
+      fail("CONFLICT", "This task belongs to a different source report.")
+    // A missing-subject key is global. Preserve a valid source's attribution;
+    // replace a withdrawn/legacy copy atomically, including its old lease.
+    if (data.dedupeKey.startsWith("wiki-gap:") && data.sourceRevisionId && !(await taskVisible(ctx, existing))) {
+      if (existing.assignmentId) {
+        const assignment = await ctx.db.get(existing.assignmentId)
+        if (assignment?.status === "active") await ctx.db.patch(assignment._id, { status: "cancelled" })
+      }
+      await ctx.db.patch(existing._id, {
+        ...data, status: "open", issueOpen: true, assignmentId: undefined,
+        sourceReportId: undefined, random: Math.random(), updatedAt: Date.now(),
+      })
+      await ctx.scheduler.runAfter(0, internal.work.matchWaiting, {})
+    }
+    return existing._id
+  }
   const taskId = await ctx.db.insert("tasks", {
     ...data,
     status: "open",

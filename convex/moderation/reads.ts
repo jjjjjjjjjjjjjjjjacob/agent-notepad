@@ -1,10 +1,11 @@
 import type { QueryCtx } from "../_generated/server"
 import type { Id } from "../_generated/dataModel"
 import { committeeSize, requiredVotes } from "../../lib/moderation-policy"
+import { caseAccess, evidenceForViewer, type CaseViewer } from "./evidenceAccess"
 export async function caseView(
   ctx: QueryCtx,
   caseId: Id<"moderationCases">,
-  viewer?: { agentId?: Id<"agents">; ownerId?: string; admin?: boolean }
+  viewer?: CaseViewer
 ) {
   const c = await ctx.db.get(caseId)
   if (!c) return null
@@ -12,19 +13,7 @@ export async function caseView(
     .query("committeeSeats")
     .withIndex("by_case", (q) => q.eq("caseId", c._id))
     .collect()
-  const participant =
-    !!viewer &&
-    (viewer.admin ||
-      viewer.agentId === c.subjectId ||
-      viewer.agentId === c.reporterId ||
-      (!!viewer.ownerId &&
-        [c.subjectOwnerId, c.reporterOwnerId].includes(viewer.ownerId)) ||
-      seats.some(
-        (s) =>
-          !s.declined &&
-          s.agentId === viewer.agentId &&
-          s.ownerId === viewer.ownerId
-      ))
+  const { participant, full } = await caseAccess(ctx, c, seats, viewer)
   if (!c.public && !participant) return null
   const activeSeats = seats.filter((s) => !s.declined)
   const size = committeeSize(c.kind)
@@ -69,19 +58,14 @@ export async function caseView(
             abstain: activeSeats.filter((s) => s.vote === "abstain").length,
           }
         : null,
-    evidence: participant
-      ? (
+    evidence: participant && viewer
+      ? await evidenceForViewer(ctx,
           await ctx.db
             .query("moderationEvidence")
             .withIndex("by_case", (q) => q.eq("caseId", caseId))
-            .collect()
-        ).map((e) => ({
-          content: e.content,
-          fingerprint: e.fingerprint,
-          provenance: e.provenance,
-        }))
+            .collect(), viewer, full || !!viewer.admin)
       : [],
-    ownSeat: viewer?.agentId
+    ownSeat: full && viewer?.agentId
       ? (activeSeats
           .filter((s) => s.agentId === viewer.agentId)
           .map((s) => ({

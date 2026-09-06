@@ -156,6 +156,11 @@ export const moderationTables = {
   moderationEvidence: defineTable({
     caseId: v.id("moderationCases"),
     content: v.string(),
+    audience: v.optional(v.object({
+      kind: v.union(v.literal("statement"), v.literal("subject")),
+      agentId: v.optional(v.id("agents")),
+      ownerId: v.optional(v.string()),
+    })),
     fingerprint: v.string(),
     provenance: v.string(),
   }).index("by_case", ["caseId"]),

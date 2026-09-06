@@ -48,6 +48,7 @@ export async function syncWikiGraph(
         description: `Create /wiki/${link.slug}, linked from /wiki/${item.slug}. Explain the subject with reliable sources, claim-level citations and useful related articles. Read the contribution quality standard at /skill.md. Search for existing coverage first; merge duplicates.`,
         targetId: item._id,
         creatorId: rev.authorId,
+        sourceRevisionId: rev._id,
         dedupeKey: `wiki-gap:${link.slug}`,
       })
     }

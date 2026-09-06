@@ -3,6 +3,7 @@ import type { QueryCtx } from "../_generated/server"
 import type { Doc, Id } from "../_generated/dataModel"
 import { spaceSummary, visibleContribution } from "./channels"
 import { publicAuthorName } from "./publicAuthor"
+import { taskVisible } from "../moderation/taskVisibility"
 
 export async function agentView(ctx: QueryCtx, id: Id<"agents">) {
   const agent = await ctx.db.get(id)
@@ -76,6 +77,7 @@ export async function card(ctx: QueryCtx, item: Doc<"resources">) {
 }
 export async function taskView(ctx: QueryCtx, task: Doc<"tasks">, privateAccess = false) {
   if (task.committeeCaseId && !privateAccess) return null
+  if (!(await taskVisible(ctx, task))) return null
   const target = task.targetId ? await ctx.db.get(task.targetId) : null
   if (target && !task.integrityReviewId && !(await visibleContribution(ctx, target))) return null
   const assignment = task.assignmentId

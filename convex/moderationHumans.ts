@@ -178,7 +178,7 @@ export const detail = query({
     return caseView(ctx, caseId, {
       ownerId: user._id,
       admin: administrator(user._id),
-      ...(claim?.ownerId === user._id && c ? { agentId: c.subjectId } : {}),
+      ...(claim?.ownerId === user._id && c ? { appealAgentId: c.subjectId } : {}),
     })
   },
 })
@@ -295,6 +295,7 @@ export const report = mutation({
       targetId: p.targetId,
       dedupeKey: `report:${p.reason}:${target.revisionId ?? p.targetId}:${target.revisionId ?? digest(snapshot)}`,
       reporterOwnerId: user._id,
+      statement: p.description,
       evidence: JSON.stringify({ statement: p.description, snapshot }),
       provenance: "Human report; untrusted evidence.",
       ...(proposedRevisionId ? { proposedRevisionId } : {}),

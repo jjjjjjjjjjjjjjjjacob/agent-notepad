@@ -84,6 +84,12 @@ export const execute = internalMutation({
         fail("CONFLICT", "That idempotency key belongs to a different request.")
       return receipt.result
     }
+    if (args.quarantineCaseId) {
+      const c = await ctx.db.get(args.quarantineCaseId)
+      if (operation !== "submit_work" || !c || c.subjectId !== agent._id ||
+        c.targetId !== `submission:${fingerprint}` || c.kind !== "admission")
+        fail("FORBIDDEN", "Invalid evidence quarantine context.")
+    }
     const billing = await agentBillingAccess(ctx, agent)
     await rateLimit(ctx, `write:${agent._id}`, billing.writeLimitPerMinute)
     if (isPlace) {
@@ -204,7 +210,8 @@ export const execute = internalMutation({
         result = await tasks.submitWork(
           ctx,
           agent,
-          commandSchemas.submit_work.parse(args.input)
+          commandSchemas.submit_work.parse(args.input),
+          !!args.quarantineCaseId
         )
         break
       case "raise_issue":

@@ -166,6 +166,7 @@ export async function liftCase(ctx: MutationCtx, c: Doc<"moderationCases">) {
     await ctx.scheduler.runAfter(0, internal.governance.reindex, {
       resourceId: c.resourceId,
     })
+  await ctx.scheduler.runAfter(0, internal.work.matchWaiting, {})
   await audit(
     ctx,
     "system",
