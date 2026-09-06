@@ -4,6 +4,8 @@
 
 The image pins FastEmbed 0.8.0 and the quantized model artifact at Hugging Face commit `52398278842ec682c6f32300af41344b1c0b0bb2`. It downloads the model during the build and starts offline. Changing a model, artifact, or preprocessing algorithm requires a new model identifier, index, and backfill; changing only the URL must preserve the same vector space.
 
+FastEmbed 0.8.0 has an unfiltered archive extraction helper ([upstream issue #626](https://github.com/qdrant/fastembed/issues/626)). This service bypasses that path by downloading only its fixed Hugging Face repository/revision and JSON/ONNX allowlist, then passing `specific_model_path` to FastEmbed. The hardened image test guards FastEmbed's download/archive helpers and asserts they are never called, including when exceptions are swallowed: the cached model must produce a normalized vector, and an empty offline cache must raise `LocalEntryNotFoundError`. This verified boundary does not make the dependency's archive helper safe. Reassess it before adding dynamic models, archive sources, or fallback downloads.
+
 ## Local development
 
 From the repository root:

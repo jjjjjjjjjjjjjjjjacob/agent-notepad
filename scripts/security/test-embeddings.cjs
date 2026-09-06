@@ -26,7 +26,11 @@ function docker(args, options = {}) {
     }
     if (!ready) throw new Error('Offline startup failed');
     docker(['exec', name, 'python', '-c', `
-import hashlib, importlib.metadata, json, os, pathlib, re, sys
+import hashlib, importlib.metadata, json, math, os, pathlib, re, sys, tempfile
+from contextlib import ExitStack
+from unittest.mock import patch
+from fastembed.common.model_management import ModelManagement
+from huggingface_hub.errors import LocalEntryNotFoundError
 assert os.getuid() == 65532 and sys.version_info[:2] == (3, 12)
 assert not pathlib.Path('/usr/local/lib/python3.12/ensurepip').exists()
 normalize = lambda name: re.sub(r'[-_.]+', '-', name.lower())
@@ -42,10 +46,30 @@ for item in manifest['packages']:
         file = pathlib.Path(record['path'])
         if 'sha256' in record: assert hashlib.sha256(file.read_bytes()).hexdigest() == record['sha256']
         else: assert str(file.readlink()) == record['symlink']
+assert os.environ.get('HF_HUB_OFFLINE') == '1'
+with ExitStack() as stack:
+    guards = [stack.enter_context(patch.object(ModelManagement, method, side_effect=AssertionError('Unexpected FastEmbed download/archive helper'))) for method in (
+        'decompress_to_cache', 'retrieve_model_gcs', 'download_file_from_gcs', 'download_files_from_huggingface',
+    )]
+    from engine import Engine
+    vector = Engine().embed(['Harmless cached-model verification.'], 'document')['embeddings'][0]
+    assert len(vector) == 384 and all(math.isfinite(value) for value in vector)
+    assert abs(math.sqrt(sum(value * value for value in vector)) - 1) < 1e-5
+    with tempfile.TemporaryDirectory(prefix='missing-model-') as empty_cache:
+        with patch.dict(os.environ, {'MODEL_CACHE': empty_cache, 'HF_HUB_OFFLINE': '1'}):
+            try:
+                Engine()
+            except LocalEntryNotFoundError:
+                pass
+            else:
+                raise AssertionError('Missing offline model did not fail closed')
+    # Also detect a helper invocation whose exception was swallowed upstream.
+    for guard in guards:
+        guard.assert_not_called()
 `]);
     const output = docker(['exec', name, 'python', 'test_service.py']);
     // The service test prints no credentials; preserve only a fixed success summary.
     if (output.includes(token)) throw new Error('Unexpected credential in test output');
-    console.log('Embedding tests passed: offline startup, exact package/provenance checks, no pip, real vectors, auth, batch/model bounds, complete windows.');
+    console.log('Embedding tests passed: offline startup, exact package/provenance checks, no pip, download/archive bypass, missing-cache rejection, real vectors, auth, batch/model bounds, complete windows.');
   } finally { spawnSync('docker', ['rm', '-f', name], { stdio: 'pipe', timeout: 30000 }); }
 })().catch(() => { console.error('Embedding image validation failed; no credentials or container logs printed.'); process.exitCode = 1; });
