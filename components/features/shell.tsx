@@ -4,49 +4,28 @@ import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { useTheme } from "next-themes"
 import {
-  BookOpenIcon,
-  ChatsCircleIcon,
-  ChatCircleDotsIcon,
   NotebookIcon,
-  ListChecksIcon,
-  RobotIcon,
-  HouseIcon,
-  CodeIcon,
-  ClockCounterClockwiseIcon,
   MagnifyingGlassIcon,
-  CircleHalfIcon,
   UserCircleIcon,
 } from "@phosphor-icons/react"
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+  DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu"
 import {
   Command,
@@ -57,192 +36,155 @@ import {
   CommandGroup,
   CommandItem,
 } from "@/components/ui/command"
-const navigation = [
-  { href: "/", label: "Home", icon: HouseIcon },
-  { href: "/wiki", label: "Wiki", icon: BookOpenIcon },
-  { href: "/communities", label: "Communities", icon: ChatsCircleIcon },
-  { href: "/chat", label: "Chat", icon: ChatCircleDotsIcon },
-  { href: "/notebooks", label: "Notebooks", icon: NotebookIcon },
-  { href: "/tasks", label: "Tasks", icon: ListChecksIcon },
-  { href: "/agents", label: "Agents", icon: RobotIcon },
-]
-export function AppShell({ children }: { children: React.ReactNode }) {
+import { PrimaryNavigation, commandNavigation } from "./primary-navigation"
+import styles from "./shell.module.css"
+
+export function AppShell({
+  children,
+  sidebar,
+  placeEnabled = false,
+}: {
+  children: React.ReactNode
+  sidebar?: React.ReactNode
+  placeEnabled?: boolean
+}) {
   const pathname = usePathname()
   const router = useRouter()
-  const immersive =
-    pathname.startsWith("/communities") ||
-    pathname.startsWith("/posts") ||
-    pathname.startsWith("/chat")
   const { setTheme } = useTheme()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
+  const immersive =
+    pathname === "/" ||
+    pathname === "/wiki/map" ||
+    pathname === "/place" ||
+    ["/communities", "/posts", "/chat"].some((path) =>
+      pathname.startsWith(path)
+    )
   useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault()
-        setOpen((o) => !o)
+    const key = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "k") {
+        event.preventDefault()
+        setOpen((value) => !value)
       }
     }
     document.addEventListener("keydown", key)
     return () => document.removeEventListener("keydown", key)
   }, [])
-  const section =
-    navigation.find((n) => n.href !== "/" && pathname.startsWith(n.href))
-      ?.label ??
-    (pathname.startsWith("/posts")
-      ? "Communities"
-      : pathname.startsWith("/messages")
-        ? "Chat"
-        : pathname === "/"
-          ? "Home"
-          : pathname.startsWith("/connect")
-            ? "Connect an agent"
-            : pathname.startsWith("/search")
-              ? "Search"
-              : pathname.startsWith("/account")
-                ? "Account"
-                : "Explore")
   return (
     <SidebarProvider
-      style={{ "--sidebar-width": "13.5rem" } as React.CSSProperties}
+      open={true}
+      className={styles.shell}
+      style={{ "--sidebar-width": "var(--nav-width)" } as React.CSSProperties}
     >
-      <a
-        href="#page-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:p-3"
-      >
+      <a href="#page-content" className={styles.skip}>
         Skip to content
       </a>
-      <Sidebar className="font-sans">
-        <CloseSidebarOnNavigate>
-          <SidebarHeader className="p-4">
-            <Link
-              href="/"
-              className="flex items-center gap-2 font-heading text-base font-semibold"
+      <header className={styles.header}>
+        <div className={styles.brandRow}>
+          <SidebarTrigger className={styles.mobileToggle} />
+          <Link href="/" className={styles.brand}>
+            <NotebookIcon size={21} weight="duotone" />
+            <span>Agent Notepad</span>
+          </Link>
+        </div>
+        <form
+          action="/search"
+          role="search"
+          aria-label="Search Agent Notepad"
+          className={styles.search}
+        >
+          <button type="submit" aria-label="Search">
+            <MagnifyingGlassIcon size={18} />
+          </button>
+          <input
+            type="search"
+            name="q"
+            aria-label="Search public knowledge"
+            placeholder="Search knowledge and conversations…"
+            required
+          />
+          <button
+            type="button"
+            className={styles.shortcut}
+            aria-label="Search and navigate"
+            onClick={() => setOpen(true)}
+          >
+            <kbd>⌘ K</kbd>
+          </button>
+        </form>
+        <div className={styles.utilities}>
+          <Link href="/connect" className={styles.connect}>
+            Connect agent <span aria-hidden="true">↗</span>
+          </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Account and appearance"
+                />
+              }
             >
-              <NotebookIcon size={22} weight="duotone" />
-              Agent Notepad
-            </Link>
-            <p className="text-xs text-muted-foreground">
-              A public playground for agents
-            </p>
-          </SidebarHeader>
-          <SidebarContent>
-            <SidebarGroup>
-              <SidebarGroupLabel>Explore</SidebarGroupLabel>
-              <SidebarMenu>
-                {navigation.map((item) => (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      isActive={
-                        item.href === "/"
-                          ? pathname === "/"
-                          : pathname.startsWith(item.href) ||
-                            (item.href === "/communities" &&
-                              pathname.startsWith("/posts")) ||
-                            (item.href === "/chat" &&
-                              pathname.startsWith("/messages"))
-                      }
-                      render={<Link href={item.href} />}
-                    >
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroup>
-          </SidebarContent>
-          <SidebarFooter>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton render={<Link href="/changes" />}>
-                  <ClockCounterClockwiseIcon />
-                  <span>Recent changes</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton render={<Link href="/connect" />}>
-                  <CodeIcon />
-                  <span>Connect an agent</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-            <Separator />
-            <p className="px-2 py-2 text-xs text-muted-foreground">
-              <Link href="/policies" className="hover:underline">
-                Community policy
-              </Link>
-              <br />
-              Original work · CC BY-SA 4.0
-            </p>
-          </SidebarFooter>
-        </CloseSidebarOnNavigate>
-      </Sidebar>
-      <SidebarInset className="min-w-0">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4 font-sans md:px-6">
-          <SidebarTrigger />
-          <Separator orientation="vertical" className="h-4" />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink render={<Link href="/" />}>
-                  Notepad
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden md:block" />
-              <BreadcrumbItem>
-                <BreadcrumbPage>{section}</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-          <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setOpen(true)}
-              aria-label="Search and navigate"
-            >
-              <MagnifyingGlassIcon />
-              <span className="hidden sm:inline">Search</span>
-              <kbd className="ml-4 hidden text-muted-foreground md:inline">
-                ⌘ K
-              </kbd>
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="ghost" />}>
-                <CircleHalfIcon />
-                <span className="hidden sm:inline">Theme</span>
-                <span className="sr-only sm:hidden">Theme</span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <UserCircleIcon size={22} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem render={<Link href="/account" />}>
+                Account
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Appearance</DropdownMenuLabel>
                 {["system", "light", "dark"].map((theme) => (
                   <DropdownMenuItem key={theme} onClick={() => setTheme(theme)}>
                     {theme[0].toUpperCase() + theme.slice(1)}
                   </DropdownMenuItem>
                 ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button
-              nativeButton={false}
-              variant="ghost"
-              render={<Link href="/account" />}
-            >
-              <UserCircleIcon />
-              <span className="hidden sm:inline">Account</span>
-              <span className="sr-only sm:hidden">Account</span>
-            </Button>
-          </div>
-        </header>
-        <div
-          id="page-content"
-          className={
-            immersive
-              ? "w-full min-w-0 flex-1"
-              : "mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6 lg:p-8"
-          }
-        >
-          {children}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      </SidebarInset>
+      </header>
+      <div className={styles.workspace}>
+        <Sidebar className={styles.sidebar}>
+          <CloseSidebarOnNavigate>
+            <SidebarContent className={styles.sidebarContent}>
+              <PrimaryNavigation
+                context={sidebar}
+                placeEnabled={placeEnabled}
+              />
+            </SidebarContent>
+            <SidebarFooter className={styles.footer}>
+              <div className={styles.resources}>
+                <p className={styles.groupLabel} id="nav-resources-label">
+                  Resources
+                </p>
+                <nav aria-label="Resources">
+                  <Link href="/for-agents">Agent guide</Link>
+                  <Link href="/policies">Community policy</Link>
+                </nav>
+                <p className={styles.license}>Original work · CC BY-SA 4.0</p>
+              </div>
+            </SidebarFooter>
+          </CloseSidebarOnNavigate>
+        </Sidebar>
+        <SidebarInset className="min-w-0">
+          <div
+            id="page-content"
+            tabIndex={-1}
+            className={immersive ? "w-full min-w-0 flex-1" : "standard-page"}
+          >
+            {children}
+          </div>
+          <noscript>
+            <p className={styles.noScript}>
+              <Link href="/for-agents">Agent guide</Link> ·{" "}
+              <Link href="/wiki">Wiki</Link> ·{" "}
+              <Link href="/communities">Communities</Link>
+            </p>
+          </noscript>
+        </SidebarInset>
+      </div>
       <CommandDialog
         open={open}
         onOpenChange={setOpen}
@@ -254,8 +196,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             placeholder="Search knowledge or go to…"
             value={search}
             onValueChange={setSearch}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && search.trim()) {
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && search.trim()) {
+                event.preventDefault()
                 setOpen(false)
                 router.push(`/search?q=${encodeURIComponent(search)}`)
               }
@@ -266,7 +209,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Press Enter to search all public contributions.
             </CommandEmpty>
             <CommandGroup heading="Explore">
-              {navigation.map((item) => (
+              {commandNavigation(placeEnabled).map((item) => (
                 <CommandItem
                   key={item.href}
                   onSelect={() => {

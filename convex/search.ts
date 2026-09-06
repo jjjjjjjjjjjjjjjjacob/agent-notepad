@@ -4,10 +4,13 @@ import { card } from "./lib/views"
 import type { QueryCtx } from "./_generated/server"
 import type { Doc } from "./_generated/dataModel"
 import { resourcePath, headingId } from "../lib/content"
+import { visibleContribution } from "./lib/channels"
+import { excerptRange, SEARCH_CANDIDATES, keywordTerms } from "../lib/retrieval"
 async function result(
   ctx: QueryCtx,
   resource: Doc<"resources">,
-  chunk: Doc<"searchDocuments">
+  chunk: Doc<"searchDocuments">,
+  query = ""
 ) {
   const revision = await ctx.db.get(chunk.revisionId)
   const report = await ctx.db
@@ -16,15 +19,16 @@ async function result(
     .filter((q) =>
       q.and(
         q.eq(q.field("revisionId"), chunk.revisionId),
-        q.eq(q.field("suppressed"), false)
+        q.and(q.eq(q.field("suppressed"), false), q.neq(q.field("quarantined"), true))
       )
     )
     .first()
   const canonicalUrl = `${process.env.SITE_URL ?? "http://localhost:3000"}${resourcePath(resource)}`
   const heading = /^#{1,6}\s+(.+)$/m.exec(chunk.text)?.[1]
+  const excerpt = excerptRange(chunk.text, [query], 1200)
   return {
     ...(await card(ctx, resource)),
-    passage: chunk.text.slice(0, 1200),
+    passage: chunk.text.slice(excerpt.start, excerpt.end),
     canonicalUrl,
     revisionUrl: `${canonicalUrl}?revision=${chunk.revisionId}`,
     sectionUrl: heading
@@ -49,7 +53,8 @@ export const keyword = query({
   },
   handler: async (ctx, args) => {
     const query = args.query.trim().slice(0, 300)
-    if (!query) return []
+    if (!query || (args.kind && !["wiki", "post", "note"].includes(args.kind)))
+      return []
     const chunks = await ctx.db
       .query("searchDocuments")
       .withSearchIndex("text", (q) => {
@@ -67,12 +72,13 @@ export const keyword = query({
       const resource = await ctx.db.get(chunk.resourceId)
       if (
         !resource ||
-        resource.suppressed ||
-        resource.currentRevisionId !== chunk.revisionId
+        !(await visibleContribution(ctx, resource)) ||
+        resource.currentRevisionId !== chunk.revisionId ||
+        (await ctx.db.get(chunk.revisionId))?.suppressed !== false
       )
         continue
       seen.add(resource._id)
-      items.push(await result(ctx, resource, chunk))
+      items.push(await result(ctx, resource, chunk, query))
     }
     return items.slice(0, 20)
   },
@@ -88,8 +94,9 @@ export const hydrateVector = internalQuery({
       if (
         !chunk ||
         !resource ||
-        resource.suppressed ||
+        !(await visibleContribution(ctx, resource)) ||
         resource.currentRevisionId !== chunk.revisionId ||
+        (await ctx.db.get(chunk.revisionId))?.suppressed !== false ||
         seen.has(resource._id)
       )
         continue
@@ -97,5 +104,31 @@ export const hydrateVector = internalQuery({
       items.push(await result(ctx, resource, chunk))
     }
     return items
+  },
+})
+
+export const candidates = internalQuery({
+  args: {
+    query: v.string(),
+    kind: v.optional(v.string()),
+    topic: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const lookup = async (query: string) =>
+      (
+        await ctx.db
+          .query("searchDocuments")
+          .withSearchIndex("text", (q) => {
+            let search = q.search("text", query)
+            if (args.kind) search = search.eq("kind", args.kind as "wiki")
+            if (args.topic !== undefined)
+              search = search.eq("topic", args.topic)
+            return search
+          })
+          .take(SEARCH_CANDIDATES)
+      ).map((chunk) => ({ id: chunk._id, resourceId: chunk.resourceId }))
+    const terms = keywordTerms(args.query)
+    // Full-text search matches any term; avoid letting question words dominate recall.
+    return lookup(terms.length ? terms.join(" ") : args.query)
   },
 })

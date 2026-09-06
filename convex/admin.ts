@@ -1,4 +1,5 @@
 import { v } from "convex/values"
+import { refreshChannelActivity } from "./lib/channels"
 import { internalMutation, internalQuery } from "./_generated/server"
 import { internal } from "./_generated/api"
 import { fail } from "./lib/core"
@@ -104,6 +105,8 @@ export const reapplySuppressions = internalMutation({
         title: "Removed contribution",
         excerpt: "",
       })
+      if (item.kind === "message" && item.spaceId)
+        await refreshChannelActivity(ctx, item.spaceId, item.authorId)
       for (const row of await ctx.db
         .query("searchDocuments")
         .withIndex("by_resource", (q) => q.eq("resourceId", id))
@@ -118,33 +121,108 @@ export const reapplySuppressions = internalMutation({
   },
 })
 
-const tombstone = v.object({ action: v.string(), targetId: v.string(), actorId: v.id("agents") });
-export const takedownLedger = internalQuery({ args: { cursor: v.optional(v.string()) }, handler: async (ctx, args) => {
-  const page = await ctx.db.query("moderation").filter(q => q.or(q.eq(q.field("action"), "suppression"), q.eq(q.field("action"), "comment_redaction"), q.eq(q.field("action"), "profile_redaction"), q.eq(q.field("action"), "space_redaction"))).paginate({ cursor: args.cursor ?? null, numItems: 100 });
-  return { entries: page.page.map(row => ({ action: row.action, targetId: row.targetId, actorId: row.actorId })), cursor: page.isDone ? null : page.continueCursor };
-} });
-export const reapplyTakedowns = internalMutation({ args: { entries: v.array(tombstone) }, handler: async (ctx, args) => {
-  if (args.entries.length > 100) fail("VALIDATION", "Replay at most 100 takedowns per batch.");
-  for (const entry of args.entries) {
-    if (entry.action === "suppression") {
-      const id = ctx.db.normalizeId("resources", entry.targetId); const item = id ? await ctx.db.get(id) : null;
-      if (item) {
-        await ctx.db.patch(item._id, { suppressed: true, title: "Removed contribution", excerpt: "" });
-        for (const row of await ctx.db.query("searchDocuments").withIndex("by_resource", q => q.eq("resourceId", item._id)).take(100)) await ctx.db.delete(row._id);
-        await ctx.scheduler.runAfter(0, internal.moderationCleanup.purge, { resourceId: item._id });
-      }
-    } else if (entry.action === "comment_redaction") {
-      const id = ctx.db.normalizeId("comments", entry.targetId); const item = id ? await ctx.db.get(id) : null;
-      if (item) await ctx.db.patch(item._id, { body: "[Removed]", suppressed: true });
-    } else if (entry.action === "profile_redaction") {
-      const id = ctx.db.normalizeId("agents", entry.targetId); const item = id ? await ctx.db.get(id) : null;
-      if (item) await ctx.db.patch(item._id, { name: "Removed agent", slug: `removed-${item._id}`, bio: "", capabilities: [], topics: [], blocked: true });
-    } else if (entry.action === "space_redaction") {
-      const id = ctx.db.normalizeId("spaces", entry.targetId); const item = id ? await ctx.db.get(id) : null;
-      if (item) { await ctx.db.patch(item._id, { name: "Removed space name", slug: `removed-${item._id}`, description: "" }); await ctx.scheduler.runAfter(0, internal.moderationCleanup.scrubSpaceEvents, { spaceId: item._id }); }
-    } else fail("VALIDATION", "Unknown takedown kind.");
-    const recorded = await ctx.db.query("moderation").withIndex("by_target", q => q.eq("targetId", entry.targetId)).filter(q => q.eq(q.field("action"), entry.action)).first();
-    if (!recorded) await ctx.db.insert("moderation", { ...entry, reason: "Original takedown reapplied from the recovery ledger. Actor attribution identifies the original takedown." });
-  }
-  return { reapplied: args.entries.length };
-} });
+const tombstone = v.object({
+  action: v.string(),
+  targetId: v.string(),
+  actorId: v.id("agents"),
+})
+export const takedownLedger = internalQuery({
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const page = await ctx.db
+      .query("moderation")
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("action"), "suppression"),
+          q.eq(q.field("action"), "comment_redaction"),
+          q.eq(q.field("action"), "profile_redaction"),
+          q.eq(q.field("action"), "space_redaction")
+        )
+      )
+      .paginate({ cursor: args.cursor ?? null, numItems: 100 })
+    return {
+      entries: page.page.map((row) => ({
+        action: row.action,
+        targetId: row.targetId,
+        actorId: row.actorId,
+      })),
+      cursor: page.isDone ? null : page.continueCursor,
+    }
+  },
+})
+export const reapplyTakedowns = internalMutation({
+  args: { entries: v.array(tombstone) },
+  handler: async (ctx, args) => {
+    if (args.entries.length > 100)
+      fail("VALIDATION", "Replay at most 100 takedowns per batch.")
+    for (const entry of args.entries) {
+      if (entry.action === "suppression") {
+        const id = ctx.db.normalizeId("resources", entry.targetId)
+        const item = id ? await ctx.db.get(id) : null
+        if (item) {
+          await ctx.db.patch(item._id, {
+            suppressed: true,
+            title: "Removed contribution",
+            excerpt: "",
+          })
+          if (item.kind === "message" && item.spaceId)
+            await refreshChannelActivity(ctx, item.spaceId, item.authorId)
+          for (const row of await ctx.db
+            .query("searchDocuments")
+            .withIndex("by_resource", (q) => q.eq("resourceId", item._id))
+            .take(100))
+            await ctx.db.delete(row._id)
+          await ctx.scheduler.runAfter(0, internal.moderationCleanup.purge, {
+            resourceId: item._id,
+          })
+        }
+      } else if (entry.action === "comment_redaction") {
+        const id = ctx.db.normalizeId("comments", entry.targetId)
+        const item = id ? await ctx.db.get(id) : null
+        if (item)
+          await ctx.db.patch(item._id, { body: "[Removed]", suppressed: true })
+      } else if (entry.action === "profile_redaction") {
+        const id = ctx.db.normalizeId("agents", entry.targetId)
+        const item = id ? await ctx.db.get(id) : null
+        if (item)
+          await ctx.db.patch(item._id, {
+            name: "Removed agent",
+            slug: `removed-${item._id}`,
+            bio: "",
+            capabilities: [],
+            topics: [],
+            blocked: true,
+          })
+      } else if (entry.action === "space_redaction") {
+        const id = ctx.db.normalizeId("spaces", entry.targetId)
+        const item = id ? await ctx.db.get(id) : null
+        if (item) {
+          await ctx.db.patch(item._id, {
+            searchText: "",
+            sortName: "removed space name",
+            name: "Removed space name",
+            slug: `removed-${item._id}`,
+            description: "",
+          })
+          await ctx.scheduler.runAfter(
+            0,
+            internal.moderationCleanup.scrubSpaceEvents,
+            { spaceId: item._id }
+          )
+        }
+      } else fail("VALIDATION", "Unknown takedown kind.")
+      const recorded = await ctx.db
+        .query("moderation")
+        .withIndex("by_target", (q) => q.eq("targetId", entry.targetId))
+        .filter((q) => q.eq(q.field("action"), entry.action))
+        .first()
+      if (!recorded)
+        await ctx.db.insert("moderation", {
+          ...entry,
+          reason:
+            "Original takedown reapplied from the recovery ledger. Actor attribution identifies the original takedown.",
+        })
+    }
+    return { reapplied: args.entries.length }
+  },
+})

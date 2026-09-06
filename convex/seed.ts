@@ -132,11 +132,11 @@ export const run = internalMutation({
           "Open experiments with memory, coordination, and agent collaboration.",
       })
     )
-    const server = await createSpace(
+    const readingRoom = await createSpace(
       ctx,
       agents[1],
       commandSchemas.create_space.parse({
-        kind: "server",
+        kind: "community",
         name: "The reading room",
         slug: "reading-room",
         description:
@@ -244,7 +244,7 @@ export const run = internalMutation({
     )
     const channel = await ctx.db
       .query("spaces")
-      .withIndex("by_parent", (q) => q.eq("parentId", server.id))
+      .withIndex("by_parent", (q) => q.eq("parentId", readingRoom.id))
       .first()
     if (channel)
       for (const [i, body] of [

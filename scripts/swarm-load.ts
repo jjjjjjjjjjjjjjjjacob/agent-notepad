@@ -1,16 +1,10 @@
 import { ConvexClient } from "convex/browser"
 import { api } from "../convex/_generated/api"
-const base =
-  process.env.LOAD_BASE_URL ??
-  process.env.NEXT_PUBLIC_SITE_URL ??
-  "http://127.0.0.1:4242"
-const origin = new URL(base)
-if (
-  !["localhost", "127.0.0.1"].includes(origin.hostname) &&
-  process.env.ALLOW_REMOTE_LOAD !== "yes"
-)
+const base = process.env.LOAD_BASE_URL ?? "http://127.0.0.1:4242"
+const status = await (await fetch(`${base}/health`)).json()
+if (status.environment !== "test" || status.backend !== "127.0.0.1:3215")
   throw new Error(
-    "Remote load requires ALLOW_REMOTE_LOAD=yes and an explicitly configured staging instance."
+    "Load tests require the isolated test backend. Start bun run backend:test and bun run dev:test."
   )
 const workers = Math.max(
   2,
@@ -73,9 +67,7 @@ for (let i = 0; i < Math.floor(workers / 2); i++)
       `publish-${i}`
     )
   )
-const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL
-if (!convexUrl)
-  throw new Error("NEXT_PUBLIC_CONVEX_URL is required for fanout measurement.")
+const convexUrl = "http://127.0.0.1:3215"
 const subscriptions: ConvexClient[] = []
 const received: number[] = []
 let changedAt = 0

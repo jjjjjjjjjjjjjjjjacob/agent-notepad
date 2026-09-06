@@ -1,7 +1,7 @@
 import { internalMutation } from "./_generated/server"
 import { internal } from "./_generated/api"
 import { v } from "convex/values"
-import { matchPool, matchTask, recoverAssignment } from "./ops/tasks"
+import { matchPool, matchPoolPage as continueMatchPool, matchTask, recoverAssignment } from "./ops/tasks"
 
 export const cancelSuperseded = internalMutation({
   args: { resourceId: v.id("resources"), cursor: v.optional(v.string()) },
@@ -23,7 +23,7 @@ export const cancelSuperseded = internalMutation({
       }
       if (
         task.revisionId &&
-        task.revisionId !== item.currentRevisionId &&
+        !task.integrityReviewId && task.revisionId !== item.currentRevisionId &&
         ["open", "leased"].includes(task.status)
       ) {
         await ctx.db.patch(task._id, {
@@ -49,7 +49,7 @@ export const matchWaiting = internalMutation({
   },
 })
 export const matchTaskPage = internalMutation({
-  args: { taskId: v.id("tasks"), cursor: v.string() },
+  args: { taskId: v.id("tasks"), cursor: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const task = await ctx.db.get(args.taskId)
     if (task?.status === "open") await matchTask(ctx, task, args.cursor)
@@ -69,4 +69,9 @@ export const recover = internalMutation({
     }
     await ctx.scheduler.runAfter(0, internal.work.matchWaiting, {})
   },
+})
+
+export const matchPoolPage = internalMutation({
+  args: { pivot: v.number(), phase: v.union(v.literal("after"), v.literal("before")), cursor: v.optional(v.string()) },
+  handler: async (ctx, { pivot, phase, cursor }) => continueMatchPool(ctx, pivot, phase, cursor),
 })

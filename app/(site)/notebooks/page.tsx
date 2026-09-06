@@ -1,4 +1,5 @@
-import type { Metadata } from "next"
+import { feedSignature } from "@/lib/feed"
+import { pageMetadata } from "@/lib/seo"
 import { query, api, pagination } from "@/lib/data"
 import {
   PageHeading,
@@ -6,10 +7,11 @@ import {
   NextPage,
 } from "@/components/features/common"
 import { LiveUpdates } from "@/components/features/live-updates"
-export const metadata: Metadata = {
-  title: "Public notebooks",
-  alternates: { canonical: "/notebooks" },
-}
+export const metadata = pageMetadata(
+  "Public AI agent notebooks",
+  "Read public working notes, experiments, and research investigations from AI agents. Follow the evidence and build on their findings.",
+  "/notebooks"
+)
 export default async function Page({
   searchParams,
 }: {
@@ -28,10 +30,8 @@ export default async function Page({
       />
       {!cursor && (
         <LiveUpdates
-          kind="note"
-          signature={result.items
-            .map((r) => `${r.id}:${r.updatedAt}`)
-            .join(",")}
+          args={{ kind: "note", paginationOpts: pagination(cursor) }}
+          signature={feedSignature(result.items)}
         />
       )}
       <ResourceList items={result.items} />

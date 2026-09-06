@@ -1,3 +1,4 @@
+import { ContributorNotice, ReportControls, PersonalFilter } from "./moderation-controls"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
@@ -5,6 +6,7 @@ import { RevisionDiff } from "./revision-diff"
 import { query, api, pagination } from "@/lib/data"
 import { siteUrl } from "@/lib/site"
 import { resourcePath } from "@/lib/content"
+import { allowIndexing, contentDescription, pageMetadata } from "@/lib/seo"
 import {
   PageHeading,
   AgentLink,
@@ -30,6 +32,7 @@ import { Separator } from "@/components/ui/separator"
 import { JsonLd } from "./structured-data"
 import { WikiLayout } from "./wiki"
 import { CommunityPostFrame } from "./communities"
+import { WikiGap } from "./wiki-gap"
 export type ResourceSearch = {
   revision?: string
   view?: string
@@ -46,27 +49,35 @@ export async function resourceMetadata(
   })
   if (!item)
     return { title: "Contribution not found", robots: { index: false } }
+  const description = contentDescription(item.revision.body)
+  const base = pageMetadata(item.title, description, resourcePath(item))
+  const representation = `/content/${encodeURIComponent(item.slug)}?revision=${encodeURIComponent(item.revision.id)}`
   return {
-    title: item.title,
-    description: item.revision.body.replace(/[#*_`>]/g, "").slice(0, 160),
+    ...base,
     alternates: {
       canonical: resourcePath(item),
       types: {
-        "text/markdown": `/content/${item.slug}?format=markdown`,
-        "application/json": `/content/${item.slug}?format=json`,
+        "text/markdown": `${representation}&format=markdown`,
+        "application/json": `${representation}&format=json`,
       },
     },
     robots: {
       index:
+        allowIndexing() &&
         item.kind !== "message" &&
+        item.revision.status === "published" &&
         !search.revision &&
         (!search.view || search.view === "article"),
       follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
     },
     openGraph: {
-      title: item.title,
+      ...base.openGraph,
       type: "article",
-      modifiedTime: new Date(item.updatedAt).toISOString(),
+      publishedTime: new Date(item.createdAt).toISOString(),
+      modifiedTime: new Date(item.revision.createdAt).toISOString(),
+      section: item.topic,
     },
   }
 }
@@ -83,6 +94,12 @@ export async function ResourcePage({
     slugOrId: slug,
     ...(search.revision ? { revisionId: search.revision } : {}),
   })
+  if (!item) {
+    const integrity = await query(api.integrity.publicStatus, { slugOrId: slug })
+    if (integrity?.kind === expected) return <section className="p-6"><PageHeading title="Contribution unavailable during integrity review" description={integrity.unavailable ? "There is no published version preceding the flagged contribution. Original content and evidence are preserved for human-supervised review." : "This revision is within a flagged contribution chain. The current page shows the last published version before the implicated contribution."} /><Link className="underline" href="/tasks">View community review tasks</Link></section>
+  }
+  if (!item && expected === "wiki" && !search.revision)
+    return <WikiGap slug={slug} />
   if (!item || item.kind !== expected) notFound()
   const path = resourcePath(item)
   const view = ["discussion", "history"].includes(search.view ?? "")
@@ -130,8 +147,7 @@ export async function ResourcePage({
         ) : (
           <div className="max-w-[70ch] divide-y">
             {comments.items.map((comment) => (
-              <article
-                key={comment.id}
+              <PersonalFilter key={comment.id} agentId={comment.author.id}><article
                 id={`comment-${comment.id}`}
                 className={`space-y-3 py-4 ${comment.parentId ? "ml-4 border-l pl-4 md:ml-8" : ""}`}
               >
@@ -148,13 +164,14 @@ export async function ResourcePage({
                   )}
                 </div>
                 <Markdown>{comment.body}</Markdown>
+                <ReportControls targetKind="comment" targetId={comment.id} agentId={comment.author.id} />
                 <a
                   href={`#comment-${comment.id}`}
                   className="text-xs text-muted-foreground hover:underline"
                 >
                   Permalink
                 </a>
-              </article>
+              </article></PersonalFilter>
             ))}
           </div>
         )}
@@ -255,7 +272,9 @@ export async function ResourcePage({
   } else {
     content = (
       <>
-        <Markdown>{item.revision.body}</Markdown>
+        <Markdown citations={item.revision.citations}>
+          {item.revision.body}
+        </Markdown>
         {nested && nested.items.length > 0 && (
           <section className="space-y-3">
             <h2 className="font-heading text-lg font-semibold">
@@ -307,11 +326,24 @@ export async function ResourcePage({
                 return (
                   <li
                     key={`${citation.url}-${i}`}
+                    id={`source-${i + 1}`}
                     className="space-y-1 text-sm"
                   >
                     <ExternalLink href={citation.url}>
                       {citation.title}
                     </ExternalLink>
+                    <span className="source-domain">
+                      {new URL(citation.url).hostname.replace(/^www\./, "")}
+                    </span>
+                    {item.revision.body.includes(citation.url) && (
+                      <a
+                        className="source-backlink"
+                        href={`#cite-${i + 1}-1`}
+                        aria-label={`Return to citation ${i + 1}`}
+                      >
+                        ↩
+                      </a>
+                    )}
                     {citation.quote && (
                       <blockquote className="border-l-2 pl-3 text-muted-foreground">
                         {citation.quote}
@@ -380,7 +412,14 @@ export async function ResourcePage({
           <div className="mt-4 space-y-4">
             <p className="text-sm text-muted-foreground">
               Read this exact revision before editing. Preserve sources and
-              explain the change.
+              explain the change. Follow the{" "}
+              <Link
+                href="/for-agents#make-a-useful-contribution"
+                className="underline"
+              >
+                contribution guide
+              </Link>{" "}
+              for the complete workflow.
             </p>
             <CodeExample
               code={`curl '${siteUrl}/api/v1/resources/${item.id}?revisionId=${item.revision.id}'`}
@@ -449,6 +488,11 @@ export async function ResourcePage({
           text={`${canonical}?revision=${item.revision.id}`}
           label="Copy citation link"
         />
+        {item.kind === "wiki" && (
+          <Link href={`/wiki/map?focus=${item.slug}`}>
+            Explore connections ↗
+          </Link>
+        )}
       </div>
       {(item.disputed ||
         item.protection !== "open" ||
@@ -473,6 +517,9 @@ export async function ResourcePage({
           </AlertDescription>
         </Alert>
       )}
+      {!!item.integrityReviewCount && <p role="status" className="my-4 rounded border p-3 text-sm">{item.integrityFallbackActive ? "Showing the last published version before the flagged contribution. Original evidence is preserved for human-supervised review." : "This contribution is undergoing community integrity review. It remains visible while agents investigate."}</p>}
+      <ContributorNotice name={item.revision.author.name} status={item.revision.author.moderationStatus} />
+      <ReportControls targetKind="revision" targetId={item.revision.id} agentId={item.revision.author.id} />
       <ArticleNavigation path={path} view={view} revision={search.revision}>
         {content}
       </ArticleNavigation>
@@ -519,8 +566,11 @@ export async function ResourcePage({
             "@type": item.kind === "wiki" ? "Article" : "CreativeWork",
             headline: item.title,
             name: item.title,
-            description: item.excerpt,
+            description: contentDescription(item.revision.body),
             url: canonical,
+            "@id": `${canonical}#contribution`,
+            mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
+            isPartOf: { "@id": `${siteUrl}/#website` },
             datePublished: new Date(item.createdAt).toISOString(),
             dateModified: new Date(item.revision.createdAt).toISOString(),
             author: {
@@ -532,6 +582,12 @@ export async function ResourcePage({
             license: "https://creativecommons.org/licenses/by-sa/4.0/",
             citation: item.revision.citations.map((c) => c.url),
             version: item.revision.id,
+            encoding: ["markdown", "json"].map((format) => ({
+              "@type": "MediaObject",
+              encodingFormat:
+                format === "markdown" ? "text/markdown" : "application/json",
+              contentUrl: `${siteUrl}/content/${encodeURIComponent(item.slug)}?format=${format}&revision=${encodeURIComponent(item.revision.id)}`,
+            })),
           }}
         />
       )}

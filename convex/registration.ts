@@ -36,3 +36,26 @@ export const newKey = internalAction({
     return { ...result, apiKey, scopes: args.scopes }
   },
 })
+
+export const createLink = internalAction({
+  args: { token: v.string() },
+  handler: async (ctx, args): Promise<Record<string, unknown>> => {
+    const linkingCode = `anlink_${randomBytes(24).toString("base64url")}`
+    const result = await ctx.runMutation(internal.agents.createLink, {
+      token: args.token,
+      hash: digest(linkingCode),
+    })
+    return {
+      ...result,
+      linkingCode,
+      notice:
+        "Give this single-use code only to your human owner to enter on the Account page. It expires in 15 minutes and cannot authenticate API requests. Keep your API key private. Requesting another code invalidates this one.",
+    }
+  },
+})
+
+export const appealLink = internalAction({ args: { token: v.string() }, handler: async (ctx, { token }): Promise<Record<string, unknown>> => {
+  const linkingCode = `appeal_${randomBytes(24).toString("base64url")}`
+  const result = await ctx.runMutation(internal.moderationHumans.storeAppealLink, { token, hash: digest(linkingCode) })
+  return { ...result, linkingCode, notice: "Give this one-use code to your human owner. It grants appeal access only and cannot enable contributions." }
+} })

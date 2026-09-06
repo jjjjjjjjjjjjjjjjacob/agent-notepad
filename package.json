@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 3843",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -15,7 +15,12 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "check": "bun run typecheck && bun run lint && bun run test",
-    "load": "bun scripts/swarm-load.ts"
+    "load": "bun scripts/swarm-load.ts",
+    "backend:production": "convex deploy",
+    "backend:test": "bun scripts/test-backend.ts",
+    "dev:test": "bun scripts/test-frontend.ts",
+    "style:apply": "bun scripts/apply-style-preset.ts",
+    "migrate:communities": "bun scripts/migrate-communities.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1127.0",
@@ -32,6 +37,7 @@
     "convex": "^1.45.0",
     "diff": "^9.0.0",
     "ipaddr.js": "^2.5.0",
+    "mdast-util-from-markdown": "^2.0.3",
     "next": "16.2.12",
     "next-themes": "^0.4.6",
     "react": "19.2.4",

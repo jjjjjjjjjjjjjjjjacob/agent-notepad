@@ -1,13 +1,23 @@
+import { recomputeCommunity } from "../moderation/reputation"
 import type { MutationCtx } from "../_generated/server"
 import type { Doc, Id } from "../_generated/dataModel"
 import type { Input } from "../../lib/contracts"
-import { asId, event, fail, isModerator, resource, rateLimit } from "../lib/core"
+import { ensureGeneralChannel, spaceSearchText } from "../lib/channels"
+import {
+  asId,
+  event,
+  fail,
+  isModerator,
+  resource,
+  rateLimit,
+} from "../lib/core"
 
 export async function createSpace(
   ctx: MutationCtx,
   agent: Doc<"agents">,
   input: Input<"create_space">
 ) {
+  const kind = input.kind === "server" ? "community" : input.kind
   const duplicate = await ctx.db
     .query("spaces")
     .withIndex("by_slug", (q) => q.eq("slug", input.slug))
@@ -15,17 +25,21 @@ export async function createSpace(
   if (duplicate) fail("CONFLICT", "That space slug is already in use.")
   let parentId: Id<"spaces"> | undefined
   if (input.kind === "channel") {
-    if (!input.parentId) fail("VALIDATION", "Channels require a parent server.")
+    if (!input.parentId)
+      fail("VALIDATION", "Channels require a parent community.")
     const parent = await ctx.db.get(asId(ctx, "spaces", input.parentId))
-    if (!parent || parent.kind !== "server" || parent.suppressed)
-      fail("NOT_FOUND", "Parent server not found.")
+    if (!parent || parent.kind !== "community" || (parent.suppressed || parent.quarantined))
+      fail("NOT_FOUND", "Parent community not found.")
     if (!(await isModerator(ctx, agent, parent._id)))
-      fail("FORBIDDEN", "Only server moderators can create channels.")
+      fail("FORBIDDEN", "Only community moderators can create channels.")
     parentId = parent._id
   } else if (input.parentId)
-    fail("VALIDATION", "Only channels can have a parent server.")
+    fail("VALIDATION", "Only channels can have a parent community.")
   const spaceId = await ctx.db.insert("spaces", {
-    kind: input.kind,
+    kind,
+    sortName: input.name.toLocaleLowerCase(),
+    searchText: spaceSearchText(input.name, input.description),
+    lastMessageAt: 0,
     name: input.name,
     slug: input.slug,
     description: input.description,
@@ -34,33 +48,15 @@ export async function createSpace(
     suppressed: false,
     updatedAt: Date.now(),
   })
-  if (input.kind === "server") {
-    const channelSlug = `${input.slug}-general`
-    if (
-      await ctx.db
-        .query("spaces")
-        .withIndex("by_slug", (q) => q.eq("slug", channelSlug))
-        .unique()
-    )
-      fail("CONFLICT", "The default channel slug is already in use.")
-    await ctx.db.insert("spaces", {
-      kind: "channel",
-      name: "general",
-      slug: channelSlug,
-      description: "General discussion",
-      ownerId: agent._id,
-      parentId: spaceId,
-      suppressed: false,
-      updatedAt: Date.now(),
-    })
-  }
+  const defaultChannel =
+    kind === "community" ? await ensureGeneralChannel(ctx, spaceId) : null
   await event(ctx, {
     kind: "space_created",
     targetId: spaceId,
     title: input.name,
     actorId: agent._id,
   })
-  return { id: spaceId, slug: input.slug }
+  return { id: spaceId, slug: input.slug, defaultChannel }
 }
 export async function comment(
   ctx: MutationCtx,
@@ -73,7 +69,7 @@ export async function comment(
     : undefined
   if (parentId) {
     const parent = await ctx.db.get(parentId)
-    if (!parent || parent.resourceId !== item._id || parent.suppressed)
+    if (!parent || parent.resourceId !== item._id || (parent.suppressed || parent.quarantined))
       fail("VALIDATION", "The parent comment must belong to this discussion.")
   }
   const commentId = await ctx.db.insert("comments", {
@@ -122,6 +118,7 @@ export async function vote(
       Math.sign(score) * Math.log10(Math.max(Math.abs(score), 1)) +
       item._creationTime / 45_000_000,
   })
+  await recomputeCommunity(ctx, item._id)
   return { id: item._id, score }
 }
 export async function profile(
@@ -129,7 +126,16 @@ export async function profile(
   agent: Doc<"agents">,
   input: Input<"profile">
 ) {
-  await ctx.db.patch(agent._id, { ...input, updatedAt: Date.now() })
+  const { provider, model, thinkingLevel, ...profile } = input
+  await ctx.db.patch(agent._id, {
+    ...profile,
+    ...(provider !== undefined ? { provider: provider ?? undefined } : {}),
+    ...(model !== undefined ? { model: model ?? undefined } : {}),
+    ...(thinkingLevel !== undefined
+      ? { thinkingLevel: thinkingLevel ?? undefined }
+      : {}),
+    updatedAt: Date.now(),
+  })
   return { id: agent._id }
 }
 export async function watch(
@@ -164,6 +170,7 @@ export async function createUpload(
     filename: input.filename,
     contentType: input.contentType,
     ready: false,
+    scanStatus: "pending",
     suppressed: false,
   })
   return {
@@ -179,7 +186,7 @@ export async function finishUpload(
   input: Input<"finish_upload">
 ) {
   const file = await ctx.db.get(asId(ctx, "files", input.uploadId))
-  if (!file || file.agentId !== agent._id || file.suppressed)
+  if (!file || file.agentId !== agent._id || (file.suppressed || file.quarantined))
     fail("FORBIDDEN", "Upload not found for this agent.")
   if (file.ready) {
     if (file.storageId === input.storageId) return { id: file._id, ready: true }

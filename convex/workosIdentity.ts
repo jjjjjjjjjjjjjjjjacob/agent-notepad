@@ -1,3 +1,5 @@
+import { humanGateway } from "./moderation/humanGateway"
+import { agentRestricted, assertOwnerActive } from "./moderation/access"
 import { v } from "convex/values"
 import {
   internalMutation,
@@ -9,6 +11,7 @@ import { authComponent } from "./auth"
 import { fail, rateLimit, requireAgent } from "./lib/core"
 import { workosPrincipal } from "./lib/agentIdentity"
 import { registrationSchema } from "../lib/contracts"
+import { agentProfile } from "./lib/agentProfile"
 
 export const provision = internalMutation({
   args: {
@@ -17,10 +20,14 @@ export const provision = internalMutation({
     existingKey: v.optional(v.string()),
   },
   handler: async (ctx, { identity, input, existingKey }) => {
+    await assertOwnerActive(ctx, identity.ownerId)
     if (identity.expiresAt <= Date.now())
       fail("UNAUTHORIZED", "Agent token expired.")
     if (input !== undefined && !registrationSchema.safeParse(input).success)
-      fail("VALIDATION", "Supply a valid agent profile with a unique slug.")
+      fail(
+        "VALIDATION",
+        "Supply a valid agent profile. Name and slug are optional."
+      )
     let binding = await ctx.db
       .query("agentRegistrations")
       .withIndex("by_registration", (q) =>
@@ -32,7 +39,10 @@ export const provision = internalMutation({
     if (binding && existingKey) {
       const existing = await requireAgent(ctx, existingKey, "keys:write")
       if (binding.agentId !== existing.agent._id)
-        fail("CONFLICT", "This WorkOS registration already belongs to another agent.")
+        fail(
+          "CONFLICT",
+          "This WorkOS registration already belongs to another agent."
+        )
     }
     if (!binding && input === undefined && !existingKey) return null
     if (!binding) {
@@ -57,17 +67,14 @@ export const provision = internalMutation({
       } else {
         const parsed = registrationSchema.safeParse(input)
         if (!parsed.success)
-          fail("VALIDATION", "Supply a valid agent profile with a unique slug.")
+          fail(
+            "VALIDATION",
+            "Supply a valid agent profile. Name and slug are optional."
+          )
         await rateLimit(ctx, "registration", 100, 60 * 60_000)
-        if (
-          await ctx.db
-            .query("agents")
-            .withIndex("by_slug", (q) => q.eq("slug", parsed.data.slug))
-            .unique()
-        )
-          fail("CONFLICT", "That agent slug is already registered.")
+        const profile = await agentProfile(ctx, parsed.data)
         agentId = await ctx.db.insert("agents", {
-          ...parsed.data,
+          ...profile,
           role: "editor",
           blocked: false,
           contributionCount: 0,
@@ -82,7 +89,7 @@ export const provision = internalMutation({
       binding = (await ctx.db.get(id))!
     }
     const agent = await ctx.db.get(binding.agentId)
-    if (!agent || agent.blocked)
+    if (!agent || await agentRestricted(ctx, agent))
       fail("FORBIDDEN", "This agent cannot contribute.")
     if (binding.ownerId && binding.ownerId !== identity.ownerId)
       fail(
@@ -114,6 +121,7 @@ export const provision = internalMutation({
     }
     return {
       agentId: agent._id,
+      name: agent.name,
       slug: agent.slug,
       registrationId: binding.registrationId,
       claimed: !!identity.ownerId,
@@ -131,8 +139,14 @@ export const claimUser = internalQuery({
 })
 
 export const claimLimit = internalMutation({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => rateLimit(ctx, `claim:${userId}`, 10),
+  args: { userId: v.string(), claimAttemptToken: v.optional(v.string()), networkProof: v.optional(v.any()) },
+  handler: async (ctx, { userId, claimAttemptToken, networkProof }) => {
+    await assertOwnerActive(ctx, userId)
+    const error = await humanGateway(ctx, userId, "/api/moderation/link-agent", { claimAttemptToken }, networkProof)
+    if (error) return error
+    await rateLimit(ctx, `claim:${userId}`, 10)
+    return null
+  },
 })
 
 export const registrations = query({
@@ -166,4 +180,12 @@ export const revoke = mutation({
   },
 })
 
-export const configuration = query({ args: {}, handler: async () => ({ enabled: !!process.env.WORKOS_API_KEY && !!process.env.WORKOS_CLIENT_ID && !!process.env.WORKOS_AUTHKIT_ISSUER }) });
+export const configuration = query({
+  args: {},
+  handler: async () => ({
+    enabled:
+      !!process.env.WORKOS_API_KEY &&
+      !!process.env.WORKOS_CLIENT_ID &&
+      !!process.env.WORKOS_AUTHKIT_ISSUER,
+  }),
+})

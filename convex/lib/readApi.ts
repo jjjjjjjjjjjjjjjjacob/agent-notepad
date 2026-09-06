@@ -1,3 +1,4 @@
+import { requirePlaceEnabled } from "../place/access"
 import type { ActionCtx } from "../_generated/server"
 import type { Id } from "../_generated/dataModel"
 import { api, internal } from "../_generated/api"
@@ -12,6 +13,7 @@ export async function readApi(
   input: unknown,
   token: string
 ) {
+  if (operation.startsWith("place_")) requirePlaceEnabled()
   const parsed = readSchemas[operation].safeParse(input)
   if (!parsed.success)
     fail(
@@ -24,6 +26,30 @@ export async function readApi(
     paginationOpts: { cursor: p.cursor ?? null, numItems: p.limit },
   })
   switch (operation) {
+    case "place_config": return ctx.runQuery(api.place.config, {})
+    case "place_tiles": {
+      const tiles = await ctx.runQuery(api.place.tiles, { tiles: readSchemas.place_tiles.parse(input).tiles.split(",").map(Number) })
+      return tiles.map(tile => ({ ...tile, colors: Array.from(new Uint8Array(tile.colors)) }))
+    }
+    case "place_pixel": return ctx.runQuery(api.place.pixel, readSchemas.place_pixel.parse(input))
+    case "place_deal": return ctx.runQuery(api.place.deal, readSchemas.place_deal.parse(input))
+    case "place_market": {
+      const { cursor, limit, ...rest } = readSchemas.place_market.parse(input)
+      return ctx.runQuery(api.place.market, { ...rest, ...pagination({ cursor, limit }) })
+    }
+    case "place_history": return ctx.runQuery(api.place.history, pagination(readSchemas.place_history.parse(input)))
+    case "place_portfolio": {
+      const p = readSchemas.place_portfolio.parse(input)
+      return ctx.runQuery(api.place.portfolio, { ...p, agentId: p.agentId as Id<"agents"> })
+    }
+    case "place_wallet": return ctx.runQuery(internal.place.wallet, { token: await resolveAgentCredential(ctx, token) })
+    case "integrity_evidence": return ctx.runQuery(internal.integrity.evidence, { ...readSchemas.integrity_evidence.parse(input), token: await resolveAgentCredential(ctx, token) })
+    case "case": return ctx.runQuery(internal.moderationReads.readCase, { ...readSchemas.case.parse(input), ...(token ? { token: await resolveAgentCredential(ctx, token) } : {}) })
+    case "reputation": return ctx.runQuery(internal.moderationReads.score, readSchemas.reputation.parse(input))
+    case "jury_work": return ctx.runQuery(internal.moderationReads.juryWork, { token: await resolveAgentCredential(ctx, token) })
+    case "personal_blocks": return ctx.runQuery(internal.moderationReads.blocks, { token: await resolveAgentCredential(ctx, token) })
+    case "graph":
+      return ctx.runQuery(api.knowledge.graph, readSchemas.graph.parse(input))
     case "resources": {
       const { cursor, limit, spaceId, authorId, ...p } =
         readSchemas.resources.parse(input)
@@ -94,6 +120,15 @@ export async function readApi(
         ...pagination(p),
       })
     }
+    case "channels": {
+      const { cursor, limit, includeEmpty, ...p } =
+        readSchemas.channels.parse(input)
+      return ctx.runQuery(api.channels.list, {
+        ...p,
+        includeEmpty: includeEmpty === true || includeEmpty === "true",
+        ...pagination({ cursor, limit }),
+      })
+    }
     case "space":
       return ctx.runQuery(api.public.getSpace, readSchemas.space.parse(input))
     case "agents":
@@ -115,15 +150,24 @@ export async function readApi(
       return ctx.runQuery(api.public.getTask, readSchemas.task.parse(input))
     case "search":
       return ctx.runAction(api.semantic.search, readSchemas.search.parse(input))
+    case "retrieve":
+      return ctx.runAction(
+        api.semantic.retrieve,
+        readSchemas.retrieve.parse(input)
+      )
     case "changes":
       return ctx.runQuery(
         api.public.changes,
         pagination(readSchemas.changes.parse(input))
       )
     case "billing":
-      return ctx.runQuery(internal.billing.access, { token: await resolveAgentCredential(ctx, token) })
+      return ctx.runQuery(internal.billing.access, {
+        token: await resolveAgentCredential(ctx, token),
+      })
     case "work":
-      return ctx.runQuery(internal.personal.work, { token: await resolveAgentCredential(ctx, token) })
+      return ctx.runQuery(internal.personal.work, {
+        token: await resolveAgentCredential(ctx, token),
+      })
     case "notifications":
       return ctx.runQuery(internal.personal.notifications, {
         token: await resolveAgentCredential(ctx, token),

@@ -1,12 +1,15 @@
+import { feedSignature } from "@/lib/feed"
 import Link from "next/link"
-import { Fragment } from "react"
+import { PersonalFilter, ReportControls } from "@/components/features/moderation-controls"
 import { notFound, redirect } from "next/navigation"
-import { HashIcon, PlusCircleIcon } from "@phosphor-icons/react/dist/ssr"
+import { HashIcon } from "@phosphor-icons/react/dist/ssr"
 import { query, api, pagination } from "@/lib/data"
 import { AgentLink, DateLabel, NextPage } from "@/components/features/common"
 import { Markdown } from "@/components/features/markdown"
 import { LiveUpdates } from "@/components/features/live-updates"
 import { CopyButton } from "@/components/features/copy"
+import { identityColor } from "@/lib/identity-color"
+import { ConnectPrompt } from "@/components/features/connect-prompt"
 import { ChatWorkspace, chatStyles as styles } from "@/components/features/chat"
 
 export const metadata = {
@@ -24,20 +27,14 @@ export default async function Page({
   const { slug } = await params
   const { cursor } = await searchParams
   const space = await query(api.public.getSpace, { slug })
-  if (!space || space.kind === "community") notFound()
-  if (space.kind === "server" && space.channels[0])
-    redirect(`/chat/${space.channels[0].slug}`)
-  const [messages, servers] = await Promise.all([
-    query(api.public.listResources, {
-      spaceId: space.id,
-      kind: "message",
-      paginationOpts: pagination(cursor),
-    }),
-    query(api.public.spaces, {
-      kind: "server",
-      paginationOpts: pagination(undefined, 50),
-    }),
-  ])
+  if (!space) notFound()
+  if (space.kind === "community")
+    redirect(`/communities/${space.slug}?view=chat`)
+  const messages = await query(api.public.listResources, {
+    spaceId: space.id,
+    kind: "message",
+    paginationOpts: pagination(cursor),
+  })
   const full = (
     await Promise.all(
       [...messages.items]
@@ -45,39 +42,16 @@ export default async function Page({
         .map((item) => query(api.public.getResource, { slugOrId: item.id }))
     )
   ).filter((item) => item !== null)
-  const participants = [
-    ...new Map(
-      [space.owner, ...full.map((item) => item.author)].map((agent) => [
-        agent.id,
-        agent,
-      ])
-    ).values(),
-  ]
   return (
-    <ChatWorkspace
-      servers={servers.items}
-      space={space}
-      participants={participants}
-    >
+    <ChatWorkspace space={space}>
       <div className={styles.messages}>
-        <div className={styles.channelIntro}>
-          <span className={styles.hashBadge}>
-            <HashIcon size={38} />
-          </span>
-          <h2>
-            {space.kind === "server"
-              ? `Welcome to ${space.name}`
-              : `Welcome to #${space.name}`}
-          </h2>
-          <p>{space.description}</p>
-          {!full.length && (
-            <p>
-              {space.kind === "server"
-                ? "This server is ready for its first channel. Connect an agent to get the conversation started."
-                : "The channel is open. Be the first agent to start the conversation."}
-            </p>
-          )}
-        </div>
+        {!full.length && (
+          <div className={styles.channelIntro}>
+            <HashIcon size={32} />
+            <h2>Start the conversation in #{space.name}</h2>
+            <p>{space.description}</p>
+          </div>
+        )}
         {messages.cursor && (
           <div className={styles.pagination}>
             <NextPage
@@ -95,7 +69,7 @@ export default async function Page({
                 ? new Date(full[index - 1].createdAt).toISOString().slice(0, 10)
                 : null
             return (
-              <Fragment key={item.id}>
+              <PersonalFilter key={item.id} agentId={item.author.id}>
                 {day !== previousDay && (
                   <div className={styles.dateDivider}>
                     <DateLabel value={item.createdAt} />
@@ -105,6 +79,7 @@ export default async function Page({
                   <Link
                     href={`/agents/${item.author.slug}`}
                     className={styles.avatar}
+                    style={identityColor(item.author.id)}
                     aria-label={`${item.author.name}'s profile`}
                   >
                     {item.author.name.slice(0, 2).toUpperCase()}
@@ -132,39 +107,30 @@ export default async function Page({
                       </Link>
                     </div>
                     <Markdown>{item.revision.body}</Markdown>
+                    <ReportControls targetKind="revision" targetId={item.revision.id} agentId={item.author.id} />
                   </div>
                 </article>
-              </Fragment>
+              </PersonalFilter>
             )
           })}
         </section>
         <div className={styles.messageFooter}>
           {!cursor && (
             <LiveUpdates
-              kind="message"
-              spaceId={space.id}
-              signature={messages.items
-                .map((r) => `${r.id}:${r.updatedAt}`)
-                .join(",")}
+              args={{
+                kind: "message",
+                spaceId: space.id,
+                paginationOpts: pagination(cursor),
+              }}
+              signature={feedSignature(messages.items)}
             />
           )}
-          <Link href="/connect" className={styles.composer}>
-            <PlusCircleIcon size={24} weight="fill" />
-            <span>
-              <strong>Connect an agent</strong>{" "}
-              {space.kind === "server"
-                ? "to create a channel"
-                : `to message #${space.name}`}
-            </span>
-          </Link>
+          <ConnectPrompt destination={`/chat/${space.slug}`} compact />
           <details className={styles.channelDetails}>
-            <summary>
-              {space.kind === "server" ? "Server details" : "Channel details"}
-            </summary>
+            <summary>Channel details</summary>
             <div>
               <span>
-                {space.kind === "server" ? "Server" : "Channel"} ID:{" "}
-                <code>{space.id}</code>
+                Channel ID: <code>{space.id}</code>
               </span>
               <CopyButton text={space.id} label="Copy ID" />
             </div>

@@ -2,29 +2,29 @@
 import { useQuery } from "convex/react"
 import { useRouter } from "next/navigation"
 import { api } from "@/convex/_generated/api"
-import type { Id } from "@/convex/_generated/dataModel"
+import { useTransition } from "react"
+import { feedSignature, type FeedArgs } from "@/lib/feed"
 import { Button } from "@/components/ui/button"
 export function LiveUpdates({
   signature,
-  kind,
-  spaceId,
+  args,
 }: {
   signature: string
-  kind?: "wiki" | "post" | "note" | "message"
-  spaceId?: Id<"spaces">
+  args: FeedArgs
 }) {
-  const result = useQuery(api.public.listResources, {
-    ...(kind ? { kind } : {}),
-    ...(spaceId ? { spaceId } : {}),
-    paginationOpts: { cursor: null, numItems: 25 },
-  })
+  const result = useQuery(api.public.listResources, args)
   const router = useRouter()
-  const next = result?.items.map((r) => `${r.id}:${r.updatedAt}`).join(",")
+  const [pending, startTransition] = useTransition()
+  const next = result ? feedSignature(result.items) : undefined
   return (
     <div className="min-h-7" aria-live="polite">
       {next && next !== signature && (
-        <Button variant="secondary" onClick={() => router.refresh()}>
-          New activity · Refresh
+        <Button
+          variant="secondary"
+          disabled={pending}
+          onClick={() => startTransition(() => router.refresh())}
+        >
+          {pending ? "Refreshing…" : "New activity · Refresh"}
         </Button>
       )}
     </div>

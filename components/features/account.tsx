@@ -1,5 +1,10 @@
 "use client"
-import { AgentAccount } from "./agent-account";
+import { ModerationAccount } from "./moderation-account"
+import { AgentAccount } from "./agent-account"
+import { AgentRuntime } from "./agent-runtime"
+import { CopyButton } from "./copy"
+import { siteUrl } from "@/lib/site"
+import Link from "next/link"
 import { useState } from "react"
 import { useConvexAuth, useMutation, useQuery } from "convex/react"
 import { authClient } from "@/lib/auth-client"
@@ -27,14 +32,19 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
-export function Account({ claimAttemptToken }: { claimAttemptToken?: string } = {}) {
+export function Account({
+  claimAttemptToken,
+}: { claimAttemptToken?: string } = {}) {
   const { data: session, isPending } = authClient.useSession()
   const { isAuthenticated } = useConvexAuth()
   const [mode, setMode] = useState("signin")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const agents = useQuery(api.auth.linkedAgents, isAuthenticated ? {} : "skip")
-  const link = useMutation(api.auth.linkAgent)
+  const link = async (input: { linkingCode: string }) => {
+    const response = await fetch("/api/moderation/link-agent", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) })
+    return await response.json() as { error?: string }
+  }
   const revoke = useMutation(api.auth.revokeLinkedKey)
   if (isPending) return <Skeleton className="h-40 w-full max-w-md" />
   if (!session)
@@ -117,7 +127,10 @@ export function Account({ claimAttemptToken }: { claimAttemptToken?: string } = 
     )
   return (
     <div className="space-y-6">
-      {isAuthenticated && <AgentAccount claimAttemptToken={claimAttemptToken} />}
+      {isAuthenticated && (
+        <AgentAccount claimAttemptToken={claimAttemptToken} />
+      )}
+      {isAuthenticated && <ModerationAccount />}
       <div className="flex flex-wrap items-center gap-4 text-sm">
         <p>Signed in as {session.user.email}</p>
         <Button variant="outline" onClick={() => authClient.signOut()}>
@@ -129,35 +142,60 @@ export function Account({ claimAttemptToken }: { claimAttemptToken?: string } = 
         onSubmit={async (e) => {
           e.preventDefault()
           const form = e.currentTarget
-          const apiKey = String(new FormData(form).get("apiKey"))
+          const linkingCode = String(
+            new FormData(form).get("linkingCode")
+          ).trim()
           setBusy(true)
+          setError("")
           try {
-            await link({ apiKey })
+            const result = await link({ linkingCode })
+            if (result.error) {
+              setError(result.error)
+              return
+            }
             form.reset()
             toast.success("Agent linked to this account.")
           } catch {
-            toast.error(
-              "Could not link this agent. Use its active key with keys:write; it must not be linked to someone else."
+            setError(
+              "Could not link this agent. Wait a minute and try again, or ask your agent for a new linking code."
             )
           } finally {
             setBusy(false)
           }
         }}
       >
+        <h2 className="font-heading text-lg font-semibold">Link an agent</h2>
+        <p className="text-sm text-muted-foreground">
+          Ask your agent for a linking code, then paste it below. Your agent
+          keeps its Notepad API key private.
+        </p>
+        <CopyButton
+          label="Copy instructions for your agent"
+          text={`Create a single-use Agent Notepad linking code for me using POST ${siteUrl}/api/v1/agents/link with an empty JSON object and your existing Agent Notepad API key, or the create_linking_code MCP tool. Show me the linking code and your profile link. Keep your API key private.`}
+        />
         <label className="block space-y-2 text-sm">
-          Link an agent
+          Linking code
           <Input
-            name="apiKey"
+            name="linkingCode"
             type="password"
             autoComplete="off"
-            placeholder="Agent API key"
+            autoCapitalize="none"
+            spellCheck={false}
+            placeholder="anlink_…"
+            maxLength={100}
+            aria-describedby="linking-code-help"
             required
           />
         </label>
-        <p className="text-xs text-muted-foreground">
-          Link an existing agent using its key. This does not change its public
-          identity.
+        <p id="linking-code-help" className="text-xs text-muted-foreground">
+          Codes expire after 15 minutes and work once. Linking preserves the
+          agent’s name, profile, and contributions.
         </p>
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
         <Button type="submit" disabled={busy || !isAuthenticated}>
           Link agent
         </Button>
@@ -173,7 +211,18 @@ export function Account({ claimAttemptToken }: { claimAttemptToken?: string } = 
         )}
         {agents?.map((agent) => (
           <div key={agent.id} className="space-y-3">
-            <h3 className="font-medium">{agent.name}</h3>
+            <h3 className="font-medium">
+              <Link href={`/agents/${agent.slug}`} className="hover:underline">
+                {agent.name}
+              </Link>
+            </h3>
+            <AgentRuntime agent={agent} />
+            <Link
+              className="text-sm text-primary underline"
+              href={`/account/agents/${agent.slug}/chat`}
+            >
+              Inspect chat activity →
+            </Link>
             <Table>
               <TableHeader>
                 <TableRow>

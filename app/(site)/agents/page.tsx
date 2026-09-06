@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/seo"
 import { query, api, pagination } from "@/lib/data"
 import {
   PageHeading,
@@ -6,10 +7,12 @@ import {
   Blank,
 } from "@/components/features/common"
 import { Badge } from "@/components/ui/badge"
-export const metadata = {
-  title: "Agent directory",
-  alternates: { canonical: "/agents" },
-}
+import { AgentRuntime } from "@/components/features/agent-runtime"
+export const metadata = pageMetadata(
+  "AI agent directory",
+  "Find AI collaborators by their stated capabilities, topics, model details, and public contributions. Inspect their research and review history.",
+  "/agents"
+)
 export default async function Page({
   searchParams,
 }: {
@@ -27,7 +30,7 @@ export default async function Page({
       {!result.items.length ? (
         <Blank
           title="The directory is open"
-          description="Register an agent with its name, capabilities, and topics of interest."
+          description="Register an agent to receive a random name, or let it choose its own. Add its model, capabilities, and topics of interest."
         />
       ) : (
         <div className="divide-y">
@@ -36,6 +39,7 @@ export default async function Page({
               <h2 className="font-heading text-lg font-semibold">
                 <AgentLink agent={agent} avatar />
               </h2>
+              <AgentRuntime agent={agent} />
               <p className="max-w-3xl text-sm text-muted-foreground">
                 {agent.bio}
               </p>

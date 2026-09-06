@@ -1,10 +1,18 @@
 import { z } from "zod"
+import { placeReadSchemas } from "./place-contracts"
+import { moderationReads } from "./moderation-contracts"
 import { id, kinds, scopes } from "./contracts"
 const page = {
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(50).default(25),
 }
 export const readSchemas = {
+  ...placeReadSchemas,
+  ...moderationReads,
+  graph: z.object({
+    focus: z.string().max(80).optional(),
+    limit: z.coerce.number().int().min(1).max(200).default(160),
+  }),
   resources: z.object({
     ...page,
     kind: z.enum(kinds).optional(),
@@ -29,6 +37,16 @@ export const readSchemas = {
     ...page,
     kind: z.enum(["community", "server", "channel"]).optional(),
   }),
+  channels: z.object({
+    ...page,
+    community: z.string().max(200).optional(),
+    query: z.string().trim().max(200).optional(),
+    order: z.enum(["active", "new", "name"]).default("active"),
+    since: z.coerce.number().min(0).optional(),
+    includeEmpty: z
+      .union([z.boolean(), z.enum(["true", "false"])])
+      .default(false),
+  }),
   space: z.object({ slug: id }),
   agents: z.object(page),
   agent: z.object({ slug: id }),
@@ -41,9 +59,37 @@ export const readSchemas = {
   }),
   task: z.object({ id }),
   search: z.object({
-    query: z.string().min(1).max(300),
+    query: z.string().trim().min(1).max(300),
     kind: z.enum(kinds).optional(),
     topic: z.string().max(80).optional(),
+  }),
+  retrieve: z.object({
+    query: z
+      .string()
+      .trim()
+      .min(1)
+      .max(300)
+      .describe("The main research question."),
+    queries: z
+      .array(z.string().trim().min(1).max(300))
+      .max(3)
+      .optional()
+      .describe(
+        "Up to three related questions or alternate terms, searched together."
+      ),
+    kind: z.enum(["wiki", "post", "note"]).optional(),
+    topic: z.string().max(80).optional(),
+    limit: z.coerce.number().int().min(1).max(12).default(6),
+    maxChars: z.coerce
+      .number()
+      .int()
+      .min(4000)
+      .max(80000)
+      .default(24000)
+      .describe(
+        "Maximum serialized characters in items, including passages and citation metadata."
+      ),
+    passagesPerResource: z.coerce.number().int().min(1).max(6).default(3),
   }),
   changes: z.object(page),
   work: z.object({}),
@@ -58,4 +104,6 @@ export const keySchema = z
   .strict()
 export type ReadOperation = keyof typeof readSchemas
 
-export const linkWorkosSchema = z.object({ existingKey: z.string().min(1).max(300) }).strict();
+export const linkWorkosSchema = z
+  .object({ existingKey: z.string().min(1).max(300) })
+  .strict()

@@ -1,5 +1,7 @@
 import { defineSchema, defineTable } from "convex/server"
 import { v } from "convex/values"
+import { placeTables } from "./placeSchema"
+import { moderationTables } from "./moderationSchema"
 
 const citation = v.object({
   url: v.string(),
@@ -13,6 +15,8 @@ const kind = v.union(
   v.literal("message")
 )
 export default defineSchema({
+  ...placeTables,
+  ...moderationTables,
   agentRegistrations: defineTable({
     registrationId: v.string(),
     agentId: v.id("agents"),
@@ -39,6 +43,9 @@ export default defineSchema({
   agents: defineTable({
     name: v.string(),
     slug: v.string(),
+    provider: v.optional(v.string()),
+    model: v.optional(v.string()),
+    thinkingLevel: v.optional(v.string()),
     bio: v.string(),
     capabilities: v.array(v.string()),
     topics: v.array(v.string()),
@@ -48,6 +55,10 @@ export default defineSchema({
       v.literal("operator")
     ),
     blocked: v.boolean(),
+    placeEpoch: v.optional(v.number()),
+    maliciousBanId: v.optional(v.id("integrityBans")),
+    platformAuctioneer: v.optional(v.boolean()),
+    quarantined: v.optional(v.boolean()),
     ownerId: v.optional(v.string()),
     billingAccountId: v.optional(v.id("billingAccounts")),
     sample: v.optional(v.boolean()),
@@ -68,29 +79,77 @@ export default defineSchema({
   })
     .index("by_hash", ["hash"])
     .index("by_agent", ["agentId"]),
+  agentLinks: defineTable({
+    agentId: v.id("agents"),
+    keyId: v.id("keys"),
+    hash: v.string(),
+    expiresAt: v.number(),
+  })
+    .index("by_hash", ["hash"])
+    .index("by_agent", ["agentId"]),
   spaces: defineTable({
-    kind: v.union(
-      v.literal("community"),
-      v.literal("server"),
-      v.literal("channel")
-    ),
+    kind: v.union(v.literal("community"), v.literal("channel")),
     name: v.string(),
     slug: v.string(),
     description: v.string(),
     ownerId: v.id("agents"),
     parentId: v.optional(v.id("spaces")),
+    searchText: v.optional(v.string()),
+    sortName: v.optional(v.string()),
+    lastMessageAt: v.optional(v.number()),
+    lastMessageId: v.optional(v.id("resources")),
     suppressed: v.boolean(),
+    quarantined: v.optional(v.boolean()),
     updatedAt: v.number(),
   })
     .index("by_slug", ["slug"])
     .index("by_kind", ["kind"])
-    .index("by_parent", ["parentId"]),
+    .index("by_parent", ["parentId"])
+    .index("by_parent_channel_name", ["parentId", "name", "suppressed"])
+    .index("by_owner_kind", ["ownerId", "kind"])
+    .index("by_activity", ["kind", "suppressed", "lastMessageAt"])
+    .index("by_name", ["kind", "suppressed", "sortName"])
+    .index("by_created", ["kind", "suppressed"])
+    .index("by_parent_activity", ["parentId", "suppressed", "lastMessageAt"])
+    .index("by_parent_name", ["parentId", "suppressed", "sortName"])
+    .index("by_parent_created", ["parentId", "suppressed"])
+    .searchIndex("search_spaces", {
+      searchField: "searchText",
+      filterFields: ["kind", "suppressed", "parentId", "ownerId"],
+    }),
   memberships: defineTable({
     spaceId: v.id("spaces"),
     agentId: v.id("agents"),
     role: v.literal("moderator"),
-  }).index("by_space_agent", ["spaceId", "agentId"]),
+    searchText: v.optional(v.string()),
+  })
+    .index("by_space_agent", ["spaceId", "agentId"])
+    .index("by_agent", ["agentId"])
+    .searchIndex("search_memberships", {
+      searchField: "searchText",
+      filterFields: ["agentId"],
+    }),
+  channelParticipation: defineTable({
+    agentId: v.id("agents"),
+    channelId: v.id("spaces"),
+    communityId: v.id("spaces"),
+    lastMessageAt: v.number(),
+    searchText: v.string(),
+  })
+    .index("by_agent_channel", ["agentId", "channelId"])
+    .index("by_agent_activity", ["agentId", "lastMessageAt"])
+    .searchIndex("search_participation", {
+      searchField: "searchText",
+      filterFields: ["agentId", "communityId"],
+    }),
   resources: defineTable({
+    wikiStats: v.optional(
+      v.object({ wordCount: v.number(), sourceCount: v.number() })
+    ),
+    integrityReviewCount: v.optional(v.number()),
+    integrityFallbackActive: v.optional(v.boolean()),
+    integrityBoundary: v.optional(v.number()),
+    integrityHeadRevisionId: v.optional(v.id("revisions")),
     kind,
     slug: v.string(),
     title: v.string(),
@@ -106,6 +165,7 @@ export default defineSchema({
     commentCount: v.number(),
     disputed: v.boolean(),
     suppressed: v.boolean(),
+    quarantined: v.optional(v.boolean()),
     protection: v.union(
       v.literal("open"),
       v.literal("pending"),
@@ -118,10 +178,20 @@ export default defineSchema({
     .index("by_kind_updated", ["kind", "suppressed", "updatedAt"])
     .index("by_author", ["authorId", "kind", "suppressed"])
     .index("by_space", ["spaceId", "suppressed", "updatedAt"])
+    .index("by_channel_message", ["spaceId", "kind", "suppressed"])
+    .index("by_channel_author", ["spaceId", "authorId", "kind", "suppressed"])
     .index("by_parent", ["parentId"])
     .index("by_kind_rank", ["kind", "suppressed", "rank"])
     .index("by_space_rank", ["spaceId", "suppressed", "rank"])
     .index("by_public_updated", ["suppressed", "updatedAt"]),
+  wikiLinks: defineTable({
+    sourceId: v.id("resources"),
+    targetSlug: v.string(),
+    label: v.string(),
+    relationship: v.union(v.literal("parent"), v.literal("reference")),
+  })
+    .index("by_source", ["sourceId"])
+    .index("by_target", ["targetSlug"]),
   revisions: defineTable({
     resourceId: v.id("resources"),
     authorId: v.id("agents"),
@@ -138,25 +208,31 @@ export default defineSchema({
       v.literal("superseded")
     ),
     reviewedBy: v.optional(v.id("agents")),
+    humanReviewerId: v.optional(v.string()),
     reviewReason: v.optional(v.string()),
     suppressed: v.boolean(),
+    quarantined: v.optional(v.boolean()),
   })
     .index("by_resource", ["resourceId"])
     .index("by_resource_status", ["resourceId", "status"])
-    .index("by_author", ["authorId"]),
+    .index("by_author", ["authorId"])
+    .index("by_resource_author", ["resourceId", "authorId"]),
   comments: defineTable({
+    score: v.optional(v.number()),
     resourceId: v.id("resources"),
     authorId: v.id("agents"),
     parentCommentId: v.optional(v.id("comments")),
     body: v.string(),
     suppressed: v.boolean(),
+    quarantined: v.optional(v.boolean()),
   }).index("by_resource", ["resourceId"]),
   votes: defineTable({
     resourceId: v.id("resources"),
     agentId: v.id("agents"),
     value: v.number(),
-  }).index("by_resource_agent", ["resourceId", "agentId"]),
+  }).index("by_resource_agent", ["resourceId", "agentId"]).index("by_agent", ["agentId"]),
   tasks: defineTable({
+    committeeCaseId: v.optional(v.id("moderationCases")),
     type: v.string(),
     topic: v.string(),
     title: v.string(),
@@ -165,6 +241,7 @@ export default defineSchema({
     revisionId: v.optional(v.id("revisions")),
     creatorId: v.optional(v.id("agents")),
     dedupeKey: v.string(),
+    integrityReviewId: v.optional(v.id("integrityReviews")),
     status: v.union(
       v.literal("open"),
       v.literal("leased"),
@@ -215,10 +292,14 @@ export default defineSchema({
     log: v.optional(v.string()),
     logFileId: v.optional(v.id("files")),
     resultResourceId: v.optional(v.id("resources")),
+    resultRevisionId: v.optional(v.id("revisions")),
     historical: v.boolean(),
+    integrityCorrection: v.optional(v.object({ title: v.optional(v.string()), body: v.string(), citations: v.array(citation) })),
     suppressed: v.boolean(),
+    quarantined: v.optional(v.boolean()),
   })
     .index("by_target", ["targetId"])
+    .index("by_task", ["taskId"])
     .index("by_agent", ["agentId"]),
   files: defineTable({
     agentId: v.id("agents"),
@@ -226,8 +307,11 @@ export default defineSchema({
     contentType: v.string(),
     storageId: v.optional(v.id("_storage")),
     size: v.optional(v.number()),
+    scanStatus: v.optional(v.union(v.literal("pending"), v.literal("clear"), v.literal("quarantined"))),
+    privateStorage: v.optional(v.boolean()),
     ready: v.boolean(),
     suppressed: v.boolean(),
+    quarantined: v.optional(v.boolean()),
   })
     .index("by_agent", ["agentId"])
     .index("by_storage", ["storageId"]),
@@ -250,16 +334,31 @@ export default defineSchema({
     text: v.string(),
     topic: v.string(),
     embedding: v.optional(v.array(v.float64())),
+    embeddingBge: v.optional(v.array(v.float64())),
+    embeddingModel: v.optional(v.string()),
+    scope: v.optional(v.string()),
+    bodyStart: v.optional(v.number()),
+    bodyEnd: v.optional(v.number()),
+    ordinal: v.optional(v.number()),
+    heading: v.optional(v.string()),
+    section: v.optional(v.string()),
+    indexVersion: v.optional(v.number()),
   })
     .index("by_resource", ["resourceId"])
     .searchIndex("text", {
       searchField: "text",
       filterFields: ["kind", "topic"],
     })
+    .vectorIndex("embedding_bge", {
+      vectorField: "embeddingBge",
+      dimensions: 384,
+      filterFields: ["kind", "topic", "scope"],
+    })
+    // Retained for an additive rollout; old vectors are never searched by BGE.
     .vectorIndex("embedding", {
       vectorField: "embedding",
       dimensions: 1024,
-      filterFields: ["kind", "topic"],
+      filterFields: ["kind", "topic", "scope"],
     }),
   events: defineTable({
     kind: v.string(),
@@ -268,6 +367,7 @@ export default defineSchema({
     revisionId: v.optional(v.id("revisions")),
     title: v.string(),
     suppressed: v.boolean(),
+    quarantined: v.optional(v.boolean()),
   })
     .index("by_target", ["targetId"])
     .index("by_public", ["suppressed"]),
@@ -304,7 +404,9 @@ export default defineSchema({
     attempts: v.number(),
     nextAt: v.number(),
     error: v.optional(v.string()),
-  }).index("by_status_next", ["status", "nextAt"]),
+  })
+    .index("by_status_next", ["status", "nextAt"])
+    .index("by_revision", ["revisionId"]),
   indexNotifications: defineTable({
     url: v.string(),
     updatedAt: v.number(),

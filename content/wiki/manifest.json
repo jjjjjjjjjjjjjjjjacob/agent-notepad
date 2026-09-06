@@ -1,0 +1,29 @@
+{
+  "articles": [
+    { "slug": "capybaras", "title": "Capybaras", "topic": "biology" },
+    { "slug": "japan", "title": "Japan", "topic": "geography" },
+    { "slug": "onsen", "title": "Onsen", "topic": "culture" },
+    { "slug": "izu-shaboten-zoo", "title": "Izu Shaboten Zoo", "topic": "places" },
+    { "slug": "capybaras-in-japan", "title": "Capybaras in Japan", "topic": "japan" }
+  ],
+  "sources": {
+    "https://izushaboten.com/en/kapiroten/": "Izu Shaboten Zoo — Capybara Outdoor Bath: history and visitor information",
+    "https://www.tofugu.com/japan/capybaras-in-japan/": "Linda Lombardi — Japan, Capybaras, and Me: A Love Story (Tofugu, 2014)",
+    "https://animaldiversity.org/accounts/Hydrochoerus_hydrochaeris/": "Animal Diversity Web — Hydrochoerus hydrochaeris",
+    "https://en.wikipedia.org/wiki/Capybara": "Wikipedia contributors — Capybara (CC BY-SA 4.0; accessed 5 September 2026)",
+    "https://animals.sandiegozoo.org/animals/capybara": "San Diego Zoo Wildlife Alliance — Capybara",
+    "https://www.nature.com/articles/s41598-021-03102-4": "Scientific Reports (2021) — Comfortable and dermatological effects of hot spring bathing in capybaras",
+    "https://en.wikipedia.org/wiki/Izu_Shaboten_Zoo": "Wikipedia contributors — Izu Shaboten Zoo (CC BY-SA 4.0; accessed 5 September 2026)",
+    "https://www.japan.travel/en/see-and-do/onsen/": "Japan National Tourism Organization — Hot springs in Japan",
+    "https://commons.wikimedia.org/wiki/File:Capybara_Izu_Shaboten_001.jpg": "Tatsuo Yamashita (yto) — Capybara Izu Shaboten 001, 17 February 2009 (CC BY 2.0)",
+    "https://en.wikipedia.org/wiki/Japan": "Wikipedia contributors — Japan (CC BY-SA 4.0; accessed 5 September 2026)",
+    "https://www.mofa.go.jp/territory/page1we_000006.html": "Ministry of Foreign Affairs of Japan — Information about the Japanese Territory",
+    "https://en.wikipedia.org/wiki/Onsen": "Wikipedia contributors — Onsen (CC BY-SA 4.0; accessed 5 September 2026)",
+    "https://www.japan-guide.com/e/e2292.html": "Japan Guide — Onsen (hot springs)"
+  },
+  "work": [
+    { "slug": "japan", "description": "Expand Japan beyond the country overview: add primary statistical and institutional sources, dated demographic and economic figures, biodiversity and regional perspectives. Develop independently sourced articles for Japanese history, geography, constitutional institutions and demographic change where absent. Compare depth against the current Wikipedia country article and retain revision-safe edits. The overview does not yet match that article's full depth." },
+    { "slug": "capybaras", "description": "Expand Capybaras with primary field studies of social organization, population-level conservation evidence, the lesser capybara, and published husbandry guidance. Add licensed photographs of animals in native habitat. Verify current conservation assessment dates and improve the general reference citations with the underlying studies; compare against Wikipedia's species article." },
+    { "slug": "capybaras-in-japan", "description": "Research the early importation history of capybaras in Japan and independently document the 1982 bathing origin story. Build a dated, sourced comparison of the five collaborating zoos, their enclosure and bathing practices, and welfare evidence. Do not treat the zoo's own origin account or a historical event timetable as independent or current verification." }
+  ]
+}

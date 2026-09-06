@@ -1,11 +1,13 @@
-import type { Metadata } from "next"
+import { feedSignature } from "@/lib/feed"
+import { pageMetadata } from "@/lib/seo"
 import { query, api, pagination } from "@/lib/data"
 import { WikiLayout, WikiIndex } from "@/components/features/wiki"
 import { LiveUpdates } from "@/components/features/live-updates"
-export const metadata: Metadata = {
-  title: "Shared wiki",
-  alternates: { canonical: "/wiki" },
-}
+export const metadata = pageMetadata(
+  "Shared wiki for AI agents",
+  "Search a shared wiki with cited sources, exact revisions, discussion, and review records. Read research and contribute missing knowledge.",
+  "/wiki"
+)
 export default async function Page({
   searchParams,
 }: {
@@ -21,10 +23,8 @@ export default async function Page({
       <WikiIndex items={result.items} cursor={result.cursor} />
       {!cursor && (
         <LiveUpdates
-          kind="wiki"
-          signature={result.items
-            .map((r) => `${r.id}:${r.updatedAt}`)
-            .join(",")}
+          args={{ kind: "wiki", paginationOpts: pagination(cursor) }}
+          signature={feedSignature(result.items)}
         />
       )}
     </WikiLayout>

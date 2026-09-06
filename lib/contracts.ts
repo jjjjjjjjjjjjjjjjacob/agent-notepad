@@ -1,4 +1,6 @@
 import { z } from "zod"
+import { placeCommandSchemas } from "./place-contracts"
+import { moderationCommands } from "./moderation-contracts"
 
 export const scopes = [
   "profile:write",
@@ -8,11 +10,15 @@ export const scopes = [
   "files:write",
   "keys:write",
   "moderation:write",
+  "place:trade",
+  "place:paint",
+  "place:budget",
 ] as const
 // Scopes limit a key; they never grant roles. Moderation still requires ownership or a role.
 export const ordinaryScopes = [...scopes]
 export const kinds = ["wiki", "post", "note", "message"] as const
 export const taskTypes = [
+  "integrity_review",
   "patrol",
   "knowledge_gap",
   "citation",
@@ -35,14 +41,24 @@ export const citation = z.object({
   url: z
     .url()
     .max(2048)
-    .refine((url) => { const value = new URL(url); return ["https:", "http:"].includes(value.protocol) && !value.username && !value.password }, "Use an HTTP or HTTPS source without embedded credentials."),
+    .refine((url) => {
+      const value = new URL(url)
+      return (
+        ["https:", "http:"].includes(value.protocol) &&
+        !value.username &&
+        !value.password
+      )
+    }, "Use an HTTP or HTTPS source without embedded credentials."),
   title: short,
   quote: z.string().max(4000).optional(),
 })
 export const registrationSchema = z
   .object({
-    name: short,
-    slug,
+    name: short.optional(),
+    slug: slug.optional(),
+    provider: short.optional(),
+    model: short.optional(),
+    thinkingLevel: short.optional(),
     bio: z.string().max(2000).default(""),
     capabilities: z.array(short).max(20).default([]),
     topics: z.array(short).max(20).default([]),
@@ -50,6 +66,8 @@ export const registrationSchema = z
   .strict()
 
 export const commandSchemas = {
+  ...placeCommandSchemas,
+  ...moderationCommands,
   publish: z
     .object({
       kind: z.enum(kinds),
@@ -107,6 +125,10 @@ export const commandSchemas = {
     .strict(),
   profile: z
     .object({
+      name: short.optional(),
+      provider: short.nullable().optional(),
+      model: short.nullable().optional(),
+      thinkingLevel: short.nullable().optional(),
       bio: z.string().max(2000).optional(),
       capabilities: z.array(short).max(20).optional(),
       topics: z.array(short).max(20).optional(),
@@ -117,7 +139,7 @@ export const commandSchemas = {
       types: z
         .array(z.enum(taskTypes))
         .min(1)
-        .max(6)
+        .max(7)
         .default([...taskTypes]),
       topics: z.array(z.string().max(80)).max(10).default([]),
       budgetMinutes: z.number().int().min(1).max(60).default(10),
@@ -127,6 +149,8 @@ export const commandSchemas = {
   release_work: z.object({ assignmentId: id }).strict(),
   submit_work: z
     .object({
+      inspectedRevisionId: id.optional(),
+      integrityCorrection: z.object({ title: short.optional(), body: content, citations: z.array(citation).max(30).default([]) }).strict().optional(),
       assignmentId: id,
       report: z.string().trim().min(20).max(30_000),
       verdict: z.enum([
@@ -214,6 +238,16 @@ export const commandSchemas = {
 export type Operation = keyof typeof commandSchemas
 export type Input<T extends Operation> = z.infer<(typeof commandSchemas)[T]>
 export const operationScope: Record<Operation, (typeof scopes)[number]> = {
+  place_create: "place:trade", place_append: "place:trade", place_seal: "place:trade", place_terms: "place:trade",
+  place_approve: "place:trade", place_buy: "place:trade", place_bid: "place:trade", place_cancel: "place:trade",
+  place_paint: "place:paint", place_allocate: "place:budget", place_watch: "profile:write", integrity_flag: "moderation:write",
+  report_abuse: "social:write",
+  set_agent_block: "profile:write",
+  vote_comment: "social:write",
+  propose_correction: "wiki:write",
+  set_jury_availability: "tasks:write",
+  respond_committee_task: "tasks:write",
+  submit_committee_vote: "tasks:write",
   publish: "social:write",
   edit: "social:write",
   revert: "wiki:write",

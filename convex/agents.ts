@@ -1,6 +1,8 @@
+import { agentRestricted } from "./moderation/access"
 import { v } from "convex/values"
 import { internalMutation, internalQuery } from "./_generated/server"
-import { fail, rateLimit } from "./lib/core"
+import { fail, rateLimit, requireAgent } from "./lib/core"
+import { agentProfile } from "./lib/agentProfile"
 import { registrationSchema, ordinaryScopes } from "../lib/contracts"
 
 export const create = internalMutation({
@@ -10,15 +12,9 @@ export const create = internalMutation({
     if (!result.success)
       fail("VALIDATION", result.error.issues.map((i) => i.message).join("; "))
     await rateLimit(ctx, "registration", 100, 60 * 60_000)
-    if (
-      await ctx.db
-        .query("agents")
-        .withIndex("by_slug", (q) => q.eq("slug", result.data.slug))
-        .unique()
-    )
-      fail("CONFLICT", "That agent slug is already registered.")
+    const profile = await agentProfile(ctx, result.data)
     const agentId = await ctx.db.insert("agents", {
-      ...result.data,
+      ...profile,
       role: "editor",
       blocked: false,
       contributionCount: 0,
@@ -32,7 +28,48 @@ export const create = internalMutation({
       label: "Initial agent key",
       scopes: [...ordinaryScopes],
     })
-    return { agentId, keyId, slug: result.data.slug, scopes: ordinaryScopes }
+    return {
+      agentId,
+      keyId,
+      name: profile.name,
+      slug: profile.slug,
+      scopes: ordinaryScopes,
+    }
+  },
+})
+export const createLink = internalMutation({
+  args: { token: v.string(), hash: v.string() },
+  handler: async (ctx, args) => {
+    const { agent, key } = await requireAgent(ctx, args.token, "keys:write")
+    if (!key)
+      fail(
+        "UNAUTHORIZED",
+        "Use an active agent API key to create a linking code."
+      )
+    if (agent.ownerId)
+      fail("CONFLICT", "This agent is already linked to an account.")
+    // WorkOS registrations use their existing claim flow, which also refreshes
+    // the provider's ownership claims. Local linking must not bypass that flow.
+    const registration = await ctx.db
+      .query("agentRegistrations")
+      .withIndex("by_agent", (q) => q.eq("agentId", agent._id))
+      .first()
+    if (registration)
+      fail("CONFLICT", "Use the WorkOS claim flow for this agent.")
+    await rateLimit(ctx, `agent-link:${agent._id}`, 10, 60 * 60_000)
+    const previous = await ctx.db
+      .query("agentLinks")
+      .withIndex("by_agent", (q) => q.eq("agentId", agent._id))
+      .unique()
+    if (previous) await ctx.db.delete(previous._id)
+    const expiresAt = Date.now() + 15 * 60_000
+    await ctx.db.insert("agentLinks", {
+      agentId: agent._id,
+      keyId: key._id,
+      hash: args.hash,
+      expiresAt,
+    })
+    return { agentId: agent._id, name: agent.name, slug: agent.slug, expiresAt }
   },
 })
 export const issueKey = internalMutation({
@@ -55,7 +92,7 @@ export const issueKey = internalMutation({
     )
       fail("UNAUTHORIZED", "A key with keys:write is required.")
     const agent = await ctx.db.get(original.agentId)
-    if (!agent || agent.blocked)
+    if (!agent || await agentRestricted(ctx, agent))
       fail("FORBIDDEN", "This agent cannot issue keys.")
     if (
       !args.scopes.length ||
@@ -82,7 +119,7 @@ export const lookup = internalQuery({
       .unique()
     if (!key || key.revokedAt) return null
     const agent = await ctx.db.get(key.agentId)
-    return agent && !agent.blocked
+    return agent && !await agentRestricted(ctx, agent)
       ? { agentId: agent._id, scopes: key.scopes }
       : null
   },

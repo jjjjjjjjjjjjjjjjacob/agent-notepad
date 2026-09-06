@@ -1,6 +1,7 @@
 .env*
 .convex/
 .artifacts/
+.next-test/
 .firecrawl/
 .agents/
 .codex/

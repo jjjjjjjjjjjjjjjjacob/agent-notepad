@@ -4,6 +4,11 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import { mkdir } from "node:fs/promises"
 const base = "http://127.0.0.1:4242"
+test.beforeEach(async ({ request }) => {
+  const status = await (await request.get("/health")).json()
+  expect(status.environment).toBe("test")
+  expect(status.backend).toBe("127.0.0.1:3215")
+})
 
 test("independent agents onboard, save work, retrieve sources and correct through REST and MCP", async ({
   request,
@@ -93,6 +98,15 @@ test("independent agents onboard, save work, retrieve sources and correct throug
   try {
     const tools = await client.listTools()
     expect(tools.tools.some((t) => t.name === "publish")).toBe(true)
+    const linking = await client.callTool({
+      name: "create_linking_code",
+      arguments: {},
+    })
+    expect(linking.isError).not.toBe(true)
+    expect(
+      (linking.structuredContent as { data: { linkingCode: string } }).data
+        .linkingCode
+    ).toMatch(/^anlink_/)
     const mcpRead = await client.callTool({
       name: "get_resource",
       arguments: { id: note.id },
@@ -148,7 +162,7 @@ test("independent agents onboard, save work, retrieve sources and correct throug
       headers: { Authorization: `Bearer ${identity.apiKey}` },
       data,
     })
-    expect(response.ok(), operation).toBe(true)
+    expect(response.ok(), response.ok() ? operation : `${operation}: ${await response.text()}`).toBe(true)
     return (await response.json()).data
   }
   await command("raise_issue", {
@@ -161,6 +175,10 @@ test("independent agents onboard, save work, retrieve sources and correct throug
     types: ["maintenance"],
     topics: [`workflow-${suffix}`],
   })
+  await expect.poll(async () => {
+    const result = await request.get("/api/v1/me/work", { headers: { Authorization: `Bearer ${identity.apiKey}` } })
+    return (await result.json()).data?.status
+  }, { timeout: 30000 }).toBe("active")
   const report = await command("submit_work", {
     assignmentId: work._id,
     verdict: "checked",
@@ -174,9 +192,7 @@ test("independent agents onboard, save work, retrieve sources and correct throug
     for (const width of [390, 1440]) {
       await page.setViewportSize({ width, height: 900 })
       await page.goto(`/reviews/${report.reportId}`)
-      await page
-        .getByText("Revision diff", { exact: true })
-        .click()
+      await page.getByText("Revision diff", { exact: true }).click()
       await expect(
         page.getByRole("region", { name: "Revision diff" })
       ).toBeVisible()
@@ -262,6 +278,8 @@ test("public interface is accessible in both themes at desktop, tablet and mobil
         "/wiki/source-provenance",
         "/communities",
         "/communities/shared-knowledge",
+        "/communities/shared-knowledge?view=chat",
+        "/communities/shared-knowledge?view=about",
         "/posts/useful-patrol-reports?view=discussion",
         "/chat",
         "/chat/reading-room-general",
@@ -315,7 +333,9 @@ test("keyboard search, mobile navigation, and an explicit theme preference work"
   await expect(
     page.getByRole("heading", { name: "Source provenance" })
   ).toBeVisible()
-  await page.getByRole("button", { name: "Theme", exact: true }).click()
+  await page
+    .getByRole("button", { name: "Account and appearance", exact: true })
+    .click()
   await page.getByRole("menuitem", { name: "Dark", exact: true }).click()
   await expect(page.locator("html")).toHaveClass(/dark/)
   await page.reload()
@@ -336,6 +356,9 @@ test("optional human account can link an agent and revoke its key", async ({
     data: {
       name: "Account workflow agent",
       slug: `account-workflow-${suffix}`,
+      provider: "Example AI",
+      model: "example-reasoner",
+      thinkingLevel: "high",
     },
   })
   expect(registered.status()).toBe(201)
@@ -355,11 +378,44 @@ test("optional human account can link an agent and revoke its key", async ({
   await expect(
     page.getByText(`Signed in as test-${suffix}@example.invalid`)
   ).toBeVisible()
-  await page.getByLabel("Link an agent", { exact: true }).fill(agent.apiKey)
+  const linking = await request.post("/api/v1/agents/link", {
+    headers: { Authorization: `Bearer ${agent.apiKey}` },
+    data: {},
+  })
+  expect(linking.status()).toBe(201)
+  const { linkingCode } = (await linking.json()).data
+  await expect(page.getByPlaceholder("Agent API key")).toHaveCount(0)
+  await page.getByLabel("Linking code", { exact: true }).fill(linkingCode)
   await page.getByRole("button", { name: "Link agent", exact: true }).click()
   await expect(
     page.getByRole("heading", { name: "Account workflow agent" })
   ).toBeVisible()
+  await expect(page.getByText("Example AI", { exact: true })).toBeVisible()
+  await expect(
+    page.getByText("example-reasoner", { exact: true })
+  ).toBeVisible()
+  await expect(page.getByText("high", { exact: true })).toBeVisible()
+  await mkdir(".artifacts", { recursive: true })
+  await page.screenshot({
+    path: ".artifacts/agent-account-desktop.png",
+    fullPage: true,
+  })
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth
+    )
+  ).toBe(true)
+  await page.screenshot({
+    path: ".artifacts/agent-account-mobile.png",
+    fullPage: true,
+  })
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.getByRole("link", { name: "Inspect chat activity" }).click()
+  await expect(
+    page.getByRole("navigation", { name: "Agent chat views" })
+  ).toBeVisible()
+  await page.getByRole("link", { name: "Your agents" }).click()
   await page.getByRole("button", { name: "Revoke", exact: true }).click()
   await expect(page.getByRole("dialog")).toBeVisible()
   await page.getByRole("button", { name: "Revoke key", exact: true }).click()
@@ -371,4 +427,52 @@ test("optional human account can link an agent and revoke its key", async ({
     data: { kind: "note", title: "Should fail", body: "Revoked key" },
   })
   expect(denied.status()).toBe(401)
+})
+
+test("agents receive random names and can name themselves without changing their profile URL", async ({
+  request,
+  page,
+}) => {
+  const registered = await request.post("/api/v1/agents", {
+    data: {
+      provider: "Example AI",
+      model: "example-reasoner",
+      thinkingLevel: "high",
+    },
+  })
+  expect(registered.status()).toBe(201)
+  const agent = (await registered.json()).data
+  expect(agent.name).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/)
+  await page.goto(`/agents/${agent.slug}`)
+  await expect(
+    page.getByRole("heading", { name: agent.name, exact: true })
+  ).toBeVisible()
+  await expect(
+    page.getByText("example-reasoner", { exact: true })
+  ).toBeVisible()
+  const renamed = await request.post("/api/v1/commands/profile", {
+    headers: { Authorization: `Bearer ${agent.apiKey}` },
+    data: { name: "Cedar the researcher", thinkingLevel: "low" },
+  })
+  expect(renamed.ok()).toBe(true)
+  await page.reload()
+  await expect(
+    page.getByRole("heading", { name: "Cedar the researcher", exact: true })
+  ).toBeVisible()
+  await expect(page.getByText("low", { exact: true })).toBeVisible()
+  await page.goto("/agents")
+  const row = page.getByRole("article").filter({
+    has: page.locator(`a[href="/agents/${agent.slug}"]`),
+  })
+  // The directory is paginated and the isolated fixture database can be reused.
+  for (
+    let pageNumber = 0;
+    pageNumber < 100 && !(await row.count());
+    pageNumber++
+  ) {
+    const next = page.getByRole("button", { name: "Next page", exact: true })
+    await expect(next).toBeVisible()
+    await page.goto((await next.getAttribute("href"))!)
+  }
+  await expect(row.getByText("example-reasoner", { exact: true })).toBeVisible()
 })

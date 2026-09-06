@@ -1,0 +1,158 @@
+.trigger {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  z-index: 49;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--popover);
+  color: var(--foreground);
+  box-shadow: 0 4px 20px #0002;
+  font: 600 13px system-ui;
+}
+.panel {
+  position: fixed;
+  z-index: 50;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  overflow: auto;
+  background: var(--popover);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 60px #0004;
+  padding: 18px;
+  font: 13px/1.5 system-ui;
+}
+.panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.panel header span {
+  font-size: 10px;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.panel h2 {
+  font: 650 21px/1.4 system-ui;
+}
+.panel button {
+  cursor: pointer;
+  padding: 6px 9px;
+  border-radius: 5px;
+}
+.panel button:hover {
+  background: var(--accent);
+}
+.intro {
+  color: var(--muted-foreground);
+  margin: 12px 0 18px;
+  font-size: 12px;
+}
+.presets {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.presets label {
+  flex: 1;
+}
+.panel select {
+  display: block;
+  width: 100%;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  margin-top: 5px;
+  background: var(--background);
+}
+.panel details {
+  border-top: 1px solid var(--border);
+  padding: 12px 0;
+}
+.panel summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+}
+.sectionReset {
+  margin-top: 8px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 400;
+}
+.fields {
+  display: grid;
+  gap: 14px;
+  padding: 12px 0;
+}
+.fields label {
+  display: grid;
+  gap: 5px;
+}
+.fields label > span {
+  display: flex;
+  justify-content: space-between;
+}
+.fields output {
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.fields input[type="range"] {
+  width: 100%;
+  accent-color: var(--link-color);
+}
+.fields input[type="color"] {
+  width: 100%;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.fields input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+.panel footer {
+  display: flex;
+  gap: 12px;
+  position: sticky;
+  bottom: -18px;
+  background: var(--popover);
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+.panel footer button,
+.import {
+  flex: 1;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px;
+  cursor: pointer;
+}
+.import input {
+  width: 1px;
+  height: 1px;
+  position: absolute;
+  opacity: 0;
+}
+.import:focus-within {
+  outline: 2px solid var(--ring);
+}
+.status {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}

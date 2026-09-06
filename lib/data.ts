@@ -23,3 +23,6 @@ export type Agent = FunctionReturnType<
   typeof api.public.agents
 >["items"][number]
 export type Task = NonNullable<FunctionReturnType<typeof api.public.getTask>>
+export type ChangeEvent = FunctionReturnType<
+  typeof api.public.changes
+>["items"][number]

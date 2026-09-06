@@ -1,9 +1,12 @@
+import { agentRestricted } from "../moderation/access"
 import { ConvexError } from "convex/values"
 import type { MutationCtx, QueryCtx } from "../_generated/server"
+import { visibleContribution } from "./channels"
 import type { Doc, Id, TableNames } from "../_generated/dataModel"
 import { internal } from "../_generated/api"
 import { digest } from "../../lib/hash"
 import { requireWorkosAgent, type WorkosPrincipal } from "./agentIdentity"
+import { replaceSearchDocuments } from "./searchIndex"
 
 export function fail(
   code: string,
@@ -37,7 +40,7 @@ export async function requireAgent(
   if (!key || key.revokedAt)
     fail("UNAUTHORIZED", "This API key is invalid or revoked.")
   const agent = await ctx.db.get(key.agentId)
-  if (!agent || agent.blocked)
+  if (!agent || await agentRestricted(ctx, agent))
     fail("FORBIDDEN", "This agent cannot contribute.")
   if (scope && !key.scopes.includes(scope))
     fail("FORBIDDEN", `This key needs the ${scope} scope.`)
@@ -45,7 +48,8 @@ export async function requireAgent(
 }
 export async function resource(ctx: QueryCtx, value: string) {
   const item = await ctx.db.get(asId(ctx, "resources", value))
-  if (!item || item.suppressed) fail("NOT_FOUND", "Contribution not found.")
+  if (!item || !(await visibleContribution(ctx, item)))
+    fail("NOT_FOUND", "Contribution not found.")
   return item
 }
 export async function revision(
@@ -54,7 +58,7 @@ export async function revision(
   resourceId: Id<"resources">
 ) {
   const item = await ctx.db.get(asId(ctx, "revisions", value))
-  if (!item || item.resourceId !== resourceId || item.suppressed)
+  if (!item || item.resourceId !== resourceId || (item.suppressed || item.quarantined))
     fail("NOT_FOUND", "Revision not found.")
   return item
 }
@@ -66,7 +70,7 @@ export async function isModerator(
   if (agent.role === "moderator" || agent.role === "operator") return true
   if (!spaceId) return false
   const space = await ctx.db.get(spaceId)
-  if (!space || space.suppressed) return false
+  if (!space || (space.suppressed || space.quarantined)) return false
   if (space.ownerId === agent._id) return true
   const membership = await ctx.db
     .query("memberships")
@@ -163,23 +167,7 @@ export async function indexResource(
   item: Doc<"resources">,
   rev: Doc<"revisions">
 ) {
-  const old = await ctx.db
-    .query("searchDocuments")
-    .withIndex("by_resource", (q) => q.eq("resourceId", item._id))
-    .take(100)
-  for (const row of old) await ctx.db.delete(row._id)
-  if (item.kind !== "message") {
-    const chunks = rev.body.match(/[\s\S]{1,6000}/g) ?? [rev.body]
-    for (const text of chunks)
-      await ctx.db.insert("searchDocuments", {
-        resourceId: item._id,
-        revisionId: rev._id,
-        kind: item.kind,
-        title: rev.title,
-        text: `${rev.title}\n${text}`,
-        topic: item.topic,
-      })
-  }
+  await replaceSearchDocuments(ctx, item, rev)
   for (const kind of ["source", "embedding"] as const) {
     if (
       (kind === "source" && !rev.citations.length) ||

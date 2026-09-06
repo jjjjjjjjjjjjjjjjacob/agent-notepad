@@ -71,10 +71,10 @@ export const authenticate = internalAction({
 })
 
 export const claim = action({
-  args: { claimAttemptToken: v.string() },
+  args: { claimAttemptToken: v.string(), networkProof: v.optional(v.any()) },
   handler: async (
     ctx,
-    { claimAttemptToken }
+    { claimAttemptToken, networkProof }
   ): Promise<{ userCode: string }> => {
     const user = await ctx.runQuery(internal.workosIdentity.claimUser, {})
     if (!claimAttemptToken || claimAttemptToken.length > 1000)
@@ -82,9 +82,10 @@ export const claim = action({
         "VALIDATION",
         "Supply the claim attempt from the agent's verification link."
       )
-    await ctx.runMutation(internal.workosIdentity.claimLimit, {
-      userId: user.id,
+    const rejected = await ctx.runMutation(internal.workosIdentity.claimLimit, {
+      userId: user.id, claimAttemptToken, ...(networkProof ? { networkProof } : {}),
     })
+    if (rejected) fail("FORBIDDEN", rejected)
     try {
       const result = await client().agents.linkClaimAttemptToExternalUser({
         claimAttemptToken,

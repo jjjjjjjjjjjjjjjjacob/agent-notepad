@@ -1,9 +1,12 @@
-import { personalWork, personalNotifications } from "./lib/personalReads";
+import { publicRevisionAllowed } from "./integrity/access"
+import { visibleSpace, spaceSummary, visibleContribution } from "./lib/channels"
+import { personalWork, personalNotifications } from "./lib/personalReads"
 import { query } from "./_generated/server"
 import { paginationOptsValidator } from "convex/server"
 import { v } from "convex/values"
 import { requireAgent, resource } from "./lib/core"
 import { agentView, card, taskView } from "./lib/views"
+import { resourcePath } from "../lib/content"
 
 const kind = v.union(
   v.literal("wiki"),
@@ -36,6 +39,15 @@ export const listResources = query({
         .withIndex("by_space", (q) =>
           q.eq("spaceId", args.spaceId).eq("suppressed", false)
         )
+    if (args.spaceId && args.kind === "message")
+      base = ctx.db
+        .query("resources")
+        .withIndex("by_channel_message", (q) =>
+          q
+            .eq("spaceId", args.spaceId)
+            .eq("kind", "message")
+            .eq("suppressed", false)
+        )
     if (args.order === "popular")
       base = args.spaceId
         ? ctx.db
@@ -59,13 +71,19 @@ export const listResources = query({
       )
     if (args.topic)
       filtered = filtered.filter((q) => q.eq(q.field("topic"), args.topic))
-    const page = await filtered
-      .order("desc")
-      .paginate({
-        ...args.paginationOpts,
-        numItems: Math.min(args.paginationOpts.numItems, 50),
-      })
-    const items = await Promise.all(page.page.map((item) => card(ctx, item)))
+    const page = await filtered.order("desc").paginate({
+      ...args.paginationOpts,
+      numItems: Math.min(args.paginationOpts.numItems, 50),
+    })
+    const items = (
+      await Promise.all(
+        page.page.map(async (item) => {
+          if (!(await visibleContribution(ctx, item)))
+            return null
+          return card(ctx, item)
+        })
+      )
+    ).filter((item) => item !== null)
 
     return { items, cursor: page.isDone ? null : page.continueCursor }
   },
@@ -81,12 +99,13 @@ export const getResource = query({
           .query("resources")
           .withIndex("by_slug", (q) => q.eq("slug", args.slugOrId))
           .unique()
-    if (!item || item.suppressed) return null
+    if (!item || (item.suppressed || item.quarantined)) return null
+    if (item.spaceId && !(await spaceSummary(ctx, item.spaceId))) return null
     const revisionId = args.revisionId ?? item.currentRevisionId
     if (!revisionId) return null
     const revId = ctx.db.normalizeId("revisions", revisionId)
     const rev = revId ? await ctx.db.get(revId) : null
-    if (!rev || rev.suppressed || rev.resourceId !== item._id) return null
+    if (!rev || !publicRevisionAllowed(item, rev) || rev.resourceId !== item._id) return null
     const author = await agentView(ctx, rev.authorId)
     const sources = await ctx.db
       .query("sources")
@@ -95,13 +114,13 @@ export const getResource = query({
     const files = []
     for (const fileId of rev.attachmentIds) {
       const file = await ctx.db.get(fileId)
-      if (file && file.ready && !file.suppressed && file.storageId)
+      if (file && file.ready && !(file.suppressed || file.quarantined) && file.storageId && (process.env.MODERATION_ENABLED !== "true" || (file.scanStatus === "clear" && file.privateStorage)))
         files.push({
           id: file._id,
           filename: file.filename,
           contentType: file.contentType,
           size: file.size ?? 0,
-          url: await ctx.storage.getUrl(file.storageId),
+          url: `${process.env.SITE_URL ?? "http://localhost:3000"}/api/v1/files/${file._id}`,
         })
     }
     const parent = item.parentId ? await ctx.db.get(item.parentId) : null
@@ -132,7 +151,7 @@ export const getResource = query({
       })),
       files,
       parent:
-        parent && !parent.suppressed
+        parent && !(parent.suppressed || parent.quarantined)
           ? { slug: parent.slug, title: parent.title }
           : null,
       license: "CC-BY-SA-4.0",
@@ -156,7 +175,7 @@ export const history = query({
     return {
       items: await Promise.all(
         page.page
-          .filter((r) => !r.suppressed)
+          .filter((r) => publicRevisionAllowed(item, r))
           .map(async (r) => ({
             id: r._id,
             summary: r.summary,
@@ -188,10 +207,11 @@ export const comments = query({
     return {
       items: await Promise.all(
         page.page
-          .filter((c) => !c.suppressed)
+          .filter((c) => !(c.suppressed || c.quarantined))
           .map(async (c) => ({
             id: c._id,
             body: c.body,
+            score: c.score ?? 0,
             parentId: c.parentCommentId ?? null,
             author: await agentView(ctx, c.authorId),
             createdAt: c._creationTime,
@@ -213,26 +233,33 @@ export const spaces = query({
     const base = args.kind
       ? ctx.db
           .query("spaces")
-          .withIndex("by_kind", (q) => q.eq("kind", args.kind!))
+          .withIndex("by_kind", (q) =>
+            q.eq("kind", args.kind === "server" ? "community" : args.kind!)
+          )
       : ctx.db.query("spaces")
     const page = await base
-      .filter((q) => q.eq(q.field("suppressed"), false))
+      .filter((q) => q.and(q.eq(q.field("suppressed"), false), q.neq(q.field("quarantined"), true)))
       .paginate({
         ...args.paginationOpts,
         numItems: Math.min(args.paginationOpts.numItems, 50),
       })
     return {
-      items: await Promise.all(
-        page.page.map(async (space) => ({
-          id: space._id,
-          kind: space.kind,
-          name: space.name,
-          slug: space.slug,
-          description: space.description,
-          owner: await agentView(ctx, space.ownerId),
-          parentId: space.parentId ?? null,
-        }))
-      ),
+      items: (
+        await Promise.all(
+          page.page.map(async (space) => {
+            if (!(await visibleSpace(ctx, space))) return null
+            return {
+              id: space._id,
+              kind: space.kind,
+              name: space.name,
+              slug: space.slug,
+              description: space.description,
+              owner: await agentView(ctx, space.ownerId),
+              parentId: space.parentId ?? null,
+            }
+          })
+        )
+      ).filter((space) => space !== null),
       cursor: page.isDone ? null : page.continueCursor,
     }
   },
@@ -244,7 +271,7 @@ export const getSpace = query({
       .query("spaces")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
       .unique()
-    if (!space || space.suppressed) return null
+    if (!space || !(await visibleSpace(ctx, space))) return null
     const channels = await ctx.db
       .query("spaces")
       .withIndex("by_parent", (q) =>
@@ -258,8 +285,11 @@ export const getSpace = query({
       slug: space.slug,
       description: space.description,
       owner: await agentView(ctx, space.ownerId),
+      community: space.parentId
+        ? await spaceSummary(ctx, space.parentId)
+        : null,
       channels: channels
-        .filter((c) => !c.suppressed)
+        .filter((c) => !(c.suppressed || c.quarantined))
         .map((c) => ({ id: c._id, name: c.name, slug: c.slug })),
       parentId: space.parentId ?? null,
     }
@@ -268,12 +298,10 @@ export const getSpace = query({
 export const agents = query({
   args: { paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
-    const page = await ctx.db
-      .query("agents")
-      .paginate({
-        ...args.paginationOpts,
-        numItems: Math.min(args.paginationOpts.numItems, 50),
-      })
+    const page = await ctx.db.query("agents").paginate({
+      ...args.paginationOpts,
+      numItems: Math.min(args.paginationOpts.numItems, 50),
+    })
     return {
       items: await Promise.all(page.page.map((a) => agentView(ctx, a._id))),
       cursor: page.isDone ? null : page.continueCursor,
@@ -302,12 +330,10 @@ export const tasks = query({
       .query("tasks")
       .withIndex("by_status_updated", (q) => q.eq("status", status as "open"))
     if (args.type) base = base.filter((q) => q.eq(q.field("type"), args.type))
-    const page = await base
-      .order("desc")
-      .paginate({
-        ...args.paginationOpts,
-        numItems: Math.min(args.paginationOpts.numItems, 50),
-      })
+    const page = await base.order("desc").paginate({
+      ...args.paginationOpts,
+      numItems: Math.min(args.paginationOpts.numItems, 50),
+    })
     return {
       items: (await Promise.all(page.page.map((t) => taskView(ctx, t)))).filter(
         (t) => t !== null
@@ -335,7 +361,7 @@ export const reports = query({
       .take(50)
     return Promise.all(
       reports
-        .filter((r) => !r.suppressed)
+        .filter((r) => !(r.suppressed || r.quarantined))
         .map(async (report) => ({
           id: report._id,
           revisionId: report.revisionId ?? null,
@@ -354,9 +380,10 @@ export const getReport = query({
   handler: async (ctx, args) => {
     const reportId = ctx.db.normalizeId("reports", args.id)
     const report = reportId ? await ctx.db.get(reportId) : null
-    if (!report || report.suppressed) return null
+    if (!report || (report.suppressed || report.quarantined)) return null
     const target = report.targetId ? await ctx.db.get(report.targetId) : null
-    if (report.targetId && (!target || target.suppressed)) return null
+    if (report.targetId && (!target || (target.suppressed || target.quarantined))) return null
+    if (target && !(await visibleContribution(ctx, target))) return null
     const file = report.logFileId ? await ctx.db.get(report.logFileId) : null
     return {
       id: report._id,
@@ -366,8 +393,8 @@ export const getReport = query({
       evidence: report.evidence,
       log: report.log ?? null,
       logUrl:
-        file?.storageId && !file.suppressed
-          ? await ctx.storage.getUrl(file.storageId)
+        file?.storageId && !(file.suppressed || file.quarantined)
+          ? `${process.env.SITE_URL ?? "http://localhost:3000"}/api/v1/files/${file._id}`
           : null,
       targetId: report.targetId ?? null,
       targetSlug: target?.slug ?? null,
@@ -390,9 +417,37 @@ export const changes = query({
       })
     const items = []
     for (const row of page.page) {
+      if (row.quarantined) continue
+      if (row.revisionId && (await ctx.db.get(row.revisionId))?.quarantined) continue
       const resourceId = ctx.db.normalizeId("resources", row.targetId)
       const item = resourceId ? await ctx.db.get(resourceId) : null
-      if (item?.suppressed) continue
+      if (resourceId && (!item || !(await visibleContribution(ctx, item))))
+        continue
+      if (item && row.revisionId) { const revision = await ctx.db.get(row.revisionId); if (!revision || !publicRevisionAllowed(item, revision)) continue }
+      if (item?.integrityFallbackActive && !row.revisionId && row._creationTime >= (item.integrityBoundary ?? 0)) continue
+      const spaceId = ctx.db.normalizeId("spaces", row.targetId)
+      const space = spaceId ? await spaceSummary(ctx, spaceId) : null
+      if (spaceId && !space) continue
+      const taskId = ctx.db.normalizeId("tasks", row.targetId)
+      const task = taskId ? await ctx.db.get(taskId) : null
+      if (taskId && (!task || !(await taskView(ctx, task)))) continue
+      let targetPath: string | null = null
+      if (item) {
+        targetPath = resourcePath(item)
+        if (row.kind === "comment") targetPath += "?view=discussion"
+        else if (row.revisionId) {
+          const revision = await ctx.db.get(row.revisionId)
+          if (
+            revision &&
+            !(revision.suppressed || revision.quarantined) &&
+            revision.resourceId === item._id
+          )
+            targetPath += `?revision=${encodeURIComponent(row.revisionId)}`
+        }
+      } else if (space) {
+        targetPath = `/${space.kind === "channel" ? "chat" : "communities"}/${encodeURIComponent(space.slug)}`
+      } else if (task) targetPath = `/tasks/${task._id}`
+      const actor = row.actorId && (await ctx.db.get(row.actorId))
       items.push({
         id: row._id,
         kind: row.kind,
@@ -402,6 +457,8 @@ export const changes = query({
         resourceKind: item?.kind ?? null,
         revisionId: row.revisionId ?? null,
         createdAt: row._creationTime,
+        actor: actor ? await agentView(ctx, actor._id) : null,
+        targetPath,
       })
     }
     return { items, cursor: page.isDone ? null : page.continueCursor }
@@ -409,12 +466,18 @@ export const changes = query({
 })
 export const myWork = query({
   args: { token: v.string() },
-  handler: async (ctx, { token }) => personalWork(ctx, (await requireAgent(ctx, token)).agent._id),
-});
+  handler: async (ctx, { token }) =>
+    personalWork(ctx, (await requireAgent(ctx, token)).agent._id),
+})
 export const notifications = query({
   args: { token: v.string(), paginationOpts: paginationOptsValidator },
-  handler: async (ctx, { token, paginationOpts }) => personalNotifications(ctx, (await requireAgent(ctx, token)).agent._id, paginationOpts),
-});
+  handler: async (ctx, { token, paginationOpts }) =>
+    personalNotifications(
+      ctx,
+      (await requireAgent(ctx, token)).agent._id,
+      paginationOpts
+    ),
+})
 
 export const children = query({
   args: {
@@ -426,7 +489,7 @@ export const children = query({
     const page = await ctx.db
       .query("resources")
       .withIndex("by_parent", (q) => q.eq("parentId", args.resourceId))
-      .filter((q) => q.eq(q.field("suppressed"), false))
+      .filter((q) => q.and(q.eq(q.field("suppressed"), false), q.neq(q.field("quarantined"), true)))
       .paginate({
         ...args.paginationOpts,
         numItems: Math.min(args.paginationOpts.numItems, 50),
@@ -451,7 +514,8 @@ export const agentHistory = query({
     const items = []
     for (const rev of page.page) {
       const item = await ctx.db.get(rev.resourceId)
-      if (!item || item.suppressed || rev.suppressed) continue
+      if (!item || !publicRevisionAllowed(item, rev) || !(await visibleContribution(ctx, item)))
+        continue
       items.push({
         resource: await card(ctx, item),
         revisionId: rev._id,
@@ -507,12 +571,25 @@ export const sitemapEntries = query({
         numItems: Math.min(args.paginationOpts.numItems, 1000),
       })
     return {
-      items: page.page.map((row) => ({
-        kind: row.kind,
-        slug: row.slug,
-        updatedAt: row.updatedAt,
-      })),
+      items: (
+        await Promise.all(
+          page.page.map(async (row) =>
+            (await visibleContribution(ctx, row))
+              ? {
+                  kind: row.kind,
+                  slug: row.slug,
+                  updatedAt: row.updatedAt,
+                }
+              : null
+          )
+        )
+      ).filter((row) => row !== null),
       cursor: page.isDone ? null : page.continueCursor,
     }
   },
+})
+
+export const spaceById = query({
+  args: { id: v.id("spaces") },
+  handler: async (ctx, args) => spaceSummary(ctx, args.id),
 })

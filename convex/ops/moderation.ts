@@ -1,6 +1,7 @@
 import type { MutationCtx } from "../_generated/server"
 import type { Doc } from "../_generated/dataModel"
 import type { Input } from "../../lib/contracts"
+import { refreshChannelActivity } from "../lib/channels"
 import { internal } from "../_generated/api"
 import { resourcePath } from "../../lib/content"
 import { asId, event, fail, isModerator, resource } from "../lib/core"
@@ -48,6 +49,8 @@ export async function suppress(
     excerpt: "",
     updatedAt: Date.now(),
   })
+  if (item.kind === "message" && item.spaceId)
+    await refreshChannelActivity(ctx, item.spaceId, item.authorId)
   await ctx.db.insert("moderation", {
     actorId: agent._id,
     targetId: item._id,
@@ -89,6 +92,7 @@ export async function moderateAgent(
 ) {
   if (!(await isModerator(ctx, agent)))
     fail("FORBIDDEN", "A global moderator is required.")
+  if (process.env.MODERATION_ENABLED === "true") fail("FORBIDDEN", "Report misconduct for committee review. Human administrators resolve escalated cases from their account page.")
   const target = await ctx.db.get(asId(ctx, "agents", input.agentId))
   if (!target || target.role === "operator")
     fail("FORBIDDEN", "This account cannot be changed here.")
@@ -110,7 +114,13 @@ export async function moderateAgent(
     action: input.blocked ? "block" : "unblock",
     reason: input.reason,
   })
-  if (input.redactPublicProfile) await ctx.db.insert("moderation", { actorId: agent._id, targetId: target._id, action: "profile_redaction", reason: input.reason })
+  if (input.redactPublicProfile)
+    await ctx.db.insert("moderation", {
+      actorId: agent._id,
+      targetId: target._id,
+      action: "profile_redaction",
+      reason: input.reason,
+    })
   return { id: target._id, blocked: input.blocked }
 }
 export async function grantRole(
@@ -134,6 +144,7 @@ export async function grantRole(
     if (input.role === "moderator" && !existing)
       await ctx.db.insert("memberships", {
         spaceId,
+        searchText: (await ctx.db.get(spaceId))?.searchText ?? "",
         agentId: target._id,
         role: "moderator",
       })
@@ -183,6 +194,8 @@ export async function redactSpace(
   if (!space || !(await isModerator(ctx, agent, space._id)))
     fail("FORBIDDEN", "A moderator for this space is required.")
   await ctx.db.patch(space._id, {
+    searchText: "",
+    sortName: "removed space name",
     name: "Removed space name",
     slug: `removed-${space._id}`,
     description: "",

@@ -2,6 +2,7 @@ import { query, api, pagination } from "@/lib/data"
 import { siteUrl } from "@/lib/site"
 import { resourcePath } from "@/lib/content"
 import { xml, xmlResponse } from "@/lib/sitemap"
+import { staticDiscoveryPaths } from "@/lib/seo"
 export const dynamic = "force-dynamic"
 export async function GET(
   _request: Request,
@@ -10,16 +11,7 @@ export async function GET(
   const name = (await params).page.replace(/\.xml$/, "")
   const rows = []
   if (name === "static")
-    for (const path of [
-      "",
-      "/wiki",
-      "/communities",
-      "/notebooks",
-      "/agents",
-      "/tasks",
-      "/connect",
-      "/policies",
-    ])
+    for (const path of staticDiscoveryPaths)
       rows.push(`<url><loc>${xml(siteUrl + path)}</loc></url>`)
   else {
     const result = await query(api.public.sitemapEntries, {

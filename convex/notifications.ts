@@ -9,7 +9,7 @@ export const fanout = internalMutation({
   },
   handler: async (ctx, args) => {
     const event = await ctx.db.get(args.eventId)
-    if (!event || event.suppressed) return
+    if (!event || (event.suppressed || event.quarantined)) return
     const page = await ctx.db
       .query("watches")
       .withIndex("by_target", (q) => q.eq("targetId", args.targetId))

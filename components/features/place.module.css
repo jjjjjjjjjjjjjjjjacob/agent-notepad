@@ -1,0 +1,353 @@
+.place {
+  --place-accent: #cd492f;
+  min-width: 0;
+}
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 28px;
+  border-bottom: 1px solid var(--border);
+}
+.heading h1 {
+  font: 500 30px var(--font-heading);
+  letter-spacing: -0.035em;
+}
+.heading p {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  margin-top: 4px;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 11px var(--font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--place-accent);
+}
+.badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background: currentColor;
+  border-radius: 50%;
+}
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+}
+.board {
+  min-width: 0;
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  font-size: 12px;
+}
+.controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.place button,
+.wallet button,
+.place input,
+.wallet input,
+.wallet select,
+.wallet textarea {
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 7px 10px;
+  font: inherit;
+  background: var(--background);
+}
+.place button,
+.wallet button {
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.place button:hover,
+.wallet button:hover {
+  background: var(--muted);
+}
+.place button:disabled,
+.wallet button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.place :focus-visible,
+.wallet :focus-visible {
+  outline: 2px solid var(--place-accent, var(--ring));
+  outline-offset: 3px;
+}
+.viewport {
+  height: min(72vh, 780px);
+  min-height: 380px;
+  overflow: hidden;
+  position: relative;
+  background: #e8e5df;
+  border-block: 1px solid var(--border);
+}
+.viewport canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+.viewport canvas:active {
+  cursor: grabbing;
+}
+.loading {
+  position: absolute;
+  left: 16px;
+  bottom: 12px;
+  background: var(--background);
+  padding: 5px 9px;
+  font-size: 12px;
+  pointer-events: none;
+}
+.palette {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 20px;
+  flex-wrap: wrap;
+}
+.swatch {
+  width: 19px;
+  height: 19px;
+  border: 1px solid #0002;
+  display: inline-block;
+  border-radius: 3px;
+}
+.palette span:last-child {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-left: auto;
+}
+.aside {
+  border-left: 1px solid var(--border);
+  min-width: 0;
+}
+.section {
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.section h2,
+.wallet h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+.section h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 16px 0 8px;
+}
+.section p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.eyebrow {
+  font: 10px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.coordinate {
+  font: 24px var(--font-mono);
+  margin: 6px 0 16px;
+  font-variant-numeric: tabular-nums;
+}
+.details {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 9px;
+  font-size: 12px;
+  align-items: center;
+}
+.details dt {
+  color: var(--muted-foreground);
+}
+.details dd {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.link {
+  color: var(--link-color);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+.tabs button {
+  flex: 1;
+  border: 0;
+  border-radius: 0;
+  padding: 14px 8px;
+  font-size: 12px;
+}
+.tabs button[aria-pressed="true"] {
+  box-shadow: inset 0 -2px var(--place-accent);
+  font-weight: 600;
+}
+.row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+}
+.row strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+}
+.row small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted-foreground);
+  font: 11px var(--font-mono);
+}
+.empty {
+  color: var(--muted-foreground);
+  padding: 12px 0;
+}
+.notice {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+}
+.jump {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 16px;
+  font-size: 12px;
+}
+.jump input {
+  width: 66px;
+}
+.wallet {
+  max-width: 900px;
+  margin: auto;
+  display: grid;
+  gap: 24px;
+}
+.wallet h1 {
+  font-size: 30px;
+  font-family: var(--font-heading);
+}
+.wallet header p {
+  color: var(--muted-foreground);
+  margin-top: 8px;
+}
+.wallet section {
+  border: 1px solid var(--border);
+  padding: 22px;
+  border-radius: 8px;
+}
+.wallet form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-top: 16px;
+}
+.wallet label {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+}
+.wallet textarea {
+  min-width: 280px;
+  min-height: 80px;
+}
+.balance {
+  font: 32px var(--font-mono);
+  margin-block: 12px;
+}
+.wallet table {
+  width: 100%;
+  text-align: left;
+  font-size: 13px;
+  border-collapse: collapse;
+}
+.wallet th,
+.wallet td {
+  padding: 10px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.wallet th {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+.message {
+  padding: 12px;
+  border: 1px solid var(--border);
+  background: var(--muted);
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.scroll {
+  overflow-x: auto;
+}
+@media (max-width: 850px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  .aside {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+  .viewport {
+    height: 60vh;
+    min-height: 300px;
+  }
+  .heading {
+    padding: 18px;
+  }
+  .heading h1 {
+    font-size: 26px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .place button,
+  .wallet button {
+    transition: none;
+  }
+}
+
+.heading > div:last-child {
+  flex-shrink: 0;
+}
+.heading > div:last-child a {
+  white-space: nowrap;
+}
+@media (max-width: 450px) {
+  .palette {
+    gap: 3px;
+  }
+  .palette .swatch {
+    width: 17px;
+    height: 17px;
+  }
+  .palette span:last-child {
+    flex-basis: 100%;
+    margin-top: 5px;
+  }
+}

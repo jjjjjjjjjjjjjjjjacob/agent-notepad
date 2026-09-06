@@ -2,6 +2,8 @@ import { internalMutation, internalQuery } from "./_generated/server"
 import { internal } from "./_generated/api"
 import { v } from "convex/values"
 import { enqueueTask, metric, rateLimit } from "./lib/core"
+import { MAX_SEARCH_CHUNKS } from "../lib/retrieval"
+import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../lib/embedding-config"
 
 export const start = internalMutation({
   args: { jobId: v.id("jobs") },
@@ -18,22 +20,32 @@ export const start = internalMutation({
     if (
       !resource ||
       resource.suppressed ||
+      resource.quarantined ||
       resource.currentRevisionId !== job.revisionId ||
       !revision ||
-      revision.suppressed
+      revision.suppressed ||
+      revision.quarantined
     ) {
       await ctx.db.patch(job._id, { status: "cancelled" })
       return null
     }
     const budgetName = `external:${job.kind}`
+    const chunks = (
+      await ctx.db
+        .query("searchDocuments")
+        .withIndex("by_resource", (q) => q.eq("resourceId", resource._id))
+        .take(MAX_SEARCH_CHUNKS + 1)
+    ).filter(
+      (chunk) =>
+        chunk.revisionId === job.revisionId &&
+        (!chunk.embeddingBge || chunk.embeddingModel !== EMBEDDING_MODEL)
+    )
     const budget = await ctx.db
       .query("limits")
       .withIndex("by_bucket", (q) => q.eq("bucket", budgetName))
       .unique()
     const cost =
-      job.kind === "source"
-        ? revision.citations.length
-        : Math.ceil(revision.body.length / 6000)
+      job.kind === "source" ? revision.citations.length : chunks.length
     const maximum = job.kind === "source" ? 1200 : 4000
     if (
       budget &&
@@ -69,10 +81,6 @@ export const start = internalMutation({
       attempts: job.attempts + 1,
       nextAt: Date.now() + 10 * 60_000,
     })
-    const chunks = await ctx.db
-      .query("searchDocuments")
-      .withIndex("by_resource", (q) => q.eq("resourceId", resource._id))
-      .take(30)
     return { ...job, attempt: job.attempts + 1, revision, chunks }
   },
 })
@@ -121,7 +129,7 @@ export const saveSource = internalMutation({
   },
   handler: async (ctx, args) => {
     const resource = await ctx.db.get(args.resourceId)
-    if (!resource || resource.suppressed) return
+    if (!resource || resource.suppressed || resource.quarantined) return
     const existing = (
       await ctx.db
         .query("sources")
@@ -155,6 +163,7 @@ export const saveEmbedding = internalMutation({
     id: v.id("searchDocuments"),
     revisionId: v.id("revisions"),
     embedding: v.array(v.float64()),
+    model: v.string(),
   },
   handler: async (ctx, args) => {
     const chunk = await ctx.db.get(args.id)
@@ -162,11 +171,19 @@ export const saveEmbedding = internalMutation({
     if (
       chunk &&
       resource &&
-      !resource.suppressed &&
+      !(resource.suppressed || resource.quarantined) &&
+      chunk.revisionId === args.revisionId &&
+      (await ctx.db.get(args.revisionId))?.suppressed === false &&
       resource.currentRevisionId === args.revisionId &&
-      args.embedding.length === 1024
+      args.model === EMBEDDING_MODEL &&
+      args.embedding.length === EMBEDDING_DIMENSIONS &&
+      args.embedding.every(Number.isFinite) &&
+      Math.abs(Math.hypot(...args.embedding) - 1) < 0.01
     )
-      await ctx.db.patch(chunk._id, { embedding: args.embedding })
+      await ctx.db.patch(chunk._id, {
+        embeddingBge: args.embedding,
+        embeddingModel: args.model,
+      })
   },
 })
 export const pendingIndex = internalQuery({
@@ -229,8 +246,12 @@ export const recordMetric = internalMutation({
   },
 })
 export const searchBudget = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    await rateLimit(ctx, "semantic_search", 120)
+  args: { count: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const count = args.count ?? 1
+    if (!Number.isInteger(count) || count < 1 || count > 4)
+      throw new Error("Invalid semantic query count.")
+    // Reserve the entire batch atomically before calling the embedding service.
+    for (let i = 0; i < count; i++) await rateLimit(ctx, "semantic_search", 120)
   },
 })

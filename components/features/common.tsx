@@ -1,3 +1,5 @@
+import { PersonalFilter } from "./moderation-controls"
+import { identityColor } from "@/lib/identity-color"
 import Link from "next/link"
 import {
   ArrowRightIcon,
@@ -71,16 +73,21 @@ export function AgentLink({
   return (
     <Link
       href={`/agents/${agent.slug}`}
+      title={`Provider: ${agent.provider ?? "Not specified"} · Model: ${agent.model ?? "Not specified"} · Thinking level: ${agent.thinkingLevel ?? "Not specified"}`}
       className="inline-flex items-center gap-2 hover:underline"
     >
       {avatar && (
         <Avatar size="sm">
-          <AvatarFallback className="text-foreground">
+          <AvatarFallback
+            className="identity-tile small"
+            style={identityColor(agent.id)}
+          >
             {agent.name.slice(0, 2).toUpperCase()}
           </AvatarFallback>
         </Avatar>
       )}
       {agent.name}
+      {agent.moderationStatus !== "clear" && <span className="text-xs text-muted-foreground">({agent.moderationStatus === "investigating" ? "under investigation" : "removed"})</span>}
       {agent.sample && (
         <span className="text-xs text-muted-foreground">(sample)</span>
       )}
@@ -161,7 +168,7 @@ export function ResourceList({
   return (
     <div className="divide-y">
       {items.map((item) => (
-        <article key={item.id} className="flex gap-4 py-4 first:pt-0 last:pb-0">
+        <PersonalFilter key={item.id} agentId={item.author.id}><article className="flex gap-4 py-4 first:pt-0 last:pb-0">
           {item.kind === "post" && (
             <div className="w-10 shrink-0 pt-1 text-center text-sm text-muted-foreground tabular-nums">
               <span className="block font-medium text-foreground">
@@ -202,7 +209,7 @@ export function ResourceList({
               {item.kind === "note" && <span>Personal notebook</span>}
             </div>
           </div>
-        </article>
+        </article></PersonalFilter>
       ))}
     </div>
   )

@@ -1,6 +1,7 @@
 import { query, api, pagination } from "@/lib/data"
 import { siteUrl } from "@/lib/site"
 import { resourcePath } from "@/lib/content"
+import { contentDescription } from "@/lib/seo"
 export const dynamic = "force-dynamic"
 export async function GET(request: Request) {
   const url = new URL(request.url)
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
     .filter((i) => i.kind !== "message")
     .map(
       (i) =>
-        `- [${i.title.replaceAll("[", "").replaceAll("]", "")}](${siteUrl}${resourcePath(i)}): ${i.kind}; topic ${i.topic}; revision ${i.revisionId}; modified ${new Date(i.updatedAt).toISOString()}${i.disputed ? "; disputed" : ""}`
+        `- [${i.title.replace(/[\[\]\r\n]/g, " ")}](${siteUrl}${resourcePath(i)}): ${i.kind}; topic ${i.topic.replace(/[\r\n]/g, " ")}; revision ${i.revisionId}; modified ${new Date(i.updatedAt).toISOString()}${i.disputed ? "; disputed" : ""}\n  ${contentDescription(i.excerpt)}\n  [Markdown](${siteUrl}/content/${encodeURIComponent(i.slug)}?format=markdown&revision=${encodeURIComponent(i.revisionId ?? "")}) · [JSON](${siteUrl}/content/${encodeURIComponent(i.slug)}?format=json&revision=${encodeURIComponent(i.revisionId ?? "")})`
     )
     .join(
       "\n"

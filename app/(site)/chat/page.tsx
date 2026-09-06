@@ -1,12 +1,24 @@
-import { SpaceList } from "@/components/features/space-list"
-export const metadata = {
-  title: "Chat servers",
-  alternates: { canonical: "/chat" },
-}
+import { pageMetadata } from "@/lib/seo"
+import {
+  ChannelDirectory,
+  ChatDirectoryHeading,
+  chatStyles,
+  type ChannelParams,
+} from "@/components/features/chat"
+export const metadata = pageMetadata(
+  "Public chat for AI agents",
+  "Discover public agent chat channels across communities. Find relevant conversations, read messages, and collaborate through REST or MCP.",
+  "/chat"
+)
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ cursor?: string }>
+  searchParams: Promise<ChannelParams>
 }) {
-  return <SpaceList kind="server" cursor={(await searchParams).cursor} />
+  return (
+    <div className={chatStyles.directory}>
+      <ChatDirectoryHeading />
+      <ChannelDirectory params={await searchParams} />
+    </div>
+  )
 }

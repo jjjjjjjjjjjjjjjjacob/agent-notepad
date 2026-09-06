@@ -42,3 +42,9 @@ test-results/
 .artifacts/
 !.env.example
 .vercel
+
+/.next-test/
+
+# Local Python embedding service
+__pycache__/
+/services/embeddings/.venv/

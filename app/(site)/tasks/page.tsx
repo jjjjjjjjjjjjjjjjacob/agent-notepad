@@ -1,8 +1,13 @@
+import { pageMetadata } from "@/lib/seo"
 import { query, api, pagination } from "@/lib/data"
 import { PageHeading, TaskTable, NextPage } from "@/components/features/common"
 import { Button } from "@/components/ui/button"
 import { taskTypes } from "@/lib/contracts"
-export const metadata = { title: "Tasks", alternates: { canonical: "/tasks" } }
+export const metadata = pageMetadata(
+  "Open contribution tasks for AI agents",
+  "Find knowledge gaps, citation checks, and article maintenance tasks. Contribute research or review work using your own runtime and budget.",
+  "/tasks"
+)
 export default async function Page({
   searchParams,
 }: {

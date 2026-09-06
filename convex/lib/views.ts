@@ -1,18 +1,26 @@
+import { contributorStatus, reputation, agentRestricted } from "../moderation/access"
 import type { QueryCtx } from "../_generated/server"
 import type { Doc, Id } from "../_generated/dataModel"
+import { spaceSummary, visibleContribution } from "./channels"
 
 export async function agentView(ctx: QueryCtx, id: Id<"agents">) {
   const agent = await ctx.db.get(id)
   return agent
     ? {
         id: agent._id,
-        name: agent.name,
+        name: agent.quarantined ? "Profile under review" : agent.name,
         slug: agent.slug,
-        bio: agent.bio,
-        capabilities: agent.capabilities,
-        topics: agent.topics,
+        provider: agent.quarantined ? null : agent.provider ?? null,
+        model: agent.quarantined ? null : agent.model ?? null,
+        thinkingLevel: agent.quarantined ? null : agent.thinkingLevel ?? null,
+        bio: agent.quarantined ? "" : agent.bio,
+        capabilities: agent.quarantined ? [] : agent.capabilities,
+        topics: agent.quarantined ? [] : agent.topics,
         role: agent.role,
-        blocked: agent.blocked,
+        blocked: await agentRestricted(ctx, agent),
+        maliciousBanId: agent.maliciousBanId ?? null,
+        moderationStatus: await contributorStatus(ctx, agent),
+        reputation: (await reputation(ctx, agent._id)).score,
         contributionCount: agent.contributionCount,
         reviewCount: agent.reviewCount,
         joinedAt: agent._creationTime,
@@ -22,11 +30,17 @@ export async function agentView(ctx: QueryCtx, id: Id<"agents">) {
         id,
         name: "Unknown agent",
         slug: "unknown",
+        provider: null,
+        model: null,
+        thinkingLevel: null,
         bio: "",
         capabilities: [],
         topics: [],
         role: "editor",
         blocked: false,
+        maliciousBanId: null,
+        moderationStatus: "clear" as const,
+        reputation: 0,
         contributionCount: 0,
         reviewCount: 0,
         joinedAt: 0,
@@ -45,6 +59,8 @@ export async function card(ctx: QueryCtx, item: Doc<"resources">) {
     score: item.score,
     commentCount: item.commentCount,
     disputed: item.disputed,
+    integrityReviewCount: item.integrityReviewCount ?? 0,
+    integrityFallbackActive: item.integrityFallbackActive ?? false,
     protection:
       item.protectionUntil && item.protectionUntil <= Date.now()
         ? "open"
@@ -53,12 +69,14 @@ export async function card(ctx: QueryCtx, item: Doc<"resources">) {
     createdAt: item._creationTime,
     revisionId: item.currentRevisionId ?? null,
     spaceId: item.spaceId ?? null,
+    space: item.spaceId ? await spaceSummary(ctx, item.spaceId) : null,
     parentId: item.parentId ?? null,
   }
 }
-export async function taskView(ctx: QueryCtx, task: Doc<"tasks">) {
+export async function taskView(ctx: QueryCtx, task: Doc<"tasks">, privateAccess = false) {
+  if (task.committeeCaseId && !privateAccess) return null
   const target = task.targetId ? await ctx.db.get(task.targetId) : null
-  if (target?.suppressed) return null
+  if (target && !task.integrityReviewId && !(await visibleContribution(ctx, target))) return null
   const assignment = task.assignmentId
     ? await ctx.db.get(task.assignmentId)
     : null
@@ -68,6 +86,7 @@ export async function taskView(ctx: QueryCtx, task: Doc<"tasks">) {
     topic: task.topic,
     title: task.title,
     description: task.description,
+    integrityReviewId: task.integrityReviewId ?? null,
     status: task.status,
     issueOpen: task.issueOpen,
     targetId: task.targetId ?? null,

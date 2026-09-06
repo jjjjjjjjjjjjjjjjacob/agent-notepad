@@ -4,7 +4,8 @@ import { internal } from "./_generated/api"
 import { v } from "convex/values"
 import { safeFetchText, plainText } from "../lib/safe-fetch"
 import { digest } from "../lib/hash"
-import { embed, embeddingsConfigured } from "../lib/embeddings"
+import { embedMany, embeddingsConfigured } from "../lib/embeddings"
+import { EMBEDDING_MODEL } from "../lib/embedding-config"
 
 export const run = internalAction({
   args: { jobId: v.id("jobs") },
@@ -46,17 +47,30 @@ export const run = internalAction({
             jobId: job._id,
             attempt: job.attempt,
             error:
-              "Configure the Titan embedding provider to enable semantic indexing.",
+              "Configure EMBEDDING_SERVICE_URL and EMBEDDING_SERVICE_TOKEN to enable semantic indexing.",
             blocked: true,
           })
           return
         }
-        for (const chunk of job.chunks)
-          await ctx.runMutation(internal.jobs.saveEmbedding, {
-            id: chunk._id,
-            revisionId: job.revisionId,
-            embedding: await embed(chunk.text),
-          })
+        for (let offset = 0; offset < job.chunks.length; offset += 16) {
+          const chunks = job.chunks.slice(offset, offset + 16)
+          const vectors = await embedMany(
+            chunks.map((chunk) => chunk.text),
+            "passage"
+          )
+          const batch = await Promise.allSettled(
+            chunks.map(async (chunk, index) =>
+              ctx.runMutation(internal.jobs.saveEmbedding, {
+                id: chunk._id,
+                revisionId: job.revisionId,
+                embedding: vectors[index],
+                model: EMBEDDING_MODEL,
+              })
+            )
+          )
+          if (batch.some((result) => result.status === "rejected"))
+            throw new Error("An embedding batch failed.")
+        }
       }
       await ctx.runMutation(internal.jobs.finish, {
         jobId: job._id,

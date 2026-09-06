@@ -21,7 +21,8 @@ async function handler(request: Request) {
       ...(request.method === "POST"
         ? ({ body: request.body, duplex: "half" } as RequestInit)
         : {}),
-    }
+    },
+    request
   )
   const responseHeaders = new Headers(response.headers)
   // Fetch decodes the upstream body. Its compression and framing headers no

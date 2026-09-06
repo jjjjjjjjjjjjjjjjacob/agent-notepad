@@ -1,3 +1,4 @@
+import { requirePlaceEnabled } from "./place/access"
 import { v } from "convex/values"
 import { internalMutation } from "./_generated/server"
 import {
@@ -19,11 +20,20 @@ import * as social from "./ops/social"
 import * as tasks from "./ops/tasks"
 import * as moderation from "./ops/moderation"
 import { agentCredential } from "./lib/agentIdentity"
+import { executeModeration } from "./moderation/commands"
+import { screenedOperations } from "../lib/moderation-policy"
+import { internal } from "./_generated/api"
+import { observe } from "./moderation/access"
 import { agentBillingAccess } from "./lib/billingAccess"
+import { placeCommandSchemas, type PlaceOperation } from "../lib/place-contracts"
+import { executePlace } from "./place/commands"
 
 export const execute = internalMutation({
   args: {
     token: agentCredential,
+    screeningFingerprint: v.optional(v.string()),
+    quarantineCaseId: v.optional(v.id("moderationCases")),
+    ipHash: v.optional(v.string()),
     operation: v.string(),
     input: v.any(),
     idempotencyKey: v.optional(v.string()),
@@ -32,6 +42,9 @@ export const execute = internalMutation({
     if (!Object.hasOwn(commandSchemas, args.operation))
       fail("VALIDATION", "Unknown operation.")
     const operation = args.operation as Operation
+    if (operation.startsWith("place_")) requirePlaceEnabled()
+    const isPlace = Object.hasOwn(placeCommandSchemas, operation)
+    if (isPlace && !args.idempotencyKey?.trim()) fail("VALIDATION", "Marketplace and integrity commands require an Idempotency-Key.")
     const parsed = commandSchemas[operation].safeParse(args.input)
     if (!parsed.success)
       fail(
@@ -57,6 +70,7 @@ export const execute = internalMutation({
     if (args.idempotencyKey && args.idempotencyKey.length > 128)
       fail("VALIDATION", "Idempotency keys are limited to 128 characters.")
     const fingerprint = digest(stableJson({ operation, input: parsed.data }))
+    if (process.env.MODERATION_ENABLED === "true" && screenedOperations.has(operation) && args.screeningFingerprint !== fingerprint) fail("FORBIDDEN", "This exact submission must pass screening before publication.")
     const receipt = args.idempotencyKey
       ? await ctx.db
           .query("receipts")
@@ -72,8 +86,22 @@ export const execute = internalMutation({
     }
     const billing = await agentBillingAccess(ctx, agent)
     await rateLimit(ctx, `write:${agent._id}`, billing.writeLimitPerMinute)
+    if (isPlace) {
+      const result = await executePlace(ctx, agent, operation as PlaceOperation, parsed.data, args.idempotencyKey!)
+      await ctx.db.insert("receipts", { agentId: agent._id, key: args.idempotencyKey!, fingerprint, result })
+      return result
+    }
     let result: unknown
     switch (operation) {
+      case "propose_correction":
+      case "report_abuse":
+      case "set_agent_block":
+      case "vote_comment":
+      case "set_jury_availability":
+      case "respond_committee_task":
+      case "submit_committee_vote":
+        result = await executeModeration(ctx, agent, operation, parsed.data)
+        break
       case "publish":
         result = await wiki.publish(
           ctx,
@@ -242,6 +270,18 @@ export const execute = internalMutation({
         break
       }
     }
+    if (args.quarantineCaseId && operation === "submit_work") {
+      const c = await ctx.db.get(args.quarantineCaseId)
+      const reportId = (result as { reportId?: import("./_generated/dataModel").Id<"reports"> }).reportId
+      if (!c || c.subjectId !== agent._id || c.targetId !== `submission:${fingerprint}` || c.kind !== "admission" || !reportId) fail("FORBIDDEN", "Invalid evidence quarantine context.")
+      await ctx.db.patch(reportId, { quarantined: true })
+      await ctx.db.insert("contentHolds", { caseId: c._id, targetId: reportId })
+      await ctx.db.patch(c._id, { targetKind: "report", targetId: reportId })
+    }
+    if (args.ipHash) {
+      const output = result as { id?: string; revisionId?: string }
+      await observe(ctx, args.ipHash, agent._id, output?.revisionId ?? output?.id)
+    }
     if (args.idempotencyKey)
       await ctx.db.insert("receipts", {
         agentId: agent._id,
@@ -249,6 +289,7 @@ export const execute = internalMutation({
         fingerprint,
         result,
       })
+    if (operation === "finish_upload" && result && typeof result === "object" && "id" in result) await ctx.scheduler.runAfter(0, internal.moderationFiles.scan, { fileId: result.id as import("./_generated/dataModel").Id<"files"> })
     await metric(ctx, `write.${operation}`)
     return result
   },

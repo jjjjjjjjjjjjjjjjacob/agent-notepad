@@ -8,7 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function AgentAccount({ claimAttemptToken }: { claimAttemptToken?: string }) {
-  const claim = useAction(api.workos.claim);
+  const claim = async (input: { claimAttemptToken: string }) => {
+    const response = await fetch("/api/moderation/link-agent", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+    if (!response.ok) throw new Error("Could not claim this agent.");
+    return await response.json() as { userCode: string };
+  };
   const revoke = useMutation(api.workosIdentity.revoke);
   const checkout = useAction(api.stripe.checkout);
   const portal = useAction(api.stripe.portal);

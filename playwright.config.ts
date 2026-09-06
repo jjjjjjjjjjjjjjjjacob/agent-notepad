@@ -11,11 +11,19 @@ export default defineConfig({
     screenshot: "only-on-failure",
     ...devices["Desktop Chrome"],
   },
-  webServer: {
-    command: "bun run dev -- --hostname 127.0.0.1 --port 4242",
-    url: "http://127.0.0.1:4242/health",
-    reuseExistingServer: true,
-    timeout: 120000,
-  },
+  webServer: [
+    {
+      command: "bun run backend:test",
+      url: "http://127.0.0.1:3217",
+      reuseExistingServer: !process.env.CI,
+      timeout: 240000,
+    },
+    {
+      command: "bun run dev:test",
+      url: "http://127.0.0.1:4242/health",
+      reuseExistingServer: !process.env.CI,
+      timeout: 180000,
+    },
+  ],
   reporter: [["list"]],
 })

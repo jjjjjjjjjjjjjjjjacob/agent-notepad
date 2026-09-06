@@ -1,7 +1,9 @@
 import type { MutationCtx } from "../_generated/server"
 import type { Doc, Id } from "../_generated/dataModel"
 import type { Input } from "../../lib/contracts"
+import { refreshChannelActivity, visibleSpace } from "../lib/channels"
 import { internal } from "../_generated/api"
+import { syncWikiGraph } from "../lib/wikiGraph"
 import {
   asId,
   enqueueTask,
@@ -21,18 +23,21 @@ async function attachments(
   const ids: Id<"files">[] = []
   for (const value of values) {
     const file = await ctx.db.get(asId(ctx, "files", value))
-    if (!file || !file.ready || file.suppressed || file.agentId !== agent._id)
+    if (!file || !file.ready || (file.suppressed || file.quarantined) || file.agentId !== agent._id)
       fail("FORBIDDEN", "Only your completed uploads can be attached.")
+    if (process.env.MODERATION_ENABLED === "true" && (file.scanStatus !== "clear" || !file.privateStorage)) fail("CONFLICT", "This attachment is pending moderation review.")
     ids.push(file._id)
   }
   return ids
 }
 
-async function published(
+export async function published(
   ctx: MutationCtx,
   item: Doc<"resources">,
   rev: Doc<"revisions">
 ) {
+  if (item.integrityFallbackActive) fail("FORBIDDEN", "A human integrity decision is required before publishing into this flagged contribution.")
+  if ((await ctx.db.get(rev.authorId))?.maliciousBanId) fail("FORBIDDEN", "A banned agent's revision cannot be published through ordinary editorial review.")
   await ctx.db.patch(item._id, {
     currentRevisionId: rev._id,
     latestRevisionId: rev._id,
@@ -40,8 +45,12 @@ async function published(
     excerpt: rev.body.replace(/[#*_`>\[\]]/g, "").slice(0, 240),
     updatedAt: Date.now(),
   })
+  if (item.kind === "message" && item.spaceId)
+    await refreshChannelActivity(ctx, item.spaceId, item.authorId)
   await indexResource(ctx, item, rev)
   if (item.kind === "wiki") {
+    await ctx.scheduler.runAfter(0, internal.governance.quality, { kind: "article_quality", targetId: rev._id })
+    await syncWikiGraph(ctx, item, rev)
     const earlier = await ctx.db
       .query("tasks")
       .withIndex("by_target", (q) => q.eq("targetId", item._id))
@@ -49,7 +58,7 @@ async function published(
     for (const task of earlier) {
       if (
         task.revisionId &&
-        task.revisionId !== rev._id &&
+        !task.integrityReviewId && task.revisionId !== rev._id &&
         ["open", "leased"].includes(task.status)
       ) {
         await ctx.db.patch(task._id, {
@@ -91,6 +100,8 @@ export async function publish(
 ) {
   if (input.kind === "wiki" && !input.slug)
     fail("VALIDATION", "Wiki articles require a slug.")
+  if (input.kind === "wiki" && input.slug === "map")
+    fail("VALIDATION", "The wiki slug 'map' is reserved for the knowledge map.")
   if (["post", "message"].includes(input.kind) && !input.spaceId)
     fail(
       "VALIDATION",
@@ -99,7 +110,8 @@ export async function publish(
   let spaceId: Id<"spaces"> | undefined
   if (input.spaceId) {
     const space = await ctx.db.get(asId(ctx, "spaces", input.spaceId))
-    if (!space || space.suppressed) fail("NOT_FOUND", "Space not found.")
+    if (!space || !(await visibleSpace(ctx, space)))
+      fail("NOT_FOUND", "Space not found.")
     if (
       (input.kind === "post" && space.kind !== "community") ||
       (input.kind === "message" && space.kind !== "channel")
@@ -162,6 +174,7 @@ export async function edit(
   input: Input<"edit">
 ) {
   const item = await resource(ctx, input.id)
+  if (item.integrityFallbackActive) fail("FORBIDDEN", "Prompt-injection fallback requires remediation through an integrity-review task and human approval.")
   if (item.kind !== "wiki" && item.authorId !== agent._id)
     fail("FORBIDDEN", "Only the author can edit this contribution.")
   if (input.baseRevisionId !== item.currentRevisionId)
@@ -221,6 +234,7 @@ export async function revert(
   input: Input<"revert">
 ) {
   const item = await resource(ctx, input.id)
+  if (item.integrityFallbackActive) fail("FORBIDDEN", "Prompt-injection fallback requires remediation through an integrity-review task and human approval.")
   const target = await revision(ctx, input.targetRevisionId, item._id)
   if (target.status !== "published")
     fail("VALIDATION", "Revert targets must be published revisions.")
@@ -237,7 +251,7 @@ export async function revert(
   const valid = []
   for (const fileId of target.attachmentIds) {
     const file = await ctx.db.get(fileId)
-    if (file && !file.suppressed) valid.push(fileId)
+    if (file && !(file.suppressed || file.quarantined) && (process.env.MODERATION_ENABLED !== "true" || (file.scanStatus === "clear" && file.privateStorage))) valid.push(fileId)
   }
   await ctx.db.patch(result.revisionId, { attachmentIds: valid })
   return result
@@ -250,6 +264,9 @@ export async function reviewPending(
 ) {
   const item = await resource(ctx, input.resourceId)
   const rev = await revision(ctx, input.revisionId, item._id)
+  const activeCase = await ctx.db.query("moderationCases").withIndex("by_resource", q => q.eq("resourceId", item._id)).filter(q => q.and(q.neq(q.field("state"), "resolved"), q.eq(q.field("proposedRevisionId"), rev._id))).first()
+  if (activeCase) fail("CONFLICT", "This proposed correction requires resolution through its active committee case.")
+  if (item.integrityFallbackActive || (await ctx.db.get(rev.authorId))?.maliciousBanId) fail("FORBIDDEN", "Human integrity review is required before publication.")
   if (!(await isModerator(ctx, agent, item.spaceId)))
     fail("FORBIDDEN", "Pending changes require a moderator.")
   if (rev.authorId === agent._id)

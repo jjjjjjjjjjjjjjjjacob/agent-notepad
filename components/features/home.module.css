@@ -1,0 +1,467 @@
+.home {
+  width: 100%;
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: 32px;
+}
+.hero {
+  padding: 6px 0 30px;
+}
+.hero h1 {
+  font-family: var(--font-heading), sans-serif;
+  font-size: 44px;
+  line-height: 1.14;
+  font-weight: 750;
+  letter-spacing: -0.055em;
+  text-wrap: initial;
+}
+.hero h1 span {
+  display: block;
+  color: var(--link-color);
+}
+.hero > p {
+  max-width: 580px;
+  margin-top: 14px;
+  color: var(--muted-foreground);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px 24px;
+  margin-top: 20px;
+  font-size: 14px;
+}
+.explore {
+  font-weight: 600;
+  color: var(--link-color);
+}
+.onboarding {
+  flex: 1;
+  min-width: 180px;
+}
+.onboarding > summary {
+  cursor: pointer;
+  color: var(--muted-foreground);
+  width: fit-content;
+}
+.onboarding > summary:hover {
+  color: var(--foreground);
+}
+.onboarding[open] {
+  flex-basis: 100%;
+}
+.onboarding > section {
+  margin-top: 12px;
+  max-width: 700px;
+}
+.sectionHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 30px;
+}
+.sectionHeading h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-family: var(--font-heading), sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.sectionHeading > div {
+  display: flex;
+  gap: 18px;
+}
+.sectionHeading a {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.sectionHeading a:hover {
+  color: var(--link-color);
+}
+.wiki {
+  border-block: 1px solid var(--border);
+  padding: 18px 0 22px;
+}
+.wikiGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  margin-top: 15px;
+}
+.wikiGrid article + article {
+  border-left: 1px solid var(--border);
+  padding-left: 22px;
+}
+.topic {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+.wikiGrid h3 {
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.3;
+  font-family: var(--font-heading), sans-serif;
+}
+.wikiGrid h3 a:hover,
+.post h3 a:hover {
+  color: var(--link-color);
+}
+.wikiGrid p {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 7px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 9px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+.wikiGrid .meta {
+  margin-top: 12px;
+  font-size: 11px;
+}
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  align-items: start;
+  gap: 28px;
+  margin-top: 28px;
+}
+.discussions {
+  min-width: 0;
+}
+.feedHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.feedHeading h2 {
+  font-family: var(--font-heading), sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  scroll-margin-top: 120px;
+}
+.sort {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  font-size: 12px;
+}
+.sort a {
+  padding: 4px 11px;
+  border-radius: 4px;
+  color: var(--muted-foreground);
+}
+.sort a[aria-current="page"] {
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+  font-weight: 600;
+}
+.updates {
+  height: 32px;
+}
+.updates > div {
+  height: 32px;
+  display: flex;
+  align-items: center;
+}
+.post {
+  display: flex;
+  align-items: start;
+  gap: 16px;
+  padding: 23px 0;
+  border-bottom: 1px solid var(--border);
+}
+.score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 30px;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  padding-top: 2px;
+}
+.score span {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.postBody {
+  min-width: 0;
+}
+.post h3 {
+  margin-top: 8px;
+  font-family: var(--font-heading), sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.communityName {
+  color: var(--link-color);
+  font-weight: 600;
+}
+.excerpt {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 9px;
+  color: var(--muted-foreground);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.postFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.postFooter a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.postFooter a:hover {
+  color: var(--link-color);
+}
+.notice {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+.rail {
+  min-width: 0;
+  display: grid;
+  gap: 24px;
+}
+.activity,
+.communities {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.rail .sectionHeading {
+  padding: 13px 15px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.rail .sectionHeading h2 {
+  font-size: 13px;
+}
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.live > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+.live[data-connected="true"] > span {
+  background: var(--success-color);
+}
+.activityWindow {
+  height: 350px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.activity ul,
+.communities ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.activity li {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--border);
+}
+.eventMarker {
+  flex-shrink: 0;
+  margin-top: 6px;
+  width: 5px;
+  height: 5px;
+  background: var(--border);
+  border-radius: 50%;
+}
+.activity li p {
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  color: var(--muted-foreground);
+}
+.activity li a {
+  color: var(--link-color);
+}
+.activity li .actor {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.activity time {
+  display: block;
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.railFooter {
+  display: block;
+  border-top: 1px solid var(--border);
+  padding: 10px 15px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.railFooter:hover {
+  color: var(--link-color);
+  background: var(--card);
+}
+.communities li > a {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 15px;
+}
+.communities li > a:hover {
+  background: var(--card);
+}
+.communityIcon {
+  flex-shrink: 0;
+}
+.communities li > a > span:last-child {
+  min-width: 0;
+}
+.communities strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+.communities li > a > span > span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.empty {
+  padding: 24px 0;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.empty h3 {
+  color: var(--foreground);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.empty a {
+  color: var(--link-color);
+}
+.rail .empty {
+  padding: 20px 15px;
+}
+.pagination {
+  display: flex;
+  gap: 20px;
+  padding: 20px 0;
+  color: var(--link-color);
+  font-size: 14px;
+}
+@media (max-width: 1199px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 767px) {
+  .home {
+    padding: 24px 16px;
+  }
+  .hero {
+    padding-top: 0;
+    padding-bottom: 24px;
+  }
+  .hero h1 {
+    font-size: 34px;
+  }
+  .hero > p {
+    font-size: 15px;
+  }
+  .wikiGrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .wikiGrid article + article {
+    padding: 16px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+  .wikiGrid .meta {
+    margin-top: 8px;
+  }
+  .sectionHeading {
+    flex-wrap: wrap;
+  }
+  .sectionHeading > div {
+    gap: 12px;
+  }
+  .rail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .post {
+    gap: 10px;
+    padding: 20px 0;
+  }
+  .post h3 {
+    font-size: 18px;
+  }
+  .score {
+    width: 22px;
+  }
+}

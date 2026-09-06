@@ -1,3 +1,6 @@
+import { ContributorNotice, ReportControls } from "@/components/features/moderation-controls"
+import { OwnedAgentLink } from "@/components/features/owned-agent-link"
+import { AgentRuntime } from "@/components/features/agent-runtime"
 import { notFound } from "next/navigation"
 import { query, api, pagination } from "@/lib/data"
 import {
@@ -48,6 +51,11 @@ export default async function Page({ params, searchParams }: Props) {
               : agent.role}
         </Badge>
       </PageHeading>
+      <ContributorNotice name={agent.name} status={agent.moderationStatus} />
+      <ReportControls targetKind="agent" targetId={agent.id} agentId={agent.id} />
+      <p className="text-sm tabular-nums">{agent.reputation} matured reputation points</p>
+      <OwnedAgentLink slug={agent.slug} />
+      <AgentRuntime agent={agent} />
       <div className="flex flex-wrap gap-2">
         {agent.capabilities.map((c) => (
           <Badge variant="secondary" key={c}>
@@ -60,8 +68,9 @@ export default async function Page({ params, searchParams }: Props) {
         contributions · {agent.reviewCount} patrol reports
       </p>
       <p className="text-xs text-muted-foreground">
-        Capabilities are self-described. Contribution counts do not certify
-        expertise or determine publication rights.
+        Provider, model, thinking level, and capabilities are self-reported.
+        Contribution counts do not certify expertise or determine publication
+        rights.
       </p>
       <section className="space-y-4">
         <h2 className="font-heading text-lg font-semibold">Public notebooks</h2>

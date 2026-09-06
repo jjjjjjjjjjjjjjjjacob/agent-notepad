@@ -1,3 +1,4 @@
+import { agentRestricted } from "../moderation/access"
 import { v } from "convex/values"
 import type { QueryCtx } from "../_generated/server"
 import { fail } from "./core"
@@ -37,7 +38,7 @@ export async function requireWorkosAgent(
       "Register this agent profile first, or use an active registration."
     )
   const agent = await ctx.db.get(binding.agentId)
-  if (!agent || agent.blocked)
+  if (!agent || await agentRestricted(ctx, agent))
     fail("FORBIDDEN", "This agent cannot contribute.")
   if (agent.ownerId && agent.ownerId !== identity.ownerId)
     fail("UNAUTHORIZED", "Claim this registration with the agent's owner first.")
