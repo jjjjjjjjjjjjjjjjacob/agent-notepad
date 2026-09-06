@@ -366,55 +366,33 @@ describe("Place feature flag", () => {
     ).rejects.toThrow("Place is not enabled.")
   })
   it("rejects unsupported-mode forfeiture auctions before receipts or scheduling", async () => {
-    const t = setup(),
-      seller = await actor(t)
+    const t = setup(), seller = await actor(t)
     await advance(t, (await proposal(t, seller, [81])).id)
     const { admin, banId } = await confirmBan(t, seller)
     await fanout(t, banId)
-    const lot = await t.run((ctx) => ctx.db.query("placeForfeitures").first())
-    const before = await t.run(async (ctx) => ({
+    const lot = await t.run(ctx => ctx.db.query("placeForfeitures").first())
+    const before = await t.run(async ctx => ({
       deals: (await ctx.db.query("placeDeals").collect()).length,
       receipts: (await ctx.db.query("placeHumanReceipts").collect()).length,
-      scheduled: (await ctx.db.system.query("_scheduled_functions").collect())
-        .length,
+      scheduled: (await ctx.db.system.query("_scheduled_functions").collect()).length,
     }))
     vi.stubEnv("PLACE_MODE", "live")
-    await expect(
-      admin.client.mutation(api.integrity.auctionLot, {
-        lotId: lot!._id,
-        title: "Unsupported auction",
-        priceCents: 1000,
-        durationMs: 300_000,
-        idempotencyKey: "unsupported-lot",
-      })
-    ).rejects.toThrow(/disabled/)
-    expect(
-      await t.run(async (ctx) => ({
-        deals: (await ctx.db.query("placeDeals").collect()).length,
-        receipts: (await ctx.db.query("placeHumanReceipts").collect()).length,
-        scheduled: (await ctx.db.system.query("_scheduled_functions").collect())
-          .length,
-      }))
-    ).toEqual(before)
+    await expect(admin.client.mutation(api.integrity.auctionLot, {
+      lotId: lot!._id, title: "Unsupported auction", priceCents: 1000,
+      durationMs: 300_000, idempotencyKey: "unsupported-lot",
+    })).rejects.toThrow(/disabled/)
+    expect(await t.run(async ctx => ({
+      deals: (await ctx.db.query("placeDeals").collect()).length,
+      receipts: (await ctx.db.query("placeHumanReceipts").collect()).length,
+      scheduled: (await ctx.db.system.query("_scheduled_functions").collect()).length,
+    }))).toEqual(before)
     vi.stubEnv("PLACE_MODE", "sandbox")
-    const request = {
-      lotId: lot!._id,
-      title: "Supported auction",
-      priceCents: 1000,
-      durationMs: 300_000,
-      idempotencyKey: "supported-lot",
-    }
-    const created = await admin.client.mutation(
-      api.integrity.auctionLot,
-      request
-    )
-    expect(
-      await admin.client.mutation(api.integrity.auctionLot, request)
-    ).toEqual(created)
+    const request = { lotId: lot!._id, title: "Supported auction", priceCents: 1000,
+      durationMs: 300_000, idempotencyKey: "supported-lot" }
+    const created = await admin.client.mutation(api.integrity.auctionLot, request)
+    expect(await admin.client.mutation(api.integrity.auctionLot, request)).toEqual(created)
     vi.stubEnv("PLACE_MODE", "live")
-    await expect(
-      admin.client.mutation(api.integrity.auctionLot, request)
-    ).rejects.toThrow(/disabled/)
+    await expect(admin.client.mutation(api.integrity.auctionLot, request)).rejects.toThrow(/disabled/)
   })
 })
 
