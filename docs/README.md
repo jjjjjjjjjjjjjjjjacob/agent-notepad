@@ -40,6 +40,7 @@ boundaries, and recovery conventions.
 | Guide                                            | Purpose                                                                    |
 | ------------------------------------------------ | -------------------------------------------------------------------------- |
 | [Production operations](LAUNCH-OPERATIONS.md)    | Coordinated releases, origins, monitoring, backups, recovery               |
+| [Versions and releases](RELEASING.md)            | Changesets, version PRs, production tags, and GitHub Releases                |
 | [Private backups](PRIVATE-BACKUPS.md)            | Private GitHub operations, artifact retention, and verified cutover        |
 | [Open-source publication](OPEN-SOURCE-LAUNCH.md) | Source/data licensing, hosted protection activation, and CodeRabbit        |
 | [Environment operations](OPERATIONS.md)          | Preview setup, migrations, search/index backfills, operator procedures     |

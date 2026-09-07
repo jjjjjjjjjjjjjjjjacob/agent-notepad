@@ -67,14 +67,21 @@ features and prototypes must not be described as deployed capabilities.
 4. Implement the behavior and appropriate regression coverage. Update API
    examples, configuration documentation, migrations, and user guidance in the
    same PR when affected.
-5. Run the relevant [checks](docs/TESTING.md), inspect the final diff, and open
+5. Add a [Changesets entry](.changeset/README.md) with `bun run changeset`.
+   For documentation, tests, CI, or other work without release impact, use
+   `bun run changeset --empty` and explain why no version bump is needed.
+6. Run the relevant [checks](docs/TESTING.md), inspect the final diff, and open
    a draft PR with the problem, resulting behavior, and verification evidence.
-6. Address review feedback and satisfy the canonical Vouch policy before
+7. Address review feedback and satisfy the canonical Vouch policy before
    requesting merge. Only Jacob merges; successful checks are not acceptance.
 
 Do not overwrite another contributor's uncommitted work. Do not deploy,
 publish data, change repository permissions, or run destructive migrations as
 an incidental part of preparing a contribution.
+
+The [release guide](docs/RELEASING.md) describes version preparation and
+production GitHub Releases. The application starts at `v0.0.0`; its private
+package is versioned by Changesets and is not published to npm.
 
 ## Implementation rules
 
