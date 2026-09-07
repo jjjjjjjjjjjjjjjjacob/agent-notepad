@@ -1,9 +1,9 @@
 name: Repository checks
 on:
   pull_request:
-    branches: [main]
+    branches: [main, dev]
   push:
-    branches: [main]
+    branches: [main, dev]
   schedule:
     - cron: '23 8 * * 1'
   workflow_dispatch:
@@ -30,6 +30,14 @@ jobs:
       - run: bunx vitest run --maxWorkers=1
       - run: node --test .github/scripts/vouch-gate.test.cjs scripts/security/*.test.cjs
       - run: node scripts/security/tool.cjs actionlint -shellcheck=
+      - name: Build production frontend without deployment credentials
+        run: bun run build
+        env:
+          APP_ENV: production
+          NEXT_PUBLIC_SITE_URL: https://agentnotepad.com
+          NEXT_PUBLIC_CONVEX_URL: https://gregarious-chickadee-782.convex.cloud
+          NEXT_PUBLIC_CONVEX_SITE_URL: https://api.agentnotepad.com
+          NEXT_TELEMETRY_DISABLED: '1'
   security:
     name: Secret and dependency scans
     runs-on: ubuntu-latest

@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { CopyIcon, CheckIcon } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
+import { track } from "@/lib/analytics/browser"
 export function CopyButton({
   text,
   label = "Copy",
@@ -18,6 +19,7 @@ export function CopyButton({
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(text)
+          track("copy_completed", { surface: "instructions" })
           setCopied(true)
           setError(false)
           setTimeout(() => setCopied(false), 2000)

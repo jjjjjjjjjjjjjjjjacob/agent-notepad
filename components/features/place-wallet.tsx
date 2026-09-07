@@ -1,4 +1,6 @@
 "use client"
+import { attempt } from "@/lib/effects"
+import { useEffectAction, useIdempotentMutation } from "@/lib/use-effect-action"
 import Link from "next/link"
 import { PageHeading } from "@/components/design-system/headings"
 import { useState } from "react"
@@ -19,7 +21,7 @@ export function PlaceWallet() {
     isAuthenticated ? {} : "skip"
   )
   const agents = useQuery(api.auth.linkedAgents, isAuthenticated ? {} : "skip")
-  const manage = useMutation(api.placeWallet.manage)
+  const manage = useIdempotentMutation(useMutation(api.placeWallet.manage))
   const [kind, setKind] = useState<"deposit" | "withdrawal">("deposit")
   const [dollars, setDollars] = useState("100")
   const cents = Math.round(Number(dollars) * 100)
@@ -34,22 +36,13 @@ export function PlaceWallet() {
   )
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState("")
-  async function perform(action: () => Promise<unknown>) {
-    setBusy(true)
-    setMessage("")
-    try {
-      await action()
-      setMessage("Sandbox request recorded.")
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Request failed. Please try again."
-      )
-    } finally {
-      setBusy(false)
-    }
-  }
+  const runAction = useEffectAction()
+  const perform = (action: () => Promise<unknown>) =>
+    runAction(attempt(action), {
+      setBusy,
+      setError: setMessage,
+      onSuccess: () => setMessage("Sandbox request recorded."),
+    })
   return (
     <div className={styles.wallet}>
       <PageHeading
@@ -102,7 +95,6 @@ export function PlaceWallet() {
                       operation: kind,
                       amountCents: quote.amountCents,
                       quotedFeeCents: quote.feeCents,
-                      idempotencyKey: crypto.randomUUID(),
                     })
                   )
               }}
@@ -200,7 +192,6 @@ export function PlaceWallet() {
                                         operation: "budget_manager",
                                         agentId: agent.id,
                                         enabled: event.target.checked,
-                                        idempotencyKey: crypto.randomUUID(),
                                       })
                                     )
                                   }
@@ -225,7 +216,6 @@ export function PlaceWallet() {
                         amountCents: Math.round(
                           Number(data.get("amount")) * 100
                         ),
-                        idempotencyKey: crypto.randomUUID(),
                       })
                     )
                   }}

@@ -1,3 +1,4 @@
+import { appError } from "./errors"
 import type {
   AgentCredentialValidation,
   AgentRegistration,
@@ -25,7 +26,7 @@ export function validatedAgentClaims(
 ) {
   const parsed = claimsSchema.safeParse(validation.claims)
   if (!validation.valid || !parsed.success)
-    throw new Error("Invalid agent token.")
+    throw appError("UNAUTHORIZED", "Invalid agent token.")
   const claims = parsed.data
   const audiences = Array.isArray(claims.audience)
     ? claims.audience
@@ -40,13 +41,16 @@ export function validatedAgentClaims(
     claims.issuedAt * 1000 > now + 60_000 ||
     !["unverified", "verified"].includes(registration.status)
   )
-    throw new Error("Invalid agent token.")
+    throw appError("UNAUTHORIZED", "Invalid agent token.")
   const claimedUser = registration.agentIdentity.userlandUserId
   if (registration.status === "verified") {
     if (!claimedUser || claims.actor?.sub !== claimedUser)
-      throw new Error("Refresh the agent token after claiming it.")
+      throw appError(
+        "UNAUTHORIZED",
+        "Refresh the agent token after claiming it."
+      )
   } else if (claims.actor || claimedUser)
-    throw new Error("Invalid agent claim state.")
+    throw appError("UNAUTHORIZED", "Invalid agent claim state.")
   return {
     registrationId: claims.registrationId,
     scopes: [...new Set((claims.scope ?? "").split(/\s+/).filter(Boolean))],

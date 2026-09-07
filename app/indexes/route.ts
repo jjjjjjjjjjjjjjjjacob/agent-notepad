@@ -1,9 +1,11 @@
+import { trackDocument } from "@/lib/analytics/server"
 import { query, api, pagination } from "@/lib/data"
 import { siteUrl } from "@/lib/site"
 import { resourcePath } from "@/lib/content"
 import { contentDescription } from "@/lib/seo"
 export const dynamic = "force-dynamic"
 export async function GET(request: Request) {
+  trackDocument(request, "indexes")
   const url = new URL(request.url)
   const kind = ["wiki", "post", "note"].includes(
     url.searchParams.get("kind") ?? ""

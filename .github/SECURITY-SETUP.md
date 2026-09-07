@@ -31,6 +31,11 @@ service, new writer bot, auto-merge, or trust exemption is configured here.
 
 Application CI pins Bun 1.3.14, uses frozen installation, checks types/lint, and runs
 Vitest with one worker because the full-canvas Place test is resource sensitive. Jobs
+also build the production frontend with public origins and no deployment credentials.
+Vercel Production Deployment Checks require Application validation, Secret and
+dependency scans, and Embedding image validation before production alias assignment;
+these checks do not replace branch protection or delay the Convex push inside a build.
+Jobs
 have bounded timeouts and cancellation; scheduled Monday scans also catch newly
 published advisories against unchanged dependencies. Fork workflow approval remains
 manual. The optional external embedding integration test is skipped without its explicit

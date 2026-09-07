@@ -1,3 +1,4 @@
+import { appError } from "../lib/errors"
 /// <reference types="vite/client" />
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest"
 import { convexTest } from "convex-test"
@@ -15,11 +16,19 @@ import { readSchemas } from "../lib/read-contracts"
 import { digest } from "../lib/hash"
 import { EMBEDDING_MODEL } from "../lib/embedding-config"
 
-vi.mock("../lib/embeddings", () => ({
-  embeddingsConfigured: vi.fn(() => false),
-  embed: vi.fn(),
-  embedMany: vi.fn(),
-}))
+vi.mock("../lib/embeddings", async () => {
+  const { attempt } = await import("../lib/effects")
+  const embed = vi.fn(),
+    embedMany = vi.fn()
+  return {
+    embeddingsConfigured: vi.fn(() => false),
+    embed,
+    embedMany,
+    embedEffect: (text: string) => attempt(() => embed(text)),
+    embedManyEffect: (texts: string[], kind: string) =>
+      attempt(() => embedMany(texts, kind)),
+  }
+})
 const modules = import.meta.glob("../convex/**/*.ts")
 const setup = () => convexTest(schema, modules)
 type Test = ReturnType<typeof setup>
@@ -326,7 +335,7 @@ describe("semantic retrieval and indexing", () => {
       a = await writer(t)
     await publish(t, a.token, "Capybara habitat wetlands.", "capybara")
     vi.mocked(embeddingsConfigured).mockReturnValue(true)
-    vi.mocked(embed).mockRejectedValue(new Error("Provider down"))
+    vi.mocked(embed).mockRejectedValue(appError("UNAVAILABLE", "Provider down"))
     const result = await t.action(api.semantic.retrieve, {
       query: "capybara",
       queries: ["habitat", "capybara"],
@@ -473,5 +482,101 @@ describe("semantic retrieval and indexing", () => {
     expect(
       (await t.mutation(internal.jobs.start, { jobId: job!._id }))?.chunks
     ).toHaveLength(1)
+  })
+})
+
+describe("Effect job recovery", () => {
+  async function embeddingJob(t: Test) {
+    const owner = await writer(t)
+    const article = await publish(
+      t,
+      owner.token,
+      "Capybaras eat grasses.",
+      "effect-job"
+    )
+    const job = await t.run(async (ctx) =>
+      (await ctx.db.query("jobs").collect()).find(
+        (job) => job.resourceId === article.id && job.kind === "embedding"
+      )
+    )
+    if (!job) throw new Error("Missing fixture job")
+    vi.mocked(embeddingsConfigured).mockReturnValue(true)
+    return job._id
+  }
+  it.each([
+    ["NOT_CONFIGURED", "blocked"],
+    ["BAD_GATEWAY", "failed"],
+    ["VALIDATION", "failed"],
+  ] as const)("records %s as %s without retrying", async (code, status) => {
+    const t = setup(),
+      jobId = await embeddingJob(t)
+    vi.mocked(embedMany).mockRejectedValue(
+      appError(code, "Safe fixture failure")
+    )
+    await t.action(internal.background.run, { jobId })
+    expect(await t.run((ctx) => ctx.db.get(jobId))).toMatchObject({
+      status,
+      attempts: 1,
+      error: "Safe fixture failure",
+    })
+    vi.setSystemTime(Date.now() + 3_600_000)
+    await t.action(internal.background.run, { jobId })
+    expect(embedMany).toHaveBeenCalledOnce()
+  })
+  it("retains the existing four-attempt limit and durable delays for transient failures", async () => {
+    const t = setup(),
+      jobId = await embeddingJob(t)
+    vi.mocked(embedMany).mockRejectedValue(
+      appError("UNAVAILABLE", "Provider unavailable")
+    )
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      await t.action(internal.background.run, { jobId })
+      const job = await t.run((ctx) => ctx.db.get(jobId))
+      expect(job).toMatchObject({
+        attempts: attempt,
+        status: attempt < 4 ? "retry" : "failed",
+      })
+      await t.action(internal.background.run, { jobId })
+      expect(embedMany).toHaveBeenCalledTimes(attempt)
+      vi.setSystemTime(job!.nextAt)
+    }
+    await t.action(internal.background.run, { jobId })
+    expect(embedMany).toHaveBeenCalledTimes(4)
+  })
+  it("records a defect as terminal and propagates a sanitized action failure", async () => {
+    const t = setup(),
+      jobId = await embeddingJob(t)
+    vi.mocked(embedMany).mockRejectedValue(
+      new TypeError("private programmer detail")
+    )
+    const log = vi.spyOn(console, "error").mockImplementation(() => {})
+    try {
+      await expect(
+        t.action(internal.background.run, { jobId })
+      ).rejects.toThrow("The request could not be completed")
+      const job = await t.run((ctx) => ctx.db.get(jobId))
+      expect(job).toMatchObject({ status: "failed", attempts: 1 })
+      expect(JSON.stringify(job)).not.toContain("private programmer detail")
+      expect(JSON.stringify(log.mock.calls)).not.toContain(
+        "private programmer detail"
+      )
+    } finally {
+      log.mockRestore()
+    }
+  })
+  it("does not disguise semantic programming defects as keyword fallback", async () => {
+    const t = setup()
+    vi.mocked(embeddingsConfigured).mockReturnValue(true)
+    vi.mocked(embedMany).mockRejectedValue(
+      new TypeError("private programmer detail")
+    )
+    const log = vi.spyOn(console, "error").mockImplementation(() => {})
+    try {
+      await expect(
+        t.action(api.semantic.retrieve, { query: "capybara" })
+      ).rejects.toThrow("The request could not be completed")
+    } finally {
+      log.mockRestore()
+    }
   })
 })

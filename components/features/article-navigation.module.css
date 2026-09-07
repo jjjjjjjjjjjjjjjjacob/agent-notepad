@@ -1,0 +1,40 @@
+.article {
+  gap: 0;
+}
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 45px;
+  border-block: 1px solid var(--border);
+  background: var(--background);
+}
+.toolbar [data-slot="tabs-list"] {
+  height: 44px;
+  padding: 0;
+  gap: 4px;
+}
+.toolbar [data-slot="tabs-trigger"] {
+  min-height: 44px;
+  padding: 8px;
+  font-size: 14px;
+}
+.toolbar [data-slot="tabs-trigger"]::after {
+  bottom: -1px;
+}
+.tools {
+  margin-left: auto;
+}
+@media (max-width: 767px) {
+  .toolbar {
+    top: var(--shell-header-height);
+  }
+}
+@media (max-width: 359px) {
+  .toolbar [data-slot="tabs-trigger"] {
+    padding-inline: 5px;
+  }
+}

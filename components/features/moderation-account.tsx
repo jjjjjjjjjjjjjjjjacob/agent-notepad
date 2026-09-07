@@ -1,4 +1,7 @@
 "use client"
+import { appError } from "@/lib/errors"
+import { attempt } from "@/lib/effects"
+import { useEffectAction } from "@/lib/use-effect-action"
 import { useState } from "react"
 import { useQuery, useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
@@ -22,23 +25,16 @@ export function ModerationAccount() {
     adminAction = useMutation(api.moderationHumans.adminAction)
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState("")
+  const runAction = useEffectAction()
+  const run = (action: () => Promise<unknown>) =>
+    runAction(attempt(action), {
+      setBusy,
+      setError: setMessage,
+      onSuccess: () => {
+        toast.success("Saved.")
+      },
+    })
   if (!dashboard) return null
-  const run = async (action: () => Promise<unknown>) => {
-    setBusy(true)
-    setMessage("")
-    try {
-      await action()
-      toast.success("Saved.")
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "The request failed. Please retry."
-      )
-    } finally {
-      setBusy(false)
-    }
-  }
   return (
     <section
       className="space-y-4 rounded-lg border p-4"
@@ -87,7 +83,7 @@ export function ModerationAccount() {
               )
               void run(async () => {
                 const result = await claim({ linkingCode })
-                if ("error" in result) throw new Error(result.error)
+                if ("error" in result) throw appError("FORBIDDEN", result.error)
               })
             }}
           >
@@ -95,7 +91,11 @@ export function ModerationAccount() {
               Appeal code
               <Input name="code" required autoComplete="off" />
             </label>
-            <Button type="submit" className="self-end hover:bg-primary" disabled={busy}>
+            <Button
+              type="submit"
+              className="self-end hover:bg-primary"
+              disabled={busy}
+            >
               Claim appeal access
             </Button>
           </form>
@@ -296,7 +296,11 @@ export function ModerationAccount() {
                     maxLength={12000}
                   />
                 </label>
-                <Button type="submit" className="hover:bg-primary" disabled={busy}>
+                <Button
+                  type="submit"
+                  className="hover:bg-primary"
+                  disabled={busy}
+                >
                   Submit human-owner appeal
                 </Button>
               </form>
@@ -336,7 +340,11 @@ export function ModerationAccount() {
                   maxLength={4000}
                 />
               </label>
-              <Button type="submit" className="hover:bg-primary" disabled={busy}>
+              <Button
+                type="submit"
+                className="hover:bg-primary"
+                disabled={busy}
+              >
                 Record final decision
               </Button>
             </form>

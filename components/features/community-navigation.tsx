@@ -3,6 +3,7 @@ import { HashIcon, MagnifyingGlassIcon } from "@phosphor-icons/react/dist/ssr"
 import { query, api, pagination } from "@/lib/data"
 import type { Id } from "@/convex/_generated/dataModel"
 import styles from "./shell.module.css"
+import { SearchResultAnalytics } from "@/components/analytics/observer"
 
 export async function CommunityNavigation({
   communitySlug,
@@ -19,16 +20,21 @@ export async function CommunityNavigation({
   navcursor?: string
   view?: string
 }) {
-  const [community, channels] = await Promise.all([
-    query(api.public.getSpace, { slug: communitySlug }),
-    query(api.channels.list, {
-      community: communitySlug,
-      query: navq,
-      includeEmpty: true,
-      order: "name",
-      paginationOpts: pagination(navcursor, 20),
-    }),
-  ])
+  const {
+    result: [community, channels],
+    duration_ms,
+  } = await timedNavigation(
+    Promise.all([
+      query(api.public.getSpace, { slug: communitySlug }),
+      query(api.channels.list, {
+        community: communitySlug,
+        query: navq,
+        includeEmpty: true,
+        order: "name",
+        paginationOpts: pagination(navcursor, 20),
+      }),
+    ])
+  )
   if (!community || community.kind !== "community") return null
   const more = new URLSearchParams({
     navcursor: channels.cursor ?? "",
@@ -37,6 +43,18 @@ export async function CommunityNavigation({
   })
   return (
     <div className={styles.context}>
+      {!!navq?.trim() && (
+        <SearchResultAnalytics
+          surface="channel_navigation"
+          query_length={Math.min(navq.length, 300)}
+          has_community
+          include_empty
+          sort_order="name"
+          mode="keyword"
+          result_count={channels.items.length}
+          duration_ms={duration_ms}
+        />
+      )}
       <p className={styles.contextTitle}>{community.name}</p>
       <nav aria-label="Community navigation">
         <Link
@@ -66,6 +84,7 @@ export async function CommunityNavigation({
         action={path}
         role="search"
         aria-label="Find community channels"
+        data-analytics-search-surface="channel_navigation"
         className={styles.channelSearch}
       >
         {view && <input type="hidden" name="view" value={view} />}
@@ -81,11 +100,14 @@ export async function CommunityNavigation({
         </button>
       </form>
       <nav aria-label="Community channels">
-        {channels.items.map((channel) => (
+        {channels.items.map((channel, index) => (
           <Link
             className={styles.navLink}
             key={channel.id}
             href={`/chat/${channel.slug}`}
+            data-analytics-search-surface="channel_navigation"
+            data-analytics-rank={navq?.trim() ? index + 1 : undefined}
+            data-analytics-resource-id={navq?.trim() ? channel.id : undefined}
             aria-current={channel.id === channelId ? "page" : undefined}
           >
             <HashIcon size={14} />
@@ -104,4 +126,8 @@ export async function CommunityNavigation({
       </Link>
     </div>
   )
+}
+async function timedNavigation<T>(request: Promise<T>) {
+  const started = Date.now()
+  return { result: await request, duration_ms: Date.now() - started }
 }

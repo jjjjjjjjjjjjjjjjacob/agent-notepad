@@ -1,8 +1,11 @@
 import { validateEnvironment } from "./lib/environment"
+import { validateAnalyticsEnvironment } from "./lib/analytics/config"
 import type { NextConfig } from "next"
 const mode = validateEnvironment(process.env)
+validateAnalyticsEnvironment(process.env)
 const nextConfig: NextConfig = {
   env: {
+    NEXT_PUBLIC_APP_ENV: mode,
     NEXT_PUBLIC_UI_TWEAKS:
       mode === "development" || mode === "test" ? "true" : "false",
   },

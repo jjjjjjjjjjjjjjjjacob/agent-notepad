@@ -90,6 +90,7 @@ export const finish = internalMutation({
     attempt: v.number(),
     error: v.optional(v.string()),
     blocked: v.optional(v.boolean()),
+    terminal: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId)
@@ -101,7 +102,7 @@ export const finish = internalMutation({
     }
     const status = args.blocked
       ? "blocked"
-      : job.attempts < 4
+      : !args.terminal && job.attempts < 4
         ? "retry"
         : "failed"
     const delay = Math.min(60_000 * 2 ** job.attempts, 30 * 60_000)
@@ -201,13 +202,14 @@ export const indexResult = internalMutation({
     ids: v.array(v.id("indexNotifications")),
     sentAt: v.number(),
     success: v.boolean(),
+    terminal: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     for (const id of args.ids) {
       const item = await ctx.db.get(id)
       if (item && item.updatedAt <= args.sentAt)
         await ctx.db.patch(id, {
-          status: args.success ? "sent" : "pending",
+          status: args.success ? "sent" : args.terminal ? "failed" : "pending",
           attempts: item.attempts + 1,
         })
     }

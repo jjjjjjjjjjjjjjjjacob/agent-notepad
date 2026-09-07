@@ -97,3 +97,28 @@ describe("API proxy with compressed upstream responses", () => {
     }
   )
 })
+
+it.each([
+  [new DOMException("private upstream detail", "TimeoutError"), 504, "TIMEOUT"],
+  [new TypeError("private connection detail"), 503, "UNAVAILABLE"],
+] as const)(
+  "normalizes gateway transport failures to %s",
+  async (failure, status, code) => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(failure)
+    try {
+      const response = await GET(
+        new Request("http://localhost/api/v1/resources")
+      )
+      expect(response.status).toBe(status)
+      expect(await response.json()).toMatchObject({ error: { code } })
+      expect(response.headers.get("Cache-Control")).toBe("no-store")
+    } finally {
+      fetch.mockRestore()
+    }
+  }
+)
+it("rejects a malformed URL path with a validation response", async () => {
+  const response = await GET(new Request("http://localhost/api/v1/%FF"))
+  expect(response.status).toBe(400)
+  expect((await response.json()).error.code).toBe("VALIDATION")
+})

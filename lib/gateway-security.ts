@@ -1,3 +1,4 @@
+import { appError } from "./errors"
 import ipaddr from "ipaddr.js"
 import { hmac } from "@noble/hashes/hmac.js"
 import { sha256 } from "@noble/hashes/sha2.js"
@@ -24,7 +25,7 @@ export function normalizeIp(value: string) {
     value.includes("%") ||
     !ipaddr.isValid(value.trim())
   )
-    throw new Error("Invalid trusted client IP")
+    throw appError("NOT_CONFIGURED", "Trusted client IP is unavailable.")
   return ipaddr.process(value.trim()).toString()
 }
 export function privateIpHash(value: string, secret: string) {
@@ -126,7 +127,10 @@ export async function boundedBody(
       size += value.length
       if (size > limit) {
         await reader.cancel()
-        throw new Error("Request exceeds 600 KB")
+        throw appError(
+          "PAYLOAD_TOO_LARGE",
+          "Request exceeds the body size limit."
+        )
       }
       chunks.push(value)
     }
@@ -136,5 +140,9 @@ export async function boundedBody(
     bytes.set(chunk, offset)
     offset += chunk.length
   }
-  return new TextDecoder("utf-8", { fatal: true }).decode(bytes)
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes)
+  } catch {
+    throw appError("VALIDATION", "Request body must contain valid UTF-8.")
+  }
 }

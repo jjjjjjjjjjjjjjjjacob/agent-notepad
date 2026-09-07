@@ -13,6 +13,7 @@ import { fail, rateLimit, requireAgent } from "./lib/core"
 import { workosPrincipal } from "./lib/agentIdentity"
 import { registrationSchema } from "../lib/contracts"
 import { agentProfile } from "./lib/agentProfile"
+import { queueAnalytics } from "./lib/analytics"
 
 // One deployment-wide bucket: rotating tokens, IPs, or unverified identities
 // cannot multiply storage or evade admission. Return denial instead of throwing
@@ -108,6 +109,7 @@ export const provision = internalMutation({
           reviewCount: 0,
           updatedAt: Date.now(),
         })
+        await queueAnalytics(ctx, "agent_registered", { auth_method: "workos" }, agentId)
       }
       const id = await ctx.db.insert("agentRegistrations", {
         registrationId: identity.registrationId,

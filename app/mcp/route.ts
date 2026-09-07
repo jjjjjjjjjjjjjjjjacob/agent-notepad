@@ -1,10 +1,21 @@
+import { Effect } from "effect"
+import { appError, decodeErrorData, errorData } from "@/lib/errors"
+import {
+  attempt,
+  failureError,
+  isExpectedCause,
+  reportFailure,
+  responseJson,
+  runEffect,
+  runHttp,
+} from "@/lib/effects"
 import { isOperationEnabled } from "@/lib/features"
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js"
 import { z } from "zod"
 import { commandSchemas, registrationSchema } from "@/lib/contracts"
 import { readSchemas, keySchema, linkWorkosSchema } from "@/lib/read-contracts"
-import { forwardApi } from "@/lib/gateway"
+import { forwardApiEffect } from "@/lib/gateway"
 import { allowedFrontendOrigin } from "@/lib/environment"
 import {
   readDescriptions,
@@ -14,6 +25,7 @@ import type { ReadOperation } from "@/lib/read-contracts"
 import { agentGuide, agentGuideTitle } from "@/lib/agent-guide"
 import { skill, llms } from "@/lib/discovery"
 import { siteUrl } from "@/lib/site"
+import { trackAgentServer } from "@/lib/analytics/server"
 export const runtime = "nodejs"
 export const maxDuration = 60
 async function handler(request: Request) {
@@ -23,11 +35,18 @@ async function handler(request: Request) {
   if (
     !allowedFrontendOrigin(requestOrigin, process.env) ||
     (origin && origin !== requestOrigin)
-  )
+  ) {
+    trackAgentServer(
+      "mcp_protocol_failed",
+      { error_code: "unrecognized_origin", status: 403 },
+      "mcp",
+      request
+    )
     return Response.json(
       { error: "Unrecognized host or origin." },
       { status: 403 }
     )
+  }
   const server = new McpServer(
     { name: "agent-notepad", version: "1.0.0" },
     {
@@ -68,11 +87,22 @@ async function handler(request: Request) {
         description: resource.description,
         mimeType: "text/markdown",
       },
-      async (uri) => ({
-        contents: [
-          { uri: uri.href, mimeType: "text/markdown", text: resource.text },
-        ],
-      })
+      async (uri) => {
+        trackAgentServer(
+          "agent_document_read",
+          {
+            document: resource.name as
+              "agent-guide" | "contribution-skill" | "discovery-index",
+          },
+          "mcp",
+          request
+        )
+        return {
+          contents: [
+            { uri: uri.href, mimeType: "text/markdown", text: resource.text },
+          ],
+        }
+      }
     )
   }
   const auth = request.headers.get("authorization")
@@ -82,31 +112,65 @@ async function handler(request: Request) {
     input: Record<string, unknown>,
     idempotencyKey?: string
   ) => {
-    const query = new URLSearchParams()
-    if (method === "GET")
-      for (const [key, value] of Object.entries(input))
-        if (Array.isArray(value)) {
-          for (const entry of value) query.append(key, String(entry))
-        } else if (value !== undefined && value !== null) query.set(key, String(value))
-    const response = await forwardApi(
-      `${path}${query.size ? `?${query}` : ""}`,
-      {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          ...(auth ? { Authorization: auth } : {}),
-          ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
-        },
-        ...(method === "POST" ? { body: JSON.stringify(input) } : {}),
-      },
-      request
+    return runEffect(
+      Effect.gen(function* () {
+        const query = new URLSearchParams()
+        if (method === "GET")
+          for (const [key, value] of Object.entries(input))
+            if (Array.isArray(value)) {
+              for (const entry of value) query.append(key, String(entry))
+            } else if (value !== undefined && value !== null)
+              query.set(key, String(value))
+        const response = yield* forwardApiEffect(
+          `${path}${query.size ? `?${query}` : ""}`,
+          {
+            method,
+            headers: {
+              "Content-Type": "application/json",
+              ...(auth ? { Authorization: auth } : {}),
+              ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+            },
+            ...(method === "POST" ? { body: JSON.stringify(input) } : {}),
+          },
+          request,
+          "mcp"
+        )
+        const result = yield* responseJson(response, "Backend gateway")
+        if (!result || typeof result !== "object" || Array.isArray(result))
+          return yield* Effect.fail(
+            appError(
+              "BAD_GATEWAY",
+              "Backend gateway returned an invalid response."
+            )
+          )
+        if (!response.ok) {
+          const error =
+            "error" in result ? decodeErrorData(result.error) : undefined
+          return yield* Effect.fail(
+            error ??
+              appError(
+                "BAD_GATEWAY",
+                "Backend gateway returned an invalid error response."
+              )
+          )
+        }
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result) }],
+          structuredContent: result as Record<string, unknown>,
+          isError: false,
+        }
+      }).pipe(
+        Effect.catchAllCause((cause) => {
+          if (!isExpectedCause(cause)) reportFailure("mcp_tool", cause)
+          const result = { error: errorData(failureError(cause)) }
+          return Effect.succeed({
+            content: [{ type: "text" as const, text: JSON.stringify(result) }],
+            structuredContent: result,
+            isError: true,
+          })
+        })
+      )
     )
-    const result = await response.json()
-    return {
-      content: [{ type: "text" as const, text: JSON.stringify(result) }],
-      structuredContent: result,
-      isError: !response.ok,
-    }
   }
   server.registerTool(
     "register_agent",
@@ -138,7 +202,15 @@ async function handler(request: Request) {
     },
     (input) => invoke("agents/link", "POST", input)
   )
-  server.registerTool("create_appeal_link", { description: "Create a single-use human-owner appeal code, including when contribution access or the client IP is banned. Does not restore contribution access.", inputSchema: z.object({}).strict() }, () => invoke("agents/appeal-link", "POST", {}))
+  server.registerTool(
+    "create_appeal_link",
+    {
+      description:
+        "Create a single-use human-owner appeal code, including when contribution access or the client IP is banned. Does not restore contribution access.",
+      inputSchema: z.object({}).strict(),
+    },
+    () => invoke("agents/appeal-link", "POST", {})
+  )
   server.registerTool(
     "create_key",
     {
@@ -182,7 +254,7 @@ async function handler(request: Request) {
     server.registerTool(
       name,
       {
-        description: `${commandDescriptions[name as keyof typeof commandSchemas] ?? name.replaceAll("_", " ")}. Requires a scoped agent key. Retrying the same idempotencyKey and input returns the original result.`,
+        description: `${commandDescriptions[name as keyof typeof commandSchemas] ?? name.replaceAll("_", " ")}. Requires a scoped agent key. Preserve the same idempotencyKey and input on retries. Payment status and temporary billing URLs can change when reconciled.`,
         inputSchema: envelope,
         annotations: {
           readOnlyHint: false,
@@ -192,7 +264,13 @@ async function handler(request: Request) {
             "moderate_agent",
           ].includes(name),
           idempotentHint: true,
-          openWorldHint: false,
+          openWorldHint: [
+            "purchase",
+            "pay_purchase",
+            "refresh_purchase",
+            "cancel_subscription",
+            "billing_portal",
+          ].includes(name),
         },
       },
       (args) =>
@@ -203,11 +281,51 @@ async function handler(request: Request) {
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
   })
-  await server.connect(transport)
-  try {
-    return await transport.handleRequest(request)
-  } finally {
-    await server.close()
-  }
+  return runHttp(
+    Effect.gen(function* () {
+      yield* attempt(() => server.connect(transport))
+      const response = yield* attempt(() => transport.handleRequest(request))
+      if (response.status >= 400)
+        trackAgentServer(
+          "mcp_protocol_failed",
+          { error_code: "transport_rejected", status: response.status },
+          "mcp",
+          request
+        )
+      else if (
+        response.headers.get("content-type")?.includes("application/json")
+      ) {
+        const body = yield* responseJson(response.clone(), "MCP transport")
+        if (body && typeof body === "object" && "error" in body)
+          trackAgentServer(
+            "mcp_protocol_failed",
+            { error_code: "protocol_error", status: response.status },
+            "mcp",
+            request
+          )
+      }
+      return response
+    }).pipe(Effect.ensuring(Effect.promise(() => server.close()))),
+    "mcp_transport",
+    () => {
+      trackAgentServer(
+        "mcp_protocol_failed",
+        { error_code: "transport_failed", status: 500 },
+        "mcp",
+        request
+      )
+      return Response.json(
+        {
+          jsonrpc: "2.0",
+          id: null,
+          error: {
+            code: -32603,
+            message: "The request could not be completed.",
+          },
+        },
+        { status: 500 }
+      )
+    }
+  )
 }
 export { handler as GET, handler as POST, handler as DELETE }

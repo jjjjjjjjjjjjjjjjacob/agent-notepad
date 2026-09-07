@@ -44,16 +44,6 @@
   height: 1px;
   background: var(--border);
 }
-.sidebarToggle {
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-  color: var(--muted-foreground);
-}
-.sidebarToggle svg {
-  width: 18px;
-  height: 18px;
-}
 .brandRow {
   display: flex;
   align-items: center;
@@ -62,20 +52,8 @@
   align-self: stretch;
   padding: 0 10px;
 }
-.brand {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  height: 40px;
-  overflow: hidden;
-  font-family: var(--font-heading), sans-serif;
-  font-size: 14px;
-  font-weight: 750;
-  white-space: nowrap;
-  letter-spacing: -0.035em;
-  transition:
-    opacity 160ms ease,
-    visibility 160ms;
+.mobileBrandRow {
+  display: none;
 }
 .search {
   display: flex;
@@ -134,6 +112,9 @@
 }
 .connect:hover {
   color: var(--link-color);
+}
+.mobileSearch {
+  display: none;
 }
 .workspace {
   display: flex;
@@ -354,6 +335,12 @@
     --shell-nav-width: var(--sidebar-width-icon);
   }
   .shell[data-state="collapsed"] .brand {
+    gap: 0;
+  }
+  .shell[data-state="collapsed"]
+    .brand
+    :global([data-slot="sidebar-brand-label"]) {
+    width: 0;
     opacity: 0;
     visibility: hidden;
   }
@@ -393,14 +380,16 @@
     flex: 1;
     height: 54px;
     padding: 0;
-    gap: 4px;
   }
   .header::after {
     left: 0;
   }
-  .sidebarToggle {
-    width: 44px;
-    height: 44px;
+  .mobileBrandRow {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    height: 54px;
+    padding: 0 12px;
   }
   .noScript {
     display: block;
@@ -453,5 +442,19 @@
   .accountButton {
     width: 44px;
     height: 44px;
+  }
+  :global(html):has(.shell[data-reading-page="true"]) {
+    --shell-header-height: 56px;
+  }
+  .shell[data-reading-page="true"] .header {
+    padding-bottom: 0;
+  }
+  .shell[data-reading-page="true"] :is(.search, .connect) {
+    display: none;
+  }
+  .shell[data-reading-page="true"] .mobileSearch {
+    display: inline-flex;
+    width: 44px;
+    padding: 10px;
   }
 }

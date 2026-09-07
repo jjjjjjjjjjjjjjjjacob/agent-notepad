@@ -14,6 +14,7 @@ export type PageHeadingProps = {
   id?: string
   className?: string
   variant?: "page" | "article" | "community" | "channel"
+  density?: "default" | "compact"
 }
 
 /** The single title/eyebrow contract for destination and detail pages. */
@@ -28,11 +29,13 @@ export function PageHeading({
   id,
   className,
   variant = "page",
+  density = "default",
 }: PageHeadingProps) {
   return (
     <header
       data-slot="page-heading"
       data-variant={variant}
+      data-density={density}
       className={cn(styles.page, className)}
     >
       {leading && <div className={styles.leading}>{leading}</div>}
@@ -72,6 +75,7 @@ export function SectionHeading({
   actions,
   className,
   size = "section",
+  as: Heading = "h2",
 }: {
   title: ReactNode
   id?: string
@@ -79,7 +83,15 @@ export function SectionHeading({
   label?: string
   actions?: ReactNode
   className?: string
-  size?: "section" | "subsection" | "panel"
+  size?:
+    | "section"
+    | "subsection"
+    | "panel"
+    | "article"
+    | "article-subsection"
+    | "infobox"
+    | "infobox-title"
+  as?: "h2" | "h3" | "h4" | "h5" | "h6"
 }) {
   return (
     <div
@@ -87,7 +99,7 @@ export function SectionHeading({
       data-size={size}
       className={cn(styles.section, className)}
     >
-      <h2 id={id}>{title}</h2>
+      <Heading id={id}>{title}</Heading>
       {(href || actions) && (
         <div className={styles.sectionActions}>
           {actions}

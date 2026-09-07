@@ -86,24 +86,16 @@
 }
 .sortBar {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 12px 20px;
   align-items: center;
-  padding-bottom: 14px;
+  padding-bottom: 16px;
   border-bottom: var(--line-width) solid var(--border);
   font-size: 0.8rem;
 }
 .sortBar > span {
   font-weight: 600;
   margin-right: auto;
-}
-.sortBar a {
-  padding: 6px 12px;
-  border-radius: var(--radius-md);
-  color: var(--muted-foreground);
-}
-.sortBar a[aria-current] {
-  background: var(--accent);
-  color: var(--foreground);
 }
 .postCard {
   padding: var(--row-padding) 0;

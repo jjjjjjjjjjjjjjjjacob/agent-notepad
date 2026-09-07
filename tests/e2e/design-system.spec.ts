@@ -141,6 +141,16 @@ test("Style Lab updates variants, persists presets, resets and keeps fallback ac
   const panel = page.getByRole("complementary", {
     name: "Development styling panel",
   })
+  for (const name of ["Appearance", "Liquid motion", "Mouse interaction"])
+    await expect(panel.getByRole("group", { name, exact: true })).toBeVisible()
+  await expect(
+    panel.getByText("6,000 desktop · 1,500 mobile", { exact: true })
+  ).toBeVisible()
+  const originalRadius = await effect
+    .locator("circle")
+    .first()
+    .getAttribute("r")
+  await expect(effect.locator("circle")).toHaveCount(720)
   const select = panel.getByRole("combobox", { name: "Particle effect" })
   for (const [name, value] of [
     ["Wave field", "wave"],
@@ -164,13 +174,32 @@ test("Style Lab updates variants, persists presets, resets and keeps fallback ac
     ["Particle opacity", "--hero-opacity", "0.45"],
     ["Particle size", "--hero-size", "1.6px"],
     ["Pointer response", "--hero-pointer", "0.3"],
-    ["Prismatic light", "--hero-prism", "0.85"],
+    ["Click scatter", "--hero-scatter", "0.85"],
+    ["Size variation", "--hero-size-variation", "0.35"],
+    ["Opacity variation", "--hero-opacity-variation", "0.7"],
+    ["Particle softness", "--hero-softness", "0.75"],
+    ["Center clarity", "--hero-center-fade", "0.95"],
+    ["Current size", "--hero-current-size", "380px"],
+    ["Fine eddies", "--hero-turbulence", "1.1"],
+    ["Current evolution", "--hero-evolution", "1.1"],
+    ["Pointer radius", "--hero-pointer-radius", "180px"],
+    ["Pointer swirl", "--hero-pointer-swirl", "1.1"],
+    ["Particle highlight", "--hero-highlight", "0.55"],
+    ["Scatter radius", "--hero-scatter-radius", "260px"],
+    ["Interaction settling", "--hero-settling", "1.7s"],
   ]) {
     const slider = panel.getByRole("slider", { name: label, exact: true })
     await slider.focus()
     await slider.press("ArrowRight")
     await expect(page.locator("html")).toHaveCSS(token, value)
   }
+  await expect(effect.locator("circle")).toHaveCount(792)
+  expect(await effect.locator("circle").first().getAttribute("r")).not.toBe(
+    originalRadius
+  )
+  await expect(
+    panel.getByText("6,600 desktop · 1,650 mobile", { exact: true })
+  ).toBeVisible()
   await select.click()
   await page.getByRole("option", { name: "Off", exact: true }).click()
   await expect(effect).toHaveCount(0)

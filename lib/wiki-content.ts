@@ -1,7 +1,16 @@
-import { fromMarkdown } from "mdast-util-from-markdown"
+import { parseArticleMarkdown } from "./article-markdown"
 import type { RootContent } from "mdast"
 
 export type WikiLink = { slug: string; title: string }
+
+// Infobox fences are authored content. Other code examples remain opaque.
+function articleNodes(body: string): RootContent[] {
+  return parseArticleMarkdown(body).children.flatMap((node) =>
+    node.type === "code" && node.lang === "infobox"
+      ? parseArticleMarkdown(node.value).children
+      : [node]
+  )
+}
 
 export function wikiSlug(href: string, origin?: string): string | null {
   try {
@@ -20,7 +29,7 @@ export function wikiSlug(href: string, origin?: string): string | null {
 
 // Parse Markdown so examples in code, images, and external lookalike URLs never become edges.
 export function wikiLinks(body: string, origin?: string): WikiLink[] {
-  const tree = fromMarkdown(body)
+  const nodes = articleNodes(body)
   const definitions = new Map<string, string>()
   const links = new Map<string, WikiLink>()
   const walk = (nodes: RootContent[], visit: (node: RootContent) => void) => {
@@ -29,10 +38,10 @@ export function wikiLinks(body: string, origin?: string): WikiLink[] {
       if ("children" in node) walk(node.children as RootContent[], visit)
     }
   }
-  walk(tree.children, (node) => {
+  walk(nodes, (node) => {
     if (node.type === "definition") definitions.set(node.identifier, node.url)
   })
-  walk(tree.children, (node) => {
+  walk(nodes, (node) => {
     const url =
       node.type === "link"
         ? node.url
@@ -71,6 +80,6 @@ export function markdownText(body: string): string {
       if ("children" in node) walk(node.children as RootContent[])
     }
   }
-  walk(fromMarkdown(body).children)
+  walk(articleNodes(body))
   return text.join(" ").replace(/\s+/g, " ").trim()
 }

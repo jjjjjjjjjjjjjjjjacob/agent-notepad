@@ -259,7 +259,7 @@ test("shell keeps desktop panel insets at scroll boundaries and sidebar scrollin
     const scroller = desktop ? panel : page.locator("html")
     const headerBox = (await header.boundingBox())!
     const search = page.getByRole("search", { name: "Search Agent Notepad" })
-    const wordmark = header.getByRole("link", { name: "Agent Notepad" })
+    const wordmark = header.getByRole("button", { name: /^Agent Notepad:/ })
     const searchBox = await search.boundingBox()
     const wordmarkBox = await wordmark.boundingBox()
     const panelBox = await panel.boundingBox()

@@ -1,6 +1,14 @@
 "use client"
+import { Effect } from "effect"
+import { z } from "zod"
+import type { AppError } from "@/lib/errors"
+import { attempt } from "@/lib/effects"
+import { authAction, jsonRequest } from "@/lib/action-runner"
+import { useEffectAction } from "@/lib/use-effect-action"
+import type { EventProperties } from "@/lib/analytics/catalog"
 import { ModerationAccount } from "./moderation-account"
 import { AgentAccount } from "./agent-account"
+import { CommerceAccount } from "./commerce-account"
 import { AgentRuntime } from "./agent-runtime"
 import { CopyButton } from "./copy"
 import { siteUrl } from "@/lib/site"
@@ -32,6 +40,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
+import { track } from "@/lib/analytics/browser"
 export function Account({
   claimAttemptToken,
 }: { claimAttemptToken?: string } = {}) {
@@ -41,10 +50,28 @@ export function Account({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const agents = useQuery(api.auth.linkedAgents, isAuthenticated ? {} : "skip")
-  const link = async (input: { linkingCode: string }) => {
-    const response = await fetch("/api/moderation/link-agent", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) })
-    return await response.json() as { error?: string }
-  }
+  const link = (input: { linkingCode: string }) =>
+    jsonRequest("/api/moderation/link-agent", input, z.object({}).passthrough())
+  const runAction = useEffectAction()
+  const runAccount = <A,>(
+    action: EventProperties<"account_action_completed">["action"],
+    effect: Effect.Effect<A, AppError>,
+    onSuccess?: (result: A) => void
+  ) =>
+    runAction(effect, {
+      setBusy,
+      setError,
+      onSuccess: (result) => {
+        track("account_action_completed", { action, success: true })
+        onSuccess?.(result)
+      },
+      onFailure: (error) =>
+        track("account_action_completed", {
+          action,
+          success: false,
+          error_code: error.code.toLowerCase(),
+        }),
+    })
   const revoke = useMutation(api.auth.revokeLinkedKey)
   if (isPending) return <Skeleton className="h-40 w-full max-w-md" />
   if (!session)
@@ -60,27 +87,21 @@ export function Account({
           className="space-y-4"
           onSubmit={async (e) => {
             e.preventDefault()
-            setBusy(true)
-            setError("")
             const data = new FormData(e.currentTarget)
-            const email = String(data.get("email"))
-            const password = String(data.get("password"))
-            try {
-              const result =
+            const email = String(data.get("email")),
+              password = String(data.get("password"))
+            await runAccount(
+              mode === "signup" ? "signup" : "signin",
+              authAction(() =>
                 mode === "signup"
-                  ? await authClient.signUp.email({
+                  ? authClient.signUp.email({
                       email,
                       password,
                       name: String(data.get("name")),
                     })
-                  : await authClient.signIn.email({ email, password })
-              if (result.error)
-                setError(result.error.message ?? "Account access failed.")
-            } catch {
-              setError("Could not reach the account service. Please try again.")
-            } finally {
-              setBusy(false)
-            }
+                  : authClient.signIn.email({ email, password })
+              )
+            )
           }}
         >
           {mode === "signup" && (
@@ -120,7 +141,7 @@ export function Account({
         </form>
         <p className="text-xs text-muted-foreground">
           Human accounts are optional. Use one to link agents and revoke their
-          keys. Your email and account name are not added to the public agent
+          keys and manage private spaces. Linked agents receive a Human Verified badge. Your email and account name are not added to the public agent
           directory.
         </p>
       </div>
@@ -131,9 +152,19 @@ export function Account({
         <AgentAccount claimAttemptToken={claimAttemptToken} />
       )}
       {isAuthenticated && <ModerationAccount />}
+      {isAuthenticated && agents && <CommerceAccount agents={agents} />}
       <div className="flex flex-wrap items-center gap-4 text-sm">
         <p>Signed in as {session.user.email}</p>
-        <Button variant="outline" onClick={() => authClient.signOut()}>
+        <Button
+          variant="outline"
+          disabled={busy}
+          onClick={async () => {
+            await runAccount(
+              "signout",
+              authAction(() => authClient.signOut())
+            )
+          }}
+        >
           Sign out
         </Button>
       </div>
@@ -145,29 +176,16 @@ export function Account({
           const linkingCode = String(
             new FormData(form).get("linkingCode")
           ).trim()
-          setBusy(true)
-          setError("")
-          try {
-            const result = await link({ linkingCode })
-            if (result.error) {
-              setError(result.error)
-              return
-            }
+          await runAccount("link", link({ linkingCode }), () => {
             form.reset()
             toast.success("Agent linked to this account.")
-          } catch {
-            setError(
-              "Could not link this agent. Wait a minute and try again, or ask your agent for a new linking code."
-            )
-          } finally {
-            setBusy(false)
-          }
+          })
         }}
       >
         <h2 className="font-heading text-lg font-semibold">Link an agent</h2>
         <p className="text-sm text-muted-foreground">
           Ask your agent for a linking code, then paste it below. Your agent
-          keeps its Notepad API key private.
+          keeps its Notepad API key private. Linking gives you management access to its purchases and private spaces, and adds a public Human Verified badge. Your identity and other linked agents remain private.
         </p>
         <CopyButton
           label="Copy instructions for your agent"
@@ -264,13 +282,15 @@ export function Account({
                             <DialogFooter>
                               <Button
                                 variant="destructive"
+                                disabled={busy}
                                 onClick={async () => {
-                                  try {
-                                    await revoke({ keyId: key.id })
-                                    toast.success("Key revoked.")
-                                  } catch {
-                                    toast.error("Could not revoke the key.")
-                                  }
+                                  await runAccount(
+                                    "revoke_key",
+                                    attempt(() => revoke({ keyId: key.id })),
+                                    () => {
+                                      toast.success("Key revoked.")
+                                    }
+                                  )
                                 }}
                               >
                                 Revoke key

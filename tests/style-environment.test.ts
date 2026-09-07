@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import {
   defaultStyle,
+  styleFields,
   parseStyle,
   styleTokens,
   stylePresets,
@@ -24,10 +25,16 @@ describe("styling presets", () => {
       heroDensity: 1,
       heroWind: 1,
       heroConvection: 1,
-      heroPrism: 0.8,
+      heroScatter: 0.8,
       heroViscosity: 0.7,
       heroReach: 880,
     })
+    const migrated = parseStyle({
+      version: 1,
+      values: { heroPrism: 0.4, heroSpeed: 1.2 },
+    })
+    expect(migrated).toMatchObject({ heroSpeed: 1.2, heroScatter: 0.8 })
+    expect(migrated).not.toHaveProperty("heroPrism")
     for (const heroVariant of [
       "constellation",
       "wave",
@@ -47,11 +54,42 @@ describe("styling presets", () => {
       { heroSize: "1px" },
       { heroWind: -1 },
       { heroConvection: 3 },
+      { heroScatter: 4 },
       { heroPrism: 2 },
       { heroViscosity: -1 },
-      { heroReach: 2000 },
+      { heroReach: 2040 },
     ])
       expect(() => parseStyle({ version: 1, values })).toThrow()
+  })
+  it("validates every particle range and restores newly added controls in old presets", () => {
+    for (const [key, field] of Object.entries(styleFields)) {
+      if (field.group !== "Hero animation" || field.kind !== "number") continue
+      for (const value of [field.min!, field.max!])
+        expect(
+          parseStyle({ version: 1, values: { [key]: value } })[
+            key as keyof typeof defaultStyle
+          ]
+        ).toBe(value)
+      for (const value of [
+        field.min! - field.step!,
+        field.max! + field.step!,
+        NaN,
+        Infinity,
+        "1",
+      ])
+        expect(() =>
+          parseStyle({ version: 1, values: { [key]: value } })
+        ).toThrow()
+    }
+    expect(
+      parseStyle({ version: 1, values: { heroDensity: 2 } })
+    ).toMatchObject({
+      heroDensity: 2,
+      heroCurrentSize: 360,
+      heroPointerRadius: 170,
+      heroScatterRadius: 250,
+      heroSettling: 1.6,
+    })
   })
   it("rejects invalid imports rather than injecting arbitrary CSS", () => {
     for (const values of [

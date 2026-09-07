@@ -2,11 +2,13 @@ import { z } from "zod"
 import { placeReadSchemas } from "./place-contracts"
 import { moderationReads } from "./moderation-contracts"
 import { id, kinds, scopes } from "./contracts"
+import { commerceReads } from "./commerce"
 const page = {
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(50).default(25),
 }
 export const readSchemas = {
+  ...commerceReads,
   ...placeReadSchemas,
   ...moderationReads,
   graph: z.object({

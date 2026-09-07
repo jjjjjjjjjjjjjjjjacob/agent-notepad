@@ -3,6 +3,8 @@ import type { CSSProperties } from "react"
 type Field = {
   label: string
   group: string
+  section?: string
+  description?: string
   css: string
   default: string | number | boolean
   kind: "number" | "color" | "font" | "boolean" | "select"
@@ -54,10 +56,28 @@ export const fonts: Record<string, { label: string; value: string }> = {
   systemSerif: { label: "System serif", value: "Georgia, serif" },
   systemMono: { label: "System mono", value: "ui-monospace, monospace" },
 }
+// Particle controls share the preset/validation machinery with the rest of
+// Style Lab; sections keep the larger set of live controls easy to scan.
+const heroNumber = (
+  section: string,
+  label: string,
+  css: string,
+  value: number,
+  min: number,
+  max: number,
+  unit: string,
+  step: number,
+  description?: string
+): Field => ({
+  ...number(label, "Hero animation", css, value, min, max, unit, step),
+  section,
+  description,
+})
 export const styleFields = {
   heroVariant: {
     label: "Particle effect",
     group: "Hero animation",
+    section: "Appearance",
     css: "--hero-variant",
     default: "constellation",
     kind: "select",
@@ -69,69 +89,29 @@ export const styleFields = {
       off: "Off",
     },
   } as Field,
-  heroDensity: number(
+  heroDensity: heroNumber(
+    "Appearance",
     "Particle density",
-    "Hero animation",
     "--hero-density",
     1,
     0.5,
-    2,
+    3,
     "×",
     0.1
   ),
-  heroSpeed: number(
-    "Animation speed",
-    "Hero animation",
-    "--hero-speed",
-    0.6,
-    0,
-    2,
-    "×",
-    0.1
-  ),
-  heroWind: number(
-    "Drift",
-    "Hero animation",
-    "--hero-wind",
-    1,
-    0,
-    2,
-    "×",
-    0.1
-  ),
-  heroConvection: number(
-    "Liquid circulation",
-    "Hero animation",
-    "--hero-convection",
-    1,
-    0,
-    2,
-    "×",
-    0.1
-  ),
-  heroViscosity: number(
-    "Viscosity",
-    "Hero animation",
-    "--hero-viscosity",
-    0.7,
-    0,
-    1,
-    "",
-    0.05
-  ),
-  heroReach: number(
+  heroReach: heroNumber(
+    "Appearance",
     "Particle field height",
-    "Hero animation",
     "--hero-reach",
     880,
     400,
-    1400,
+    2000,
     "px",
     40
   ),
-  heroOpacity: number(
+  heroOpacity: heroNumber(
+    "Appearance",
     "Particle opacity",
-    "Hero animation",
     "--hero-opacity",
     0.4,
     0,
@@ -139,35 +119,205 @@ export const styleFields = {
     "",
     0.05
   ),
-  heroSize: number(
+  heroSize: heroNumber(
+    "Appearance",
     "Particle size",
-    "Hero animation",
     "--hero-size",
     1.5,
     0.5,
-    3,
+    5,
     "px",
     0.1
   ),
-  heroPointer: number(
-    "Pointer response",
-    "Hero animation",
-    "--hero-pointer",
-    0.25,
+  heroSizeVariation: heroNumber(
+    "Appearance",
+    "Size variation",
+    "--hero-size-variation",
+    0.3,
+    0,
+    0.9,
+    "",
+    0.05,
+    "Mix small and large dots. Zero makes them uniform."
+  ),
+  heroOpacityVariation: heroNumber(
+    "Appearance",
+    "Opacity variation",
+    "--hero-opacity-variation",
+    0.65,
     0,
     1,
     "",
     0.05
   ),
-  heroPrism: number(
-    "Prismatic light",
-    "Hero animation",
-    "--hero-prism",
-    0.8,
+  heroSoftness: heroNumber(
+    "Appearance",
+    "Particle softness",
+    "--hero-softness",
+    0.7,
+    0,
+    1,
+    "",
+    0.05,
+    "From crisp dots to soft edges."
+  ),
+  heroCenterFade: heroNumber(
+    "Appearance",
+    "Center clarity",
+    "--hero-center-fade",
+    0.9,
+    0,
+    1,
+    "",
+    0.05,
+    "Higher values keep reading areas clear. Lower values fill the center."
+  ),
+  heroSpeed: heroNumber(
+    "Liquid motion",
+    "Animation speed",
+    "--hero-speed",
+    0.6,
+    0,
+    2,
+    "×",
+    0.1,
+    "Affects every effect. Zero pauses ambient motion; mouse interaction stays active."
+  ),
+  heroWind: heroNumber(
+    "Liquid motion",
+    "Drift",
+    "--hero-wind",
+    1,
+    0,
+    2,
+    "×",
+    0.1
+  ),
+  heroConvection: heroNumber(
+    "Liquid motion",
+    "Liquid circulation",
+    "--hero-convection",
+    1,
+    0,
+    2,
+    "×",
+    0.1
+  ),
+  heroViscosity: heroNumber(
+    "Liquid motion",
+    "Viscosity",
+    "--hero-viscosity",
+    0.7,
     0,
     1,
     "",
     0.05
+  ),
+  heroCurrentSize: heroNumber(
+    "Liquid motion",
+    "Current size",
+    "--hero-current-size",
+    360,
+    120,
+    720,
+    "px",
+    20,
+    "Larger values create broad, rolling currents."
+  ),
+  heroTurbulence: heroNumber(
+    "Liquid motion",
+    "Fine eddies",
+    "--hero-turbulence",
+    1,
+    0,
+    2,
+    "×",
+    0.1,
+    "Add small swirls within the larger currents."
+  ),
+  heroEvolution: heroNumber(
+    "Liquid motion",
+    "Current evolution",
+    "--hero-evolution",
+    1,
+    0,
+    2,
+    "×",
+    0.1,
+    "How quickly the current pattern changes. Zero keeps its shape steady."
+  ),
+  heroPointer: heroNumber(
+    "Mouse interaction",
+    "Pointer response",
+    "--hero-pointer",
+    0.25,
+    0,
+    2,
+    "",
+    0.05
+  ),
+  heroPointerRadius: heroNumber(
+    "Mouse interaction",
+    "Pointer radius",
+    "--hero-pointer-radius",
+    170,
+    60,
+    400,
+    "px",
+    10
+  ),
+  heroPointerSwirl: heroNumber(
+    "Mouse interaction",
+    "Pointer swirl",
+    "--hero-pointer-swirl",
+    1,
+    0,
+    2,
+    "×",
+    0.1,
+    "How strongly particles curl around the cursor."
+  ),
+  heroHighlight: heroNumber(
+    "Mouse interaction",
+    "Particle highlight",
+    "--hero-highlight",
+    0.5,
+    0,
+    1,
+    "",
+    0.05,
+    "Brighten and enlarge dots near the cursor."
+  ),
+  heroScatter: heroNumber(
+    "Mouse interaction",
+    "Click scatter",
+    "--hero-scatter",
+    0.8,
+    0,
+    3,
+    "",
+    0.05
+  ),
+  heroScatterRadius: heroNumber(
+    "Mouse interaction",
+    "Scatter radius",
+    "--hero-scatter-radius",
+    250,
+    80,
+    480,
+    "px",
+    10
+  ),
+  heroSettling: heroNumber(
+    "Mouse interaction",
+    "Interaction settling",
+    "--hero-settling",
+    1.6,
+    0.4,
+    3,
+    "s",
+    0.1,
+    "How long particles coast after stirring or scattering."
   ),
   bodyFont: font("Body font", "--ui-font-body", "source"),
   headingFont: font("Heading font", "--ui-font-heading", "manrope"),
@@ -453,6 +603,17 @@ export function parseStyle(value: unknown): StyleConfig {
   const values = envelope.values as Record<string, unknown>
   const result = { ...baseStyle }
   for (const [key, value] of Object.entries(values)) {
+    // Retire the removed light effect without invalidating saved v1 presets.
+    if (key === "heroPrism") {
+      if (
+        typeof value !== "number" ||
+        !Number.isFinite(value) ||
+        value < 0 ||
+        value > 1
+      )
+        throw new Error("Invalid value for retired Prismatic light setting.")
+      continue
+    }
     if (!Object.hasOwn(styleFields, key))
       throw new Error(`Unknown setting: ${key}`)
     const field: Field = styleFields[key as StyleKey]

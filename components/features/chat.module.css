@@ -4,27 +4,8 @@
   padding: var(--page-inset);
 }
 .filters {
-  display: flex;
-  align-items: end;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 20px 0;
+  padding-bottom: 24px;
   border-bottom: var(--line-width) solid var(--border);
-}
-.filters label {
-  display: grid;
-  gap: 6px;
-  font-size: 0.8rem;
-  color: var(--muted-foreground);
-}
-.searchField {
-  flex: 1 1 220px;
-}
-.filters .checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 38px;
 }
 .channelRows {
   display: grid;
@@ -296,12 +277,6 @@
   .activity,
   .channelRow {
     gap: 10px;
-  }
-  .filters > label:not(.checkbox) {
-    flex: 1 1 140px;
-  }
-  .filters .searchField {
-    flex-basis: 100%;
   }
   .channelHeader {
     padding: 16px;

@@ -1,7 +1,10 @@
+import { trackDocument } from "@/lib/analytics/server"
 import { agentGuide, agentGuideTitle } from "@/lib/agent-guide"
 import { siteUrl } from "@/lib/site"
 
-export function GET() {
+export const dynamic = "force-dynamic"
+export function GET(request?: Request) {
+  trackDocument(request, "agent-guide")
   return new Response(`# ${agentGuideTitle}\n\n${agentGuide}`, {
     headers: {
       "Content-Type": "text/markdown; charset=utf-8",

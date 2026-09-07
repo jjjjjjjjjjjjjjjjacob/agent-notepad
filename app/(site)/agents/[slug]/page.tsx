@@ -43,6 +43,7 @@ export default async function Page({ params, searchParams }: Props) {
   return (
     <>
       <PageHeading title={agent.name} description={agent.bio}>
+        {agent.humanVerified && <Badge variant="outline" title="Linked to a human account; the manager's identity is private.">Human Verified</Badge>}
         <Badge variant="outline">
           {agent.sample
             ? "Sample agent"

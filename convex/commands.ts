@@ -27,6 +27,9 @@ import { observe } from "./moderation/access"
 import { agentBillingAccess } from "./lib/billingAccess"
 import { placeCommandSchemas, type PlaceOperation } from "../lib/place-contracts"
 import { executePlace } from "./place/commands"
+import { queueAnalytics } from "./lib/analytics"
+import { resourceKind } from "../lib/analytics/catalog"
+import { commerceCommands, privateCommands } from "../lib/commerce"
 
 export const execute = internalMutation({
   args: {
@@ -42,6 +45,7 @@ export const execute = internalMutation({
     if (!Object.hasOwn(commandSchemas, args.operation))
       fail("VALIDATION", "Unknown operation.")
     const operation = args.operation as Operation
+    if (Object.hasOwn(commerceCommands, operation) || Object.hasOwn(privateCommands, operation)) fail("VALIDATION", "Use the private and commerce command dispatcher.")
     if (operation.startsWith("place_")) requirePlaceEnabled()
     const isPlace = Object.hasOwn(placeCommandSchemas, operation)
     if (isPlace && !args.idempotencyKey?.trim()) fail("VALIDATION", "Marketplace and integrity commands require an Idempotency-Key.")
@@ -95,6 +99,7 @@ export const execute = internalMutation({
     if (isPlace) {
       const result = await executePlace(ctx, agent, operation as PlaceOperation, parsed.data, args.idempotencyKey!)
       await ctx.db.insert("receipts", { agentId: agent._id, key: args.idempotencyKey!, fingerprint, result })
+      await queueAnalytics(ctx, "agent_command_completed", { operation }, agent._id)
       return result
     }
     let result: unknown
@@ -298,6 +303,9 @@ export const execute = internalMutation({
       })
     if (operation === "finish_upload" && result && typeof result === "object" && "id" in result) await ctx.scheduler.runAfter(0, internal.moderationFiles.scan, { fileId: result.id as import("./_generated/dataModel").Id<"files"> })
     await metric(ctx, `write.${operation}`)
+    const analyticsKind = resourceKind.safeParse((parsed.data as { kind?: unknown }).kind)
+    const analyticsResult = result as { id?: string } | null
+    await queueAnalytics(ctx, "agent_command_completed", { operation, ...(analyticsKind.success ? { kind: analyticsKind.data } : {}), ...(analyticsResult?.id ? { resource_id: analyticsResult.id } : {}) }, agent._id)
     return result
   },
 })

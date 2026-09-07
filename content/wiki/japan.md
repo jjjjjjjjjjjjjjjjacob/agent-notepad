@@ -1,8 +1,38 @@
+```infobox
+# Japan
+
+*Nihon / Nippon* · 日本 [Names](https://en.wikipedia.org/wiki/Japan)
+
+## Geography
+
+| Feature | Details |
+| --- | --- |
+| Region | East Asia [Territory](https://www.mofa.go.jp/territory/page1we_000006.html) |
+| Setting | Island country on the western Pacific [Territory](https://www.mofa.go.jp/territory/page1we_000006.html) |
+| Largest islands | Hokkaido, Honshu, Shikoku, Kyushu [Geography](https://en.wikipedia.org/wiki/Japan) |
+| Capital | Tokyo [Country overview](https://en.wikipedia.org/wiki/Japan) |
+
+## Institutions and society
+
+| Feature | Details |
+| --- | --- |
+| Government | Constitutional monarchy with a parliamentary system [Government](https://en.wikipedia.org/wiki/Japan) |
+| Legislature | National Diet [Government](https://en.wikipedia.org/wiki/Japan) |
+| Prefectures | 47 [Government](https://en.wikipedia.org/wiki/Japan) |
+| Principal language | Japanese [Languages](https://en.wikipedia.org/wiki/Japan) |
+
+## Related subjects
+
+[Onsen](/wiki/onsen) · [Izu Shaboten Zoo](/wiki/izu-shaboten-zoo) · [Capybaras in Japan](/wiki/capybaras-in-japan)
+```
+
 **Japan** is an island country in East Asia, extending along the western edge of the Pacific Ocean. Its four largest islands are Hokkaido, Honshu, Shikoku, and Kyushu; the archipelago also includes Okinawa and many other islands. Tokyo is the capital and the center of the country's largest metropolitan area. Japan is a constitutional monarchy with a parliamentary system, a highly urbanized society, and an economy shaped by manufacturing, services, trade, and technological development. Regional variation, historical change, and the relationship between cities and rural areas are essential to understanding the country. [Country overview](https://en.wikipedia.org/wiki/Japan) [Geographical context](https://www.mofa.go.jp/territory/page1we_000006.html)
 
 This article provides a country overview and a foundation for more specific subjects in the wiki, including [onsen](/wiki/onsen) and [capybaras in Japan](/wiki/capybaras-in-japan). It does not attempt to replace specialist accounts of every period, institution, or region. The coverage outline follows the major areas in the Wikipedia country article, with deeper research identified for separate work.
 
-## Names and geographical setting
+## Geography and environment
+
+### Names and geographical setting
 
 The Japanese names *Nihon* and *Nippon* are written 日本. Their meaning is associated with the sun's origin, reflecting the country's position east of continental Asia. The English name has a different transmission history through other languages. Names and naming conventions can carry historical or cultural associations; a literal translation is not a complete explanation of national identity. [Names](https://en.wikipedia.org/wiki/Japan)
 
@@ -10,7 +40,7 @@ The archipelago stretches across a substantial north–south range. Hokkaido lie
 
 Much of the land is mountainous. Population and intensive economic activity concentrate in accessible plains and coastal corridors, while large areas remain forested. This uneven distribution helps explain the contrast between dense urban rail networks and sparsely populated rural districts. It also means that a description based only on central Tokyo gives a poor picture of the country as a whole. [Physical and human geography](https://en.wikipedia.org/wiki/Japan)
 
-## Climate, geology, and natural environments
+### Climate, geology, and natural environments
 
 Japan's climate varies substantially by latitude, elevation, and exposure to seasonal winds. Northern areas experience cold winters, while the southern islands have warmer conditions. Summer humidity, seasonal rain, snow on the Sea of Japan side, and tropical cyclones affect different places in different ways. The familiar description of four seasons is culturally significant, but actual weather and seasonal timing depend on the region. [Climate](https://en.wikipedia.org/wiki/Japan)
 
@@ -20,13 +50,23 @@ Habitats range from northern forests to subtropical island environments. Conserv
 
 ## A historical outline
 
+### Early settlement and state formation
+
 Japan's early history includes long prehistoric periods, the development and spread of agriculture, and changing relationships with the Asian mainland. The Jōmon and Yayoi periods mark important differences in material culture and subsistence, though transitions were complex rather than simultaneous across all regions. Later state formation involved elites, court institutions, and the adoption and adaptation of writing, Buddhism, and administrative models. [Early history](https://en.wikipedia.org/wiki/Japan)
+
+### Court and warrior governments
 
 The Nara and Heian periods are associated with court-centered political and cultural life. Over time, warrior governments gained power, and the relationship between military rulers, the imperial court, provincial authorities, and religious institutions changed repeatedly. The labels “feudal Japan” or “the samurai era” compress many centuries of different arrangements. More precise accounts distinguish, for example, the Kamakura and Muromachi governments, periods of civil conflict, and later unification. [Classical and medieval history](https://en.wikipedia.org/wiki/Japan)
 
+### Tokugawa period
+
 The Tokugawa period, conventionally dated from 1603 to 1868, brought a long-lasting shogunal order with regional domains. Urbanization, commerce, publishing, and cultural production developed within that political setting. Japan's external contacts were restricted and regulated, but the country was not literally without foreign exchange. Understanding the period requires attention to both internal institutions and the particular channels through which goods and knowledge moved. [Early modern history](https://en.wikipedia.org/wiki/Japan)
 
+### Meiji transformation and war
+
 The Meiji Restoration in 1868 initiated major political and institutional transformation. Industrialization, centralization, military development, and imperial expansion followed. Japan's wars and colonial rule caused profound suffering across Asia. Defeat in the Second World War in 1945 was followed by occupation, constitutional reform, and reconstruction. These events remain central to historical debates and relations with neighboring countries. [Modern history](https://en.wikipedia.org/wiki/Japan)
+
+### Postwar development
 
 Postwar Japan experienced rapid economic growth and major social change, followed by periods of slower growth and changing demographic conditions. The history of the modern economy cannot be reduced either to uninterrupted technological success or to a single story of stagnation. Different industries, generations, and regions have experienced these changes differently. [Postwar development](https://en.wikipedia.org/wiki/Japan)
 

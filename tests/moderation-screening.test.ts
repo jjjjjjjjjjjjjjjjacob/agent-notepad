@@ -7,10 +7,11 @@ import { digest } from "../lib/hash"
 import { GATEWAY_HEADER, signGateway } from "../lib/gateway-security"
 import { screenText } from "../lib/injection-screening"
 import { decide } from "../convex/moderation/decisions"
-const mock = vi.hoisted(() => ({ send: vi.fn() }))
+const mock = vi.hoisted(() => ({ send: vi.fn(), destroy: vi.fn() }))
 vi.mock("@aws-sdk/client-bedrock-runtime", () => ({
   BedrockRuntimeClient: class {
     send = mock.send
+    destroy = mock.destroy
   },
   ApplyGuardrailCommand: class {
     constructor(public input: unknown) {}
@@ -40,6 +41,7 @@ beforeEach(() => {
   vi.stubEnv("MODERATION_GUARDRAIL_VERSION", "1")
   vi.stubEnv("AWS_REGION", "us-east-1")
   mock.send.mockReset().mockImplementation(async (command) => clean(command))
+  mock.destroy.mockReset()
 })
 afterEach(() => {
   vi.useRealTimers()
@@ -95,6 +97,26 @@ describe("guardrail publication boundary", () => {
       source: "INPUT",
       outputScope: "FULL",
     })
+    expect(mock.destroy).toHaveBeenCalledOnce()
+  })
+  it("classifies malformed provider responses and releases the client on every outcome", async () => {
+    mock.send.mockResolvedValueOnce({ assessments: "invalid" })
+    await expect(screenText("payload")).rejects.toMatchObject({
+      code: "BAD_GATEWAY",
+    })
+    expect(mock.destroy).toHaveBeenCalledTimes(1)
+    mock.send.mockRejectedValueOnce(
+      Object.assign(new Error("private"), { status: 503 })
+    )
+    await expect(screenText("payload")).rejects.toMatchObject({
+      code: "UNAVAILABLE",
+    })
+    expect(mock.destroy).toHaveBeenCalledTimes(2)
+    mock.send.mockRejectedValueOnce(new Error("private programming error"))
+    await expect(screenText("payload")).rejects.toThrow(
+      "Unexpected operation failure."
+    )
+    expect(mock.destroy).toHaveBeenCalledTimes(3)
   })
   it("rejects incomplete scans, a draft guardrail, and a changed strength", async () => {
     mock.send.mockResolvedValue({ assessments: [] })
@@ -186,7 +208,9 @@ describe("guardrail publication boundary", () => {
   it("fails closed on a detector outage without banning the actor", async () => {
     const t = setup(),
       a = await actor(t)
-    mock.send.mockRejectedValue(new Error("test provider outage"))
+    mock.send.mockRejectedValue(
+      Object.assign(new Error("test provider outage"), { status: 503 })
+    )
     const path = "/api/v1/commands/publish",
       body = JSON.stringify({
         kind: "note",

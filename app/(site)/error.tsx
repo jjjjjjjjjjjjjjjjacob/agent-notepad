@@ -1,11 +1,14 @@
 "use client"
 import { Button } from "@/components/ui/button"
+import { useEffect } from "react"
+import { track } from "@/lib/analytics/browser"
 export default function ErrorPage({
   reset,
 }: {
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  useEffect(() => { track("application_error", { error_code: "route_failed", source: "route" }) }, [])
   return (
     <div className="max-w-xl space-y-4">
       <h1 className="font-heading text-2xl font-semibold">

@@ -2,12 +2,12 @@ See [production launch operations](LAUNCH-OPERATIONS.md) for the current custom 
 
 # Environment and community rollout
 
-| Frontend          | Backend                  | Frontend URL                                 |
-| ----------------- | ------------------------ | -------------------------------------------- |
-| Local development | incredible-boar-27       | http://localhost:3843                        |
-| Vercel Preview    | incredible-boar-27       | https://agent-notepad-development.vercel.app |
-| Vercel Production | gregarious-chickadee-782 | https://agentnotepad.com              |
-| Isolated tests    | local, ports 3215/3216   | http://127.0.0.1:4242                        |
+| Frontend          | Backend                  | Frontend URL                 |
+| ----------------- | ------------------------ | ---------------------------- |
+| Local development | incredible-boar-27       | http://localhost:3843        |
+| Vercel Preview    | incredible-boar-27       | https://dev.agentnotepad.com |
+| Vercel Production | gregarious-chickadee-782 | https://agentnotepad.com     |
+| Isolated tests    | local, ports 3215/3216   | http://127.0.0.1:4242        |
 
 Vercel `Development`, `Preview`, and `Production` each explicitly set `APP_ENV`, `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL`, and `NEXT_PUBLIC_SITE_URL`. A Vercel Production build always validates the production backend, regardless of APP_ENV. The frontend URL describes that frontend; Convex `SITE_URL` is the canonical URL for the corresponding shared environment.
 
@@ -29,17 +29,17 @@ The Style lab is enabled in local/preview builds and isolated browser tests, dis
 
 ## Development preview
 
-The Vercel project is `agent-notepad` in `jjjjjjjjjjjjjjjjacobs-projects`. Its Preview environment uses the hosted Convex development deployment `jjjjjjjjjjjjjjjjacob-gmail-com:agent-notepad:dev/vercel` (`incredible-boar-27`). The preview origin is `https://agent-notepad-development.vercel.app`.
+The Vercel project is `agent-notepad` in `jjjjjjjjjjjjjjjjacobs-projects`. Its Preview environment uses the hosted Convex development deployment `jjjjjjjjjjjjjjjjacob-gmail-com:agent-notepad:dev/vercel` (`incredible-boar-27`). The preview origin is `https://dev.agentnotepad.com`.
 
 Vercel's Preview environment contains `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL`, and `NEXT_PUBLIC_SITE_URL`. The development backend has the matching `SITE_URL` and its own `BETTER_AUTH_SECRET`. Local development uses this same hosted backend. Old local data is preserved separately and never automatically imported. `.vercelignore` excludes environment files, local backend data, and generated artifacts from deployment uploads.
 
-After validating and committing changes, run `vercel deploy --target preview --yes`, then `vercel alias set <deployment-url> agent-notepad-development.vercel.app` to update the stable preview URL. `vercel.json` installs from the frozen Bun lockfile and runs `bun run build:vercel`; previews build only the frontend.
+The `dev.agentnotepad.com` project domain is assigned to Git branch `dev`, which uses Vercel Preview; `main` uses Production. Push validated commits to `dev` to update its domain automatically. `vercel.json` installs from the frozen Bun lockfile and runs `bun run build:vercel`. The wrapper runs typecheck/lint/tests, builds the frontend, and deploys the hosted development backend using `convex deploy --cmd`. Store a development deployment key as `CONVEX_DEPLOY_KEY` in Preview scoped **only to Git branch `dev`**, with `deployment:deploy` and `deployment:data:view`. Give that branch `NEXT_PUBLIC_SITE_URL=https://dev.agentnotepad.com`. Other previews have no deployment key and only build the frontend against shared development. The wrapper rejects missing/wrong keys, a wrong dev origin, and deployment keys on other preview branches.
 
 The preview retains the project's Vercel Authentication protection. Signed-in team members can open it; use `vercel curl /health --deployment <preview-url>` for authenticated deployment checks. Agent REST/MCP workflows are public on the production domain and available locally. Do not disable project-wide protection merely to run a preview smoke check.
 
 Production is built with Production-scoped variables, staged with `vercel deploy --prod --skip-domain --yes`, then promoted with `vercel promote <production-deployment-url> --yes`. Keep the stable development alias assigned to the Preview deployment. Never promote a Preview build to production: its compiled browser code targets the development backend.
 
-For backend changes, select `jjjjjjjjjjjjjjjjacob-gmail-com:agent-notepad:dev/vercel` with `bunx convex deployment select` and run `bunx convex dev --once`. Deployment selection changes `.env.local`; keep the hosted development deployment selected for ordinary local development. The isolated test runner owns its own configuration.
+For an explicitly authorized manual backend update, select `jjjjjjjjjjjjjjjjacob-gmail-com:agent-notepad:dev/vercel` with `bunx convex deployment select` and run `bunx convex dev --once`. Deployment selection changes `.env.local`; keep the hosted development deployment selected for ordinary local development. The isolated test runner owns its own configuration.
 
 ## Managed deployment
 

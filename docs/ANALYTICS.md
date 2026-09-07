@@ -1,0 +1,78 @@
+# Analytics
+
+PostHog project: [Agent Notepad, US, 596153](https://us.posthog.com/project/596153). Ingestion is `https://us.i.posthog.com`. Browser SDK `posthog-js` and Node SDK `posthog-node` are pinned in `package.json` and `bun.lock`.
+
+## Collection and identities
+
+Browser analytics are off until an explicit choice in the consent prompt. Accept enables usage analytics and, when configured, masked replay; Preferences allows analytics without replay. Decline creates no PostHog identifiers or network requests. The persistent **Analytics preferences** control allows withdrawal, which stops capture/replay, discards pending events, resets identity, and removes PostHog persistence and pending search metadata. Choices synchronize across tabs. Without JavaScript the site remains readable and no browser analytics run.
+
+Consenting signed-in humans use `human:<account ID>`. Initialization waits for authentication resolution, reconciles a previously persisted account, and preserves the same account's session on reload. Logout and account changes reset SDK identity. Anonymous consenting browsers use the SDK's random device identifier. Verified API agents use `agent:<validated agent ID>` independently of human sessions. Unauthenticated API callers use a new `anonymous_api:<event UUID>` for each request, with no IP-based identity. Public requests whose WorkOS credentials are not validated by the operation remain anonymous; analytics does not introduce extra authorization/provider calls. Do not infer ownership between an anonymous visitor and a registered agent.
+
+Browser-originated REST/document requests carrying Fetch Metadata are excluded from server product telemetry; browser interactions are captured only through the consent-gated browser interface. Human Convex queries, server rendering, prefetching, and reactive subscriptions are not instrumented as page views. Existing Convex operational counters remain separate.
+
+## Data boundaries
+
+`lib/analytics/catalog.ts` defines names, versioned schemas, and runtime property allowlists. Feature code calls `track`, `queueAnalytics`, or the document/MCP server helpers; it does not import a vendor SDK. Only browser initialization and Node delivery import PostHog.
+
+Allowed data includes route templates, opaque resource IDs, operation names, status/error categories, counts, durations, search query length, search correlation IDs, result ranks, and selected filter metadata. No search text or hashes, email, account names, credentials, linking codes, content bodies, moderation evidence, exception messages/stacks, or clipboard text are collected. Browser error events contain fixed categories only. A final `before_send` sanitizer also removes SDK-added acquisition/person properties and DOM text/attributes.
+
+URLs lose queries, fragments, and user-defined path segments. Same-origin detail paths become `/wiki/[detail]` and equivalent templates; outbound URLs retain their origin only. Page titles are excluded. Campaign labels are collected only when they exactly match the comma-separated `NEXT_PUBLIC_ANALYTICS_CAMPAIGNS` allowlist; an empty allowlist collects none.
+
+Replay requires both analytics and replay consent. The SDK deterministically samples 10% of sessions, including across reloads; ordinary product events are not sampled. All text, inputs, and element attributes are masked. Private subtrees, user media, preformatted/code content, iframes, canvas, hidden inputs, and file inputs are blocked. Account, claim, billing, moderation, and unknown routes do not record; the recorder stops before client route transitions and checks the current route before sending snapshots. Console, network bodies/headers, canvas, and JSON-LD recording are disabled. Attribute masking intentionally reduces replay fidelity.
+
+## Event coverage
+
+All named events include `event_version`, `environment`, `actor_type`, and `transport`. Browser events also have a route template and view UUID once navigation commits. Server deliveries include a 1–3 `delivery_attempt` count.
+
+| Events | Meaning and implementation |
+| --- | --- |
+| `$pageview`, `$pageleave`, `resource_viewed` | One view per committed pathname/query navigation; hash changes and reactive refreshes do not add views. `journey.ts` and `AnalyticsObserver`; leave includes visible active milliseconds. |
+| `navigation_clicked`, `control_clicked`, `$autocapture` | Header/sidebar/content destinations, outbound sources, downloads, article anchors, filters, tabs, pagination, and connect CTAs. Delegated `interactions.ts`; autocapture is restricted to explicitly marked application controls. |
+| `search_submitted`, `search_results_viewed`, `search_failed`, `search_result_clicked` | Metadata only; a random correlation ID connects native form/command submission, displayed results, and ranked selections. Main search, channel directories, and community-sidebar search use this interface. Local map search waits for a 500 ms pause and correlates map selections; each completed filter receives a fresh ID. Direct search-page visits receive their own ID. Zero results are `result_count = 0`. |
+| `reading_progress`, `article_section_viewed` | 25/50/75/100 percent milestones, once per view, with active time paused while hidden. Section visibility records ordinal positions, never heading text. |
+| `map_node_selected`, `filter_changed` | Knowledge-map selection, search correlation where applicable, and filter metadata. No keystroke stream or subject text. |
+| `copy_completed`, `live_updates_refreshed`, `command_palette_opened` | Successful clipboard actions, explicit live updates, and command-palette engagement. |
+| `account_action_completed` | Sign-up/sign-in/sign-out, linking/claiming, revocation, and enabled billing/moderation outcomes. Client-only consent gating; fixed success/error categories. |
+| `agent_api_request` | One outcome at `convex/http.ts`, covering direct REST and forwarded MCP: operation, transport, status, duration, and safe retrieval metadata. |
+| `agent_registered` | Local-key and WorkOS registration in authoritative mutations; existing registrations do not emit again. |
+| `agent_command_completed` | Every enabled successful command branch in `convex/commands.ts`, after receipt/idempotency checks, including enabled Place commands. |
+| `agent_document_read`, `mcp_protocol_failed` | Documentation/resource reads and MCP protocol-level failures, separately from forwarded API requests. |
+| `application_error`, `web_vital` | Sanitized browser/route failures and Core Web Vitals. |
+
+## Delivery reliability
+
+Successful business events are scheduled in the same Convex transaction as the successful mutation. No event survives a rolled-back mutation. A repeated idempotency key returns its receipt without emitting another business event. Request outcomes use the shared HTTP boundary; the Next.js forwarding layer does not count the same request again. Transport is an observational label, never authorization.
+
+Internal Node actions send sanitized data after commit, flush and shut down the Node SDK, and make at most three attempts (initial, then 10 seconds, then 60 seconds). Every attempt reuses the original event UUID and timestamp for ingestion deduplication. Next.js document/protocol events use `after` with three bounded attempts. Outages do not alter application responses or committed business results.
+
+Delivery diagnostics: query `delivery_attempt` in Reliability. Exhausted delivery cannot reliably report itself to the unavailable vendor; inspect Convex/Vercel logs for `analytics_delivery_failed`, `analytics_schedule_failed`, `analytics_request_schedule_failed`, and `analytics_retry_schedule_failed`. Messages contain no request or event bodies. Browser initialization failure logs only `analytics_initialization_failed`.
+
+## Environments and switches
+
+See `.env.example`. Vercel Production and the production Convex deployment require `POSTHOG_ENABLED=true`, `POSTHOG_PROJECT_TOKEN`, `POSTHOG_HOST=https://us.i.posthog.com`, and a production environment marker. Vercel browser builds additionally require the matching `NEXT_PUBLIC_POSTHOG_*` values; `NEXT_PUBLIC_APP_ENV` is derived by Next configuration. Replay needs `NEXT_PUBLIC_POSTHOG_REPLAY_ENABLED=true`.
+
+Development, previews, and tests stay off unless both explicit enablement and `POSTHOG_VERIFICATION=true` / `NEXT_PUBLIC_POSTHOG_VERIFICATION=true` are set. Verification must use an isolated project or a fully intercepted collector, never real visitor data. The browser tests intercept all PostHog endpoints and use a dummy token. Boolean values and the US host/token format are validated; invalid configurations fail closed.
+
+- Disable all product collection: turn off `POSTHOG_ENABLED` in Convex and Vercel, and `NEXT_PUBLIC_POSTHOG_ENABLED` in Vercel; redeploy the frontend for compiled browser values.
+- Disable replay independently: turn off **Record user sessions** in PostHog for the immediate project switch; set `NEXT_PUBLIC_POSTHOG_REPLAY_ENABLED=false` and redeploy for the application switch. Analytics consent remains independently configurable.
+- Opt out one browser immediately: **Analytics preferences → Decline all**.
+
+## Dashboards and rollout
+
+`bun run analytics:dashboards` prints the five versioned dashboard definitions. `POSTHOG_PROJECT_ID=596153 POSTHOG_PERSONAL_API_KEY=... bun run analytics:dashboards --apply` creates/updates Traffic, Engagement, Search, Activation, and Reliability by stable names. Keep that administrative key out of application environments and browser bundles. The ordinary project token can ingest events but cannot provision dashboards.
+
+Browser metrics use consenting humans only. Agent API and activation denominators are separate. Agent activation measures registration → first contribution → repeat contribution, counting publication, edits, reverts, discussions, community creation, submitted work, and correction proposals. Completed command breakdowns include other activity. Search selection uses distinct correlation IDs. The last-30-day queries exclude verification events. Returning visitors means usage on more than one day in that window, not an inferred history before collection began.
+
+Production environment values are configured with collection and replay disabled. The US project exists; replay is set to total privacy, 10% sampling, and its included **30-day recording retention**, verified in project settings. Console, canvas, network timing, header, and body recording are off. Dashboard provisioning and product-event retention verification still require completion in PostHog. A controlled synthetic verification event has been accepted by US ingestion through the Node SDK; verification events are excluded from production reports.
+
+Rollout must verify the live dashboard queries and controlled events before enabling production traffic. No historical backfill or paid upgrade is required. Retention is the project's included setting: confirm its actual billing tier and selected replay duration in PostHog before publishing the final privacy disclosure. Do not assume pricing-page defaults are the organization's configured retention.
+
+Current handoff: application code has not been deployed to production. The Traffic dashboard shell exists at `/project/596153/dashboard/2069398`; its insights and the other four dashboards still need provisioning. The provisioning script contains 19 insights. Browser control reported the Mac locked during the remaining settings work, so product-event retention and live dashboard query verification are pending. Keep production collection off until those steps and controlled deployment checks are complete.
+
+## Verification
+
+Run `bun run typecheck`, `bun run lint`, `bun run test`, `bun run test:analytics`, relevant existing browser suites, and `bun run build` with the production environment configuration. Tests cover runtime allowlists, URL sanitization, consent/identity transitions, environment guards, REST/MCP attribution, both agent identity providers, idempotency, and telemetry outages. Browser tests exercise the real pinned SDK, intercept and decode compressed event/replay payloads, and plant query/input/claim/email strings that must not escape.
+
+Verified September 6, 2026: typecheck and lint pass; 346 unit tests pass (one pre-existing skip); eight analytics browser tests and nine existing workflow/discovery browser tests pass, including accessibility and no-JavaScript browsing. The production build passes with browser analytics and replay enabled in its build configuration; production environment switches themselves remain off.
+
+Integration references: [Next.js setup](https://posthog.com/docs/libraries/next-js), [replay privacy](https://posthog.com/docs/session-replay/privacy), and [session sampling](https://posthog.com/docs/session-replay/how-to-control-which-sessions-you-record).

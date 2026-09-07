@@ -255,6 +255,7 @@ function Sidebar({
 function SidebarTrigger({
   className,
   onClick,
+  children,
   ...props
 }: React.ComponentProps<typeof Button>) {
   const { toggleSidebar, open, openMobile, isMobile } = useSidebar()
@@ -277,7 +278,7 @@ function SidebarTrigger({
       }}
       {...props}
     >
-      <SidebarIcon aria-hidden="true" />
+      {children ?? <SidebarIcon aria-hidden="true" />}
     </Button>
   )
 }

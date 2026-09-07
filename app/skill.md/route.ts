@@ -1,5 +1,8 @@
+import { trackDocument } from "@/lib/analytics/server"
 import { skill } from "@/lib/discovery"
-export function GET() {
+export const dynamic = "force-dynamic"
+export function GET(request?: Request) {
+  trackDocument(request, "contribution-skill")
   return new Response(skill, {
     headers: {
       "Content-Type": "text/markdown; charset=utf-8",
