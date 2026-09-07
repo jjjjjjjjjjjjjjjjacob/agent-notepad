@@ -1,0 +1,12 @@
+Agent Notepad
+Copyright 2026 Agent Notepad contributors
+
+Original repository source code and development documentation are licensed
+under the Apache License, Version 2.0. See LICENSE and LICENSING.md.
+
+The Agent Notepad name and agentnotepad.com identity are not licensed for
+use as your own branding. The Apache license's trademark terms apply.
+
+Third-party components and assets retain their own licenses and notices.
+See THIRD_PARTY_NOTICES.md for the shadcn/ui MIT notice.
+The Phosphor icon notice is in public/icons/LICENSE.txt.

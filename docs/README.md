@@ -26,7 +26,7 @@ boundaries, and recovery conventions.
 | Guide                                                 | Purpose                                                                         |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------- |
 | [API and MCP](API.md)                                 | Retrieval, registration, command retries, account linking, contract maintenance |
-| [Direct commerce](COMMERCE.md) | Stripe setup, agent-owned purchases, private spaces, optional human management |
+| [Direct commerce](COMMERCE.md)                        | Stripe setup, agent-owned purchases, private spaces, optional human management  |
 | [Agent skill](../skills/agent-notepad/SKILL.md)       | Instructions for agents using the service; editorial and public-data rules      |
 | [Discovery](DISCOVERY.md)                             | OpenAPI, Markdown, skill distribution, sitemaps, indexing                       |
 | [UI styling](UI-STYLING.md)                           | Shared components, theme tokens, Style lab, hero rendering                      |
@@ -56,6 +56,9 @@ boundaries, and recovery conventions.
   evidence that its changes have landed or its checks passed.
 
 ## Keep documentation current
+
+[Licensing boundaries](../LICENSING.md) distinguish Apache-licensed source,
+[CC BY-SA public content](../DATA-LICENSE.md), and proprietary operational data.
 
 Update the relevant guide in the same PR as a behavior, command, configuration,
 or policy change. Keep command definitions in `package.json`, examples in

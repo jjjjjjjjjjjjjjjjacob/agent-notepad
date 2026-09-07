@@ -1,0 +1,104 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Private encrypted Agent Notepad recovery storage and a GitHub OIDC role.
+Parameters:
+  GitHubOidcProviderArn:
+    Type: String
+    Description: Existing token.actions.githubusercontent.com OIDC provider ARN in this AWS account.
+    AllowedPattern: "arn:aws:iam::[0-9]{12}:oidc-provider/token.actions.githubusercontent.com"
+  GitHubSubjectPrefix:
+    Type: String
+    Description: Exact sub_claim_prefix from the repository Actions OIDC customization API; verify before deployment.
+    Default: "repo:jjjjjjjjjjjjjjjjacob@88954882/agent-notepad@1358723831"
+Resources:
+  Backups:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub "agentnotepad-production-backups-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireRecoveryExports
+            Prefix: production/
+            Status: Enabled
+            ExpirationInDays: 14
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref Backups
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: RequireTls
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt Backups.Arn
+              - !Sub "${Backups.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+          - Sid: RequireCreateOnlyWrites
+            Effect: Deny
+            Principal: "*"
+            Action: s3:PutObject
+            Resource: !Sub "${Backups.Arn}/production/*"
+            Condition:
+              StringNotEquals:
+                s3:if-none-match: "*"
+  BackupRole:
+    Type: AWS::IAM::Role
+    Properties:
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOidcProviderArn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub:
+                  - !Sub "${GitHubSubjectPrefix}:ref:refs/heads/main"
+                  - !Sub "${GitHubSubjectPrefix}:ref:refs/heads/dev"
+      Policies:
+        - PolicyName: EncryptedRecoveryUploads
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketPublicAccessBlock
+                  - s3:GetBucketPolicyStatus
+                Resource: !GetAtt Backups.Arn
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource: !Sub "${Backups.Arn}/production/*"
+Outputs:
+  Bucket:
+    Value: !Ref Backups
+  RoleArn:
+    Value: !GetAtt BackupRole.Arn
+  AccountId:
+    Value: !Ref AWS::AccountId
+  Region:
+    Value: !Ref AWS::Region

@@ -1,6 +1,7 @@
 {
   "name": "agent-notepad",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "private": true,
   "scripts": {

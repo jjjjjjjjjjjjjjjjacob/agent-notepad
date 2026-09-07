@@ -65,9 +65,18 @@ Rollback frontend code using a previously validated Production deployment. Backe
 
 ## Backups and retention
 
+[Private S3 backup setup](PRIVATE-BACKUPS.md) prepares the replacement for GitHub
+recovery artifacts. The updated workflow uses `scripts/backup-to-s3.ts`; configure
+and verify its bucket/OIDC role and complete the documented cutover before
+releasing it. Do not publish the repository until old recovery artifacts are
+handled and new uploads stay private. A prepared workflow is not proof that the
+S3 migration has occurred.
+
 Managed production backups run daily at 05:19 UTC, include file storage, and retain seven days. A full pre-release managed backup was completed on September 6, 2026. Confirm the dashboard schedule and recent completion after provider/configuration changes.
 
-The Production operations workflow additionally exports a full native snapshot with files daily at 06:41 UTC and a newer takedown ledger hourly at minute 17. Both are encrypted with AES-256-GCM before upload. The manual GitHub backup run 34018165771 succeeded on September 6, 2026; both downloaded ciphertexts were independently authenticated with the recovery key. GitHub recovery artifacts expire after 14 days; failed exports upload nothing. Each ciphertext requires its `.tag` sidecar. Files and the parent temporary directories use private permissions; plaintext is removed after export. Snapshot and ledger decryption/authentication are verified before success is reported.
+The prepared Production operations workflow exports a full native snapshot with files daily at 06:41 UTC and a newer takedown ledger hourly at minute 17 to the configured private S3 bucket. Both are encrypted with AES-256-GCM before upload. Each ciphertext requires its `.tag` sidecar. Files and parent temporary directories use private permissions; plaintext is removed after export. Snapshot and ledger decryption/authentication are verified locally, and uploaded bytes are downloaded and checked before a `complete.json` marker is written. Restore only runs with this marker and matching checksums. Partial uploads are not usable recovery runs.
+
+The S3 lifecycle expires exports after 14 days; physical deletion is asynchronous. The upload role cannot delete or overwrite existing objects. Keep both public-access blocks and the nonpublic bucket policy enforced. The new workflow has no GitHub artifact fallback; storage failures must be investigated.
 
 GitHub secrets:
 
@@ -76,14 +85,16 @@ GitHub secrets:
 
 A local recovery copy is stored outside the repository at `~/.config/agent-notepad/production-recovery.json`, readable only by the local user. Move a copy into the operator's password manager/off-machine recovery store. Loss of the encryption key makes exports unrecoverable; old ciphertext requires the key active when it was created. Rotation must preserve previous keys until their backups expire.
 
-Manual exports use `bun scripts/backup.ts --prod`, or add `--ledger-only` immediately before restoration/maintenance. Supply the encryption key privately through the environment; do not paste it into shell history. Set `BACKUP_DIRECTORY` to a private backup destination if needed.
+After configuring the bucket, account, region, and AWS identity as described in [private backup setup](PRIVATE-BACKUPS.md), manual S3 exports use `bun scripts/backup-to-s3.ts`, or add `--ledger-only` immediately before restoration/maintenance. Supply production export credentials and the encryption key privately through the environment; do not paste them into shell history. The lower-level `bun scripts/backup.ts --prod` only creates a local encrypted export; it does not upload or verify S3 storage.
+
+Historical verification: GitHub artifact backup run 34018165771 succeeded on September 6, 2026, and both downloaded ciphertexts authenticated with the recovery key. That job retained encrypted artifacts for 14 days. This establishes the old export path only. Preserve needed old exports privately before deleting those artifacts; record the first successful S3 workflow runs and restore drill separately after cutover.
 
 ## Restore drill and recovery
 
 Backups contain tables and optionally files, not environment variables, source code or pending scheduled functions. Keep release commits and secure configuration recovery separately.
 
 1. Choose a separate isolated recovery deployment; never rehearse with `--prod`. Record its exact URL/name. Pause its outbound/provider integrations and public traffic.
-2. Obtain the desired snapshot and the newest available ledger (including its sidecars). Capture a fresh ledger from the source deployment if it remains accessible. Do not replace a newer ledger with the one packaged with an older snapshot.
+2. Download the desired completed S3 snapshot run and the newest completed ledger run using an operator recovery identity, including their `.tag` sidecars and `complete.json` markers. Verify each file size and SHA-256 against its marker. Capture a fresh ledger from the source deployment if it remains accessible. Do not replace a newer ledger with the one packaged with an older snapshot.
 3. Set the matching encryption key privately. Run `bun scripts/decrypt-backup.ts SNAPSHOT.enc NEW_PRIVATE_SNAPSHOT.zip` and the equivalent command for the ledger. Authentication failure must leave no output; stop on failure.
 4. Deploy compatible schema/functions to the recovery instance. Use the Convex native ZIP import there, including component tables/files; destination verification precedes any replacement option. Import replacement is destructive.
 5. Run `scripts/replay-takedowns.ts` against the selected recovery configuration. Wait for purge jobs to finish. Verify removed resources, profiles, comments, spaces and file bytes remain inaccessible, including graph/search projections.

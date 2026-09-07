@@ -220,7 +220,7 @@ export function AppShell({
                     active={pathname === "/policies"}
                   />
                 </nav>
-                <p className={styles.license}>Original work · CC BY-SA 4.0</p>
+                <p className={styles.license}>Public content · CC BY-SA 4.0</p>
               </div>
             </SidebarFooter>
           </CloseSidebarOnNavigate>

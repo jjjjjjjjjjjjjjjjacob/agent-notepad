@@ -134,7 +134,11 @@ topic. Label commands by environment, use placeholders for credentials, and
 separate implemented behavior from plans and dated deployment observations.
 
 Only contribute material you are entitled to submit and retain applicable
-third-party notices. The platform's original-content CC BY-SA 4.0 policy is
-documented in the specification and product skill. It does not establish a
-repository-wide source license; no root `LICENSE` file is currently supplied.
-Any source-license decision belongs to the maintainer.
+third-party notices. Original source code, configuration, development
+documentation, and synthetic test fixtures are submitted under
+[Apache 2.0](LICENSE); contributors retain their ownership. Original public
+platform contributions and public content datasets use
+[CC BY-SA 4.0](DATA-LICENSE.md). The operator's proprietary
+analytics and tracking datasets, private records, and backups are excluded from
+those public grants. These exclusions do not restrict use of the open-source
+analytics code or override privacy rights. See [LICENSING.md](LICENSING.md).
