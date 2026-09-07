@@ -1,87 +1,95 @@
-# Private S3 recovery storage
+# Private GitHub recovery operations
 
-This is the prepared replacement for GitHub recovery artifacts. It is not active
-until the AWS stack, repository variables, and workflow release are verified.
-Do not make the repository public or remove existing backups during this setup.
+Production recovery belongs in the private
+[jjjjjjjjjjjjjjjjacob/agent-notepad-ops](https://github.com/jjjjjjjjjjjjjjjjacob/agent-notepad-ops)
+repository. The application source and ordinary sanitized CI artifacts may be
+public. Keep the operations repository private permanently; its artifact access
+follows repository access. No AWS or separate Convex storage project is needed.
 
-The existing export still encrypts the native Convex snapshot and takedown ledger
-with AES-256-GCM and verifies decryption locally. `scripts/backup-to-s3.ts` uploads
-only recognized ciphertext/tag pairs, rejects the wrong AWS account or a bucket
-without all public-access blocks and a nonpublic policy, and downloads every
-object to verify its SHA-256. It publishes `complete.json` last. A missing marker
-means the run is incomplete and must not be used for restoration.
+## Verified status — September 7, 2026
 
-The uploader uses AWS CLI v2, explicit AWS HTTPS endpoints, three provider retry
-attempts, and bounded command timeouts. It supports standard commercial AWS
-regions and single files up to 5 GiB. Larger exports need a separately reviewed
-multipart implementation. There is no fallback to GitHub artifacts.
+The private repository is active. Full run `34088062680` and ledger-only run
+`34088102370` succeeded and their downloaded artifacts were authenticated. All
+nine old application recovery archives were preserved privately and verified
+before removal from GitHub. The old application workflow is disabled, no old
+runs remained active, and the application repository has no recovery artifacts
+or recovery secrets. See [the cutover evidence](LAUNCH-OPERATIONS.md#private-repository-cutover--september-7-2026).
 
-## Provision and review
+The steps below remain the procedure for future migrations or re-verification;
+they do not require repeating this completed cutover.
 
-1. Choose the AWS account and region. S3 storage and requests are billed to that
-   account. Review the change set before creating resources.
-2. Identify the account's existing GitHub OIDC provider. If absent, configure
-   `https://token.actions.githubusercontent.com` with audience `sts.amazonaws.com`
-   through IAM. Do not create permanent AWS access keys for the workflow.
-3. Query the actual repository subject configuration; use its exact
-   `sub_claim_prefix`, not a guessed owner/repository string:
+## Design
 
-   ```sh
-   gh api repos/jjjjjjjjjjjjjjjjacob/agent-notepad/actions/oidc/customization/sub
-   ```
+The operations repository contains reviewed copies of the small export, crypto,
+decryption, and health-check tools, plus a pinned Convex CLI dependency. It does
+not clone contributed application code or need a cross-repository access token.
+Updates to those copies are explicit reviewed changes with source provenance.
 
-4. Create a CloudFormation change set from
-   [infra/backup-storage.yaml](../infra/backup-storage.yaml), supplying the OIDC
-   provider ARN and verified subject prefix. Review and execute it in the chosen
-   account/region. The stack creates a private bucket with public-access blocks,
-   bucket-owner enforcement, encryption at rest, TLS-only access, 14-day expiry,
-   and a role limited to this repository's `main`/`dev` OIDC subjects. IAM can
-   therefore trust scheduled runs from default branch `dev` and manual runs from
-   `main`. The scripts still explicitly check out `main` for production work.
-5. Preserve the stack outputs as these GitHub Actions **variables**:
-   `BACKUP_S3_BUCKET`, `BACKUP_AWS_ROLE_ARN`, `BACKUP_AWS_ACCOUNT_ID`, and
-   `BACKUP_AWS_REGION`. Retain existing **secrets** `CONVEX_OPERATIONS_KEY` and
-   `BACKUP_ENCRYPTION_KEY`. Keep the encryption key's independent recovery copy.
+The private workflow keeps the existing schedules: a full native Convex snapshot
+with file storage daily at 06:41 UTC, and a newer takedown ledger hourly at minute 17. Only the private repository's `main` branch may run production jobs, and a
+fresh GitHub API check verifies repository privacy before export. GitHub
+schedules may be delayed; they are not a guaranteed recovery-point objective.
 
-The role can inspect the bucket's privacy status and create/read objects under
-`production/`; it cannot delete objects, change policies, or administer AWS.
-Conditional writes prevent overwriting existing keys. The bucket is retained
-if the CloudFormation stack is deleted. Retention is an S3 lifecycle rule;
-expiry eligibility and physical deletion are asynchronous. Partial runs also
-expire. This is not immutable Object Lock storage or protection against an AWS
-account administrator. Never promise otherwise.
+Both payloads use AES-256-GCM with their `.tag` sidecars. The exporter verifies
+authentication locally before success. A strict pre-upload check rejects
+plaintext, symlinks, missing sidecars, and unexpected files. `manifest.json`
+records generated paths, sizes, and SHA-256 checksums. Only successful, complete
+runs are recovery candidates. Artifacts have 14-day retention; deleting a run or
+the repository can remove them earlier. This is not immutable backup storage.
 
-## Cut over without losing recovery coverage
+Only `agent-notepad-ops` receives `CONVEX_OPERATIONS_KEY` and
+`BACKUP_ENCRYPTION_KEY` as Actions secrets. The former remains restricted to
+production data reads, exports, and internal queries, without deploy/mutation/
+action permission. The encryption key is never included in an artifact. Keep
+its independent recovery copy and previous keys until corresponding backups
+expire. Keep managed Convex backups enabled.
 
-1. With the new storage configured, run a **full** `bun scripts/backup-to-s3.ts`
-   from this reviewed checkout using the existing production recovery credentials
-   privately and the selected AWS identity. This exports production but does not
-   modify production data. Run it with `--ledger-only` as well.
-2. Using an operator recovery identity, download a completed run from S3. Verify
-   each object's size and SHA-256 against `complete.json`, then authenticate both
-   ciphertexts with their `.tag` files and the matching recovery key using
-   `scripts/decrypt-backup.ts`. Start recovery with the ledger paired with the
-   full snapshot; replace it only with an authenticated ledger whose `capturedAt`
-   is at least as recent. Stop if the paired ledger is missing or either capture
-   timestamp is invalid. Marker/upload time is not capture time. Preserve
-   decryption output in a private temporary directory; remove it after inspection. Repeat the isolated restore drill in
-   [production operations](LAUNCH-OPERATIONS.md#restore-drill-and-recovery).
-3. Jacob merges the reviewed workflow and scripts through `dev` and releases
-   them to `main`. Both must contain the change because scheduled workflow
-   definitions come from default branch `dev`, while production scripts are
-   checked out from `main`. Until that release, the old artifact job is still
-   active. Do not describe a successful local upload as a completed cutover.
-4. Verify full and ledger-only **GitHub** runs against S3, their OIDC identity,
-   completion markers, schedule, and failure notifications. Confirm no new
-   `recovery-*` Actions artifacts are created. Keep managed Convex backups on.
-5. Preserve needed old recovery exports in private storage with their original
-   keys and retention obligations, then delete the old GitHub recovery artifacts.
-   Do not delete the only usable backup. Only after this verification and cleanup
-   should the source repository become public.
+## Cutover and verification
 
-Use new unique run directories when retrying failed uploads; never overwrite a
-completed run. Recovery exports include restricted records even when some public
-content is CC BY-SA. They are not public data releases.
+1. Create and verify the private operations repository. Keep default Actions
+   permissions read-only, disable Actions PR approvals and auto-merge, and require
+   SHA-pinned actions. Preserve Jacob as the sole collaborator/merger.
+2. Configure its two existing recovery secrets privately. Run full and
+   ledger-only manual jobs, checking the target deployment and private artifact
+   retention. Download both artifacts; verify their checksums and authenticate
+   all encrypted payloads with the matching recovery key. Validate the native
+   snapshot structure and ledger capture metadata without logging user data.
+3. Disable the old application operations workflow only after the private jobs
+   and health monitor succeed. Preserve every retained old recovery archive
+   outside the application repository with checksums and original expiry dates;
+   verify those copies before removing the GitHub originals. Recheck for any
+   in-flight old run that could produce another artifact.
+4. Remove the application's two backup secrets. Remove its backup job through
+   normal review; the application workflow in this change is monitoring-only.
+   Jacob merges/releases the source change. Until then, leave the old application
+   workflow disabled; the private operations repository also runs health checks.
+5. Before public visibility, verify the operations repository is still private,
+   its schedule is active, recent backup runs succeed, no `recovery-*` artifacts
+   remain in the application repository, and the old job cannot upload more.
+   Verify operator failure notifications and retain off-machine key recovery.
 
-References: [AWS conditional writes](https://docs.aws.amazon.com/cli/latest/reference/s3api/put-object.html),
-[GitHub OIDC with AWS](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws).
+Migrated historical archives may remain in the operator's private local recovery
+archive with their original expiry dates recorded; they are not added to Git
+history or the public repository. Remove those local copies when their recorded
+retention expires. Record the preservation location privately. Fresh daily and
+hourly artifacts are stored in the private operations repository.
+
+## Recovery
+
+Download a successful full run from `agent-notepad-ops`. Verify each encrypted
+file's size and SHA-256 against `manifest.json`, using its
+`scripts/verify-backup.ts DIRECTORY --existing`. Authenticate the snapshot and
+ledger with `scripts/decrypt-backup.ts`, keeping plaintext in a private temporary
+directory and removing it after inspection or recovery.
+
+Start with the ledger paired with the full snapshot; it was captured after the
+snapshot export. Replace it only with an authenticated ledger whose `capturedAt`
+is at least as recent. Stop if the paired ledger is missing or either capture
+timestamp is invalid. Marker/upload times do not establish capture order.
+Follow the [isolated restore and takedown replay procedure](LAUNCH-OPERATIONS.md#restore-drill-and-recovery).
+
+Backups include restricted records, even when some content is CC BY-SA. They
+are not public dataset exports. Encryption protects content; private artifact
+access adds a separate boundary and limits distribution of historical copies.
+
+Reference: [GitHub artifact access](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/download-workflow-artifacts).

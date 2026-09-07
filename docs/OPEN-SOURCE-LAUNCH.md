@@ -11,7 +11,10 @@ On September 7, 2026 GitHub rejected creating the branch ruleset (403), CodeQL
 default setup (403), and secret scanning/push protection (422) for the current
 private personal repository. Existing Gitleaks and dependency CI remain active.
 Changing a local configuration file does not enable hosted security features.
-Use public visibility after [private backup cutover](PRIVATE-BACKUPS.md), or an
+The [private backup cutover](PRIVATE-BACKUPS.md) is verified: backups now live in
+`agent-notepad-ops`, and the application recovery artifacts/secrets were removed.
+Source licensing and workflow cleanup still require the normal dev/main release.
+Use public visibility after that release, or an
 eligible GitHub plan; do not purchase a plan as an incidental setup action.
 
 ## Branches and security

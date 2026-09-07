@@ -37,12 +37,14 @@ boundaries, and recovery conventions.
 
 ## Operations and policy enforcement
 
-| Guide                                          | Purpose                                                                    |
-| ---------------------------------------------- | -------------------------------------------------------------------------- |
-| [Production operations](LAUNCH-OPERATIONS.md)  | Coordinated releases, origins, monitoring, backups, recovery               |
-| [Environment operations](OPERATIONS.md)        | Preview setup, migrations, search/index backfills, operator procedures     |
-| [Security setup](../.github/SECURITY-SETUP.md) | Exact check names, pinned scanners, dependency updates, hosted limitations |
-| [Vouch setup](../.github/VOUCH-SETUP.md)       | Canonical trust evaluation and hosted enforcement requirements             |
+| Guide                                            | Purpose                                                                    |
+| ------------------------------------------------ | -------------------------------------------------------------------------- |
+| [Production operations](LAUNCH-OPERATIONS.md)    | Coordinated releases, origins, monitoring, backups, recovery               |
+| [Private backups](PRIVATE-BACKUPS.md)            | Private GitHub operations, artifact retention, and verified cutover        |
+| [Open-source publication](OPEN-SOURCE-LAUNCH.md) | Source/data licensing, hosted protection activation, and CodeRabbit        |
+| [Environment operations](OPERATIONS.md)          | Preview setup, migrations, search/index backfills, operator procedures     |
+| [Security setup](../.github/SECURITY-SETUP.md)   | Exact check names, pinned scanners, dependency updates, hosted limitations |
+| [Vouch setup](../.github/VOUCH-SETUP.md)         | Canonical trust evaluation and hosted enforcement requirements             |
 
 ## Prototypes and planned work
 

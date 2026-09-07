@@ -53,7 +53,7 @@ The public smoke check validates health, the production backend, documentation o
 
 ## Monitoring and incidents
 
-`.github/workflows/operations.yml` runs a public service check hourly and on manual dispatch. GitHub schedules originate from default branch `dev`; both operations jobs explicitly check out `main` before running production scripts. Manual operations dispatches must select `main`. It fails on unavailable health, wrong origins/backend, missing documentation or broken MCP. GitHub Actions run notifications provide failure visibility to subscribed repository operators; verify account notification delivery. The daily backup job also invokes these checks. GitHub scheduled runs may be delayed and are not an availability SLA.
+`.github/workflows/operations.yml` runs a public service check hourly and on manual dispatch. GitHub schedules originate from default branch `dev`; the monitoring job explicitly checks out `main` before running production scripts. Manual operations dispatches must select `main`. During backup cutover, the old combined application workflow is disabled and the private operations repository runs the same public checks. Re-enable the application workflow only once both `dev` and `main` contain its monitoring-only definition. It fails on unavailable health, wrong origins/backend, missing documentation or broken MCP. GitHub Actions run notifications provide failure visibility to subscribed repository operators; verify account notification delivery. The private operations workflow also runs these checks alongside backups. GitHub scheduled runs may be delayed and are not an availability SLA.
 
 Use Convex Health/Logs/Usage for authoritative errors, function execution and bandwidth/storage usage; use Vercel Observability for frontend failures and function duration. `bunx convex run admin:status '{}' --prod` reports recent background jobs, counters and indexing backlog without exposing source contents. Missing optional embedding configuration is expected keyword-only operation. Investigate unexpected failed/retry jobs and blocked jobs for configured providers.
 
@@ -65,36 +65,33 @@ Rollback frontend code using a previously validated Production deployment. Backe
 
 ## Backups and retention
 
-[Private S3 backup setup](PRIVATE-BACKUPS.md) prepares the replacement for GitHub
-recovery artifacts. The updated workflow uses `scripts/backup-to-s3.ts`; configure
-and verify its bucket/OIDC role and complete the documented cutover before
-releasing it. Do not publish the repository until old recovery artifacts are
-handled and new uploads stay private. A prepared workflow is not proof that the
-S3 migration has occurred.
+[Private GitHub recovery operations](PRIVATE-BACKUPS.md) moves production backups
+to the private `jjjjjjjjjjjjjjjjacob/agent-notepad-ops` repository. The application
+workflow in this change is monitoring-only. The hosted backup cutover was
+verified on September 7, 2026; see the dated evidence below. Keep the application
+workflow disabled until its monitoring-only definition is released.
 
 Managed production backups run daily at 05:19 UTC, include file storage, and retain seven days. A full pre-release managed backup was completed on September 6, 2026. Confirm the dashboard schedule and recent completion after provider/configuration changes.
 
-The prepared Production operations workflow exports a full native snapshot with files daily at 06:41 UTC and a newer takedown ledger hourly at minute 17 to the configured private S3 bucket. Both are encrypted with AES-256-GCM before upload. Each ciphertext requires its `.tag` sidecar. Files and parent temporary directories use private permissions; plaintext is removed after export. Snapshot and ledger decryption/authentication are verified locally, and uploaded bytes are downloaded and checked before a `complete.json` marker is written. Restore only runs with this marker and matching checksums. Partial uploads are not usable recovery runs.
+The private operations workflow exports a full native snapshot with files daily at 06:41 UTC and a newer takedown ledger hourly at minute 17. Both are encrypted with AES-256-GCM and authenticated locally before upload. Each ciphertext requires its `.tag` sidecar. A strict layout check rejects unexpected files before upload and records sizes/SHA-256 in `manifest.json`. Restore only successful complete runs after checksum and authentication verification. Private artifacts expire after 14 days; do not delete a run or repository that holds a needed backup.
 
-The S3 lifecycle expires exports after 14 days; physical deletion is asynchronous. The upload role cannot delete or overwrite existing objects. Keep both public-access blocks and the nonpublic bucket policy enforced. The new workflow has no GitHub artifact fallback; storage failures must be investigated.
-
-GitHub secrets:
+Only the private operations repository stores these GitHub secrets:
 
 - `CONVEX_OPERATIONS_KEY`: deployment-scoped permission to view data, create/view/download backups and run internal queries. No deploy, mutation or action permission.
 - `BACKUP_ENCRYPTION_KEY`: independent 32-byte hex key. Never upload it alongside backups.
 
 A local recovery copy is stored outside the repository at `~/.config/agent-notepad/production-recovery.json`, readable only by the local user. Move a copy into the operator's password manager/off-machine recovery store. Loss of the encryption key makes exports unrecoverable; old ciphertext requires the key active when it was created. Rotation must preserve previous keys until their backups expire.
 
-After configuring the bucket, account, region, and AWS identity as described in [private backup setup](PRIVATE-BACKUPS.md), manual S3 exports use `bun scripts/backup-to-s3.ts`, or add `--ledger-only` immediately before restoration/maintenance. Supply production export credentials and the encryption key privately through the environment; do not paste them into shell history. The lower-level `bun scripts/backup.ts --prod` only creates a local encrypted export; it does not upload or verify S3 storage.
+Manual hosted exports use workflow dispatch in `agent-notepad-ops` on `main`; select `ledger_only` for the latest takedown ledger. Local-only exports remain available with `bun scripts/backup.ts --prod` and optional `--ledger-only`. Supply credentials privately, set `BACKUP_DIRECTORY` to a private destination, and never include the resulting backups in a public artifact upload.
 
-Historical verification: GitHub artifact backup run 34018165771 succeeded on September 6, 2026, and both downloaded ciphertexts authenticated with the recovery key. That job retained encrypted artifacts for 14 days. This establishes the old export path only. Preserve needed old exports privately before deleting those artifacts; record the first successful S3 workflow runs and restore drill separately after cutover.
+Historical verification: application-repository run 34018165771 succeeded on September 6, 2026, and both downloaded ciphertexts authenticated with the recovery key. That establishes the old export path only. Preserve retained old archives privately with original expiry dates before deleting application-repository artifacts.
 
 ## Restore drill and recovery
 
 Backups contain tables and optionally files, not environment variables, source code or pending scheduled functions. Keep release commits and secure configuration recovery separately.
 
 1. Choose a separate isolated recovery deployment; never rehearse with `--prod`. Record its exact URL/name. Pause its outbound/provider integrations and public traffic.
-2. Download the desired completed S3 snapshot run, including its paired ledger, `.tag` sidecars, and `complete.json` marker, using an operator recovery identity. Verify each file size and SHA-256 against its marker. The paired ledger was captured after the snapshot export and is the minimum recovery baseline. Obtain the most recently captured completed ledger as well; capture a fresh one from the source deployment if it remains accessible. Never substitute an older ledger for the snapshot's paired ledger.
+2. Download a successful full snapshot artifact from the private operations repository, including its paired ledger, `.tag` sidecars, and `manifest.json`. Verify each file size and SHA-256 against its manifest. The paired ledger was captured after the snapshot export and is the minimum recovery baseline. Obtain the most recently captured completed ledger as well; capture a fresh one from the source deployment if it remains accessible. Never substitute an older ledger for the snapshot's paired ledger.
 3. Set the matching encryption key privately. Run `bun scripts/decrypt-backup.ts SNAPSHOT.enc NEW_PRIVATE_SNAPSHOT.zip` and the equivalent command for each ledger. Authentication failure must leave no output; stop on failure. Compare the authenticated ledger payloads' `capturedAt` values: a replacement must be at least as recent as the paired snapshot ledger. Use the paired ledger when it is the newest available. Stop if the paired ledger is missing or either timestamp is invalid. Upload/marker times and run-directory names are not evidence of capture order.
 4. Deploy compatible schema/functions to the recovery instance. Use the Convex native ZIP import there, including component tables/files; destination verification precedes any replacement option. Import replacement is destructive.
 5. Run `scripts/replay-takedowns.ts` against the selected recovery configuration. Wait for purge jobs to finish. Verify removed resources, profiles, comments, spaces and file bytes remain inaccessible, including graph/search projections.
@@ -106,3 +103,31 @@ Initial recovery targets are daily data snapshots and an hourly takedown ledger.
 ## Recovery verification — September 6, 2026
 
 The encrypted production snapshot was authenticated and restored into a separate local backend on port 3245, including the Better Auth component tables. Production had no user files at snapshot time. A separate local fixture verified native snapshot file restoration, exact file-byte equality, and replay of a takedown captured after the snapshot. After replay the resource/file routes returned 404 and the storage table was empty. No production import was performed. This small fixture does not establish a recovery-time objective for a populated service.
+
+## Private repository cutover — September 7, 2026
+
+The private `agent-notepad-ops` repository now owns recovery and runs the same
+production health checks. Its [full snapshot run](https://github.com/jjjjjjjjjjjjjjjjacob/agent-notepad-ops/actions/runs/34088062680)
+and [ledger-only run](https://github.com/jjjjjjjjjjjjjjjjacob/agent-notepad-ops/actions/runs/34088102370)
+succeeded using operations commit `4c1e6214c760023a940a690159268ade1ae0d005`.
+Both downloaded artifacts matched GitHub archive digests and their manifests;
+all three ciphertexts authenticated, the native snapshot tables parsed, and
+ledger deployment/capture metadata validated. Temporary plaintext was removed.
+This was download/authentication/format verification, not a new database restore
+or a measurement of recovery time. The September 6 isolated restore remains
+separate evidence.
+
+All nine retained application recovery archives were preserved locally outside
+the repository with private permissions, checksums, and original expiry dates.
+Their twelve ciphertexts authenticated, including three native snapshots. The
+GitHub originals were then removed. The application operations workflow is
+`disabled_manually`, no old runs remained in flight, and its two recovery secrets
+were removed. Reinspection found zero application `recovery-*` artifacts and
+confirmed that operations storage is private with an active schedule.
+
+The private repository has only Jacob as a collaborator, read-only default
+workflow tokens, no Actions PR approvals or auto-merge, and a SHA-pinned action
+allowlist. Full and ledger-only manual execution were verified; the first
+scheduled execution and notification delivery were not observed during cutover.
+No AWS resources, separate Convex deployment, backend code deployment, or
+production import was performed.
