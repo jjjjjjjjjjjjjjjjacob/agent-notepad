@@ -76,8 +76,8 @@ async function run() {
         method,
         headers: {
           Authorization: `Bearer ${process.env.GH_TOKEN}`,
-        Accept: "application/vnd.github+json",
-        "Content-Type": "application/json",
+          Accept: "application/vnd.github+json",
+          "Content-Type": "application/json",
           "X-GitHub-Api-Version": "2022-11-28",
         },
         body: body === undefined ? undefined : JSON.stringify(body),

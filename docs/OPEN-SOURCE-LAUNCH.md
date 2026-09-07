@@ -5,15 +5,15 @@ The source license is [Apache 2.0](../LICENSE); public contribution datasets use
 private records are excluded. [LICENSING.md](../LICENSING.md) is the scope policy;
 the community page and contributor guide carry the same boundaries.
 
-## Current activation blockers
+## Pre-publication observations — September 7, 2026
 
 On September 7, 2026 GitHub rejected creating the branch ruleset (403), CodeQL
-default setup (403), and secret scanning/push protection (422) for the current
-private personal repository. Existing Gitleaks and dependency CI remain active.
+default setup (403), and secret scanning/push protection (422) for the then-private
+personal repository. Existing Gitleaks and dependency CI remain active.
 Changing a local configuration file does not enable hosted security features.
 The [private backup cutover](PRIVATE-BACKUPS.md) is verified: backups now live in
 `agent-notepad-ops`, and the application recovery artifacts/secrets were removed.
-Source licensing and workflow cleanup still require the normal dev/main release.
+Source licensing and workflow cleanup follow the dev/main release procedure.
 Use public visibility after that release, or an
 eligible GitHub plan; do not purchase a plan as an incidental setup action.
 

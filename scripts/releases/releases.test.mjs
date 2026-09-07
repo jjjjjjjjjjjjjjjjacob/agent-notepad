@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { readFileSync } from "node:fs"
 import { parseChangeset, validateCoverage } from "./check-changesets.mjs"
 import {
   checksPassed,
@@ -12,6 +13,24 @@ const manifest = { name: "agent-notepad", version: "0.0.0", private: true }
 const empty = "---\n---\n\nCI-only change; no application version bump.\n"
 const patch = '---\n"agent-notepad": patch\n---\n\nFix public search.\n'
 const changelog = "# agent-notepad\n\n## 0.0.0\n\nInitial release.\n"
+
+test("release workflow targets the configured repository and fixed trusted main", () => {
+  const config = JSON.parse(
+    readFileSync(
+      new URL("../../.changeset/config.json", import.meta.url),
+      "utf8"
+    )
+  )
+  const workflow = readFileSync(
+    new URL("../../.github/workflows/release.yml", import.meta.url),
+    "utf8"
+  )
+  assert.ok(
+    workflow.includes(`github.repository == '${config.changelog[1].repo}'`)
+  )
+  assert.ok(workflow.includes("github.actor == github.repository_owner"))
+  assert.match(workflow, /ref: main\s+persist-credentials: false/)
+})
 
 test("accepts release notes and explained non-release changesets", () => {
   assert.deepEqual(parseChangeset(patch), [

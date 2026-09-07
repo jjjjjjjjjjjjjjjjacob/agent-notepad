@@ -15,12 +15,12 @@ concurrency:
 jobs:
   release:
     if: >-
-      github.repository == 'jjjjjjjjjjjjjjjacob/agent-notepad' &&
+      github.repository == 'jjjjjjjjjjjjjjjjacob/agent-notepad' &&
       ((github.event_name == 'deployment_status' &&
         github.event.deployment_status.state == 'success' &&
         github.event.deployment.environment == 'Production') ||
        (github.event_name == 'workflow_dispatch' &&
-        github.actor == 'jjjjjjjjjjjjjjjacob' && github.ref == 'refs/heads/main'))
+        github.actor == github.repository_owner && github.ref == 'refs/heads/main'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
