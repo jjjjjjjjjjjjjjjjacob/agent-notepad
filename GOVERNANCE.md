@@ -29,6 +29,10 @@ list inside a PR cannot self-vouch its author. A successful status alone does
 not prove merge eligibility: Jacob must verify the actual author against
 canonical trust and wait for a current successful refresh.
 
+Maintainer-triggered policy refreshes can finish successfully while recording
+expected denials on unrelated PRs. The workflow result does not change each
+PR's trust status or merge eligibility; evaluator and API errors still fail.
+
 See [Vouch setup](.github/VOUCH-SETUP.md) for status races, strict up-to-date
 requirements, hosted activation limits, and the exact evaluator/publisher
 boundary. These documents and CODEOWNERS do not enable branch protection or

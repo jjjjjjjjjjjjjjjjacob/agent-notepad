@@ -53,6 +53,17 @@ all heads pending until batching is extended. Shared head SHAs use the most
 restrictive current PR author/draft decision. Closed PR events refresh remaining
 PRs. GitHub may coalesce queued concurrency runs; each run refreshes current state.
 
+When Jacob triggers a run, expected PR eligibility denials are job notices, so
+his push, personal-token action, or manual rerun can finish successfully even
+when unrelated PRs remain unvouched. GitHub's `triggering_actor` identifies the
+current triggering account; commit authors, email addresses, PR contents, and
+the original actor of a rerun do not grant this behavior. Individual PR heads
+still receive failing `Vouch / trusted contributor` statuses for draft, unknown,
+or denounced authors. Runs triggered by other accounts still fail on those
+denials. Missing or malformed evaluation results, API errors, and state races
+remain failures for everyone. This behavior takes effect when the publisher
+change reaches canonical `main`.
+
 Commit statuses bind to a SHA, not a unique PR identity. Although current
 same-head PRs receive the most restrictive decision, event/API races remain:
 a newly opened or changed PR can briefly inherit an earlier successful status.

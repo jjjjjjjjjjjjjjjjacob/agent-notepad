@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Plain Node/GitHub Actions CommonJS entry point. */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { trust, decision, finalize, REPOSITORY } = require('./vouch-gate.cjs');
+const { trust, decision, finalize, REPOSITORY, MAINTAINER } = require('./vouch-gate.cjs');
 const pr = (login = 'alice', overrides = {}) => ({ number: 1, state: 'open', draft: false, base: { ref: 'main' }, user: { login }, head: { sha: 'head-a' }, ...overrides });
 
 test('explicit vouch, denial, draft, bot and collaborator exemptions', () => {
@@ -23,7 +23,7 @@ test('malformed, duplicate and empty lists fail closed', () => {
 });
 
 function fixture({ contents = 'github:alice', fileError = false, prs, heads = [], bases = [], drafts = [], targets = [] } = {}) {
-  const statuses = [], contentRequests = [], failures = [];
+  const statuses = [], contentRequests = [], failures = [], notices = [];
   let headCalls = 0, baseCalls = 0;
   const github = {
     paginate: async () => prs ?? [pr()],
@@ -47,9 +47,9 @@ function fixture({ contents = 'github:alice', fileError = false, prs, heads = []
     },
   };
   const [owner, repo] = REPOSITORY.split('/');
-  const args = { github, context: { repo: { owner, repo }, runId: 7 }, core: { setFailed: msg => failures.push(msg) },
+  const args = { github, context: { repo: { owner, repo }, runId: 7 }, core: { setFailed: msg => failures.push(msg), notice: msg => notices.push(msg) },
     snapshot: { number: 1, author: 'alice', sha: 'head-a', base: 'base-a' }, actionStatus: 'vouched' };
-  return { args, statuses, contentRequests, failures };
+  return { args, statuses, contentRequests, failures, notices };
 }
 test('reads canonical base only, ignoring any fork self-vouch', async () => {
   const f = fixture(); await finalize(f.args);
@@ -62,6 +62,49 @@ test('canonical trust removal overrides successful upstream output', async () =>
   const f = fixture({ contents: 'github:someone-else' }); await finalize(f.args);
   assert.equal(f.statuses.at(-1).state, 'failure');
   assert.equal(f.failures.length, 1);
+});
+test('maintainer-triggered refreshes succeed while denied PRs retain failing trust statuses', async () => {
+  for (const actionStatus of ['vouched', 'collaborator', 'bot', 'unknown', 'denounced']) {
+    const f = fixture({ contents: 'github:someone-else' });
+    f.args.triggeringActor = MAINTAINER;
+    f.args.actionStatus = actionStatus;
+    await finalize(f.args);
+    assert.equal(f.statuses.at(-1).state, 'failure');
+    assert.equal(f.failures.length, 0);
+    assert.equal(f.notices.length, 1);
+  }
+  const draft = fixture({ drafts: [true, true, true], prs: [pr('alice', { draft: true })] });
+  draft.args.triggeringActor = MAINTAINER;
+  await finalize(draft.args);
+  assert.equal(draft.statuses.at(-1).state, 'failure');
+  assert.equal(draft.failures.length, 0);
+});
+test('the original actor of a rerun cannot stand in for the current triggering actor', async () => {
+  for (const triggeringActor of [undefined, '', 'someone-else']) {
+    const f = fixture({ contents: 'github:someone-else' });
+    f.args.context.actor = MAINTAINER;
+    f.args.triggeringActor = triggeringActor;
+    await finalize(f.args);
+    assert.equal(f.statuses.at(-1).state, 'failure');
+    assert.equal(f.failures.length, 1);
+    assert.equal(f.notices.length, 0);
+  }
+});
+test('maintainer refreshes still fail on unavailable evaluations, API errors and publication races', async () => {
+  const unavailable = fixture();
+  unavailable.args.triggeringActor = MAINTAINER;
+  unavailable.args.actionStatus = 'unavailable';
+  await finalize(unavailable.args);
+  assert.equal(unavailable.statuses.at(-1).state, 'failure');
+  assert.equal(unavailable.failures.length, 1);
+  assert.equal(unavailable.notices.length, 0);
+  for (const options of [{ fileError: true }, { bases: ['base-a', 'base-b'] }, { heads: ['head-a', 'head-a', 'head-b'] }]) {
+    const f = fixture(options);
+    f.args.triggeringActor = MAINTAINER;
+    await assert.rejects(finalize(f.args));
+    assert.equal(f.statuses.at(-1).state, 'error');
+    assert.equal(f.notices.length, 0);
+  }
 });
 test('dev PRs use canonical main trust and include same-head main PRs', async () => {
   const devPr = pr('alice', { base: { ref: 'dev' } });
@@ -146,15 +189,15 @@ test('evaluation boundary accepts only bounded regular scalar data', () => {
     for (const value of ['vouched', 'collaborator', 'bot', 'unknown', 'denounced']) {
       fs.writeFileSync(file, value);
       assert.equal(readEvaluation(file, true), value);
-      assert.equal(readEvaluation(file, false), 'unknown');
+      assert.equal(readEvaluation(file, false), 'unavailable');
     }
     for (const value of ['vouched\n', '{"status":"vouched"}', 'vouched; process.exit(0)', 'x'.repeat(1000)]) {
-      fs.writeFileSync(file, value); assert.equal(readEvaluation(file, true), 'unknown');
+      fs.writeFileSync(file, value); assert.equal(readEvaluation(file, true), 'unavailable');
     }
     fs.unlinkSync(file); fs.symlinkSync(__filename, file);
-    assert.equal(readEvaluation(file, true), 'unknown');
-    assert.equal(readEvaluation(dir, true), 'unknown');
-    assert.equal(readEvaluation(path.join(dir, 'missing'), true), 'unknown');
+    assert.equal(readEvaluation(file, true), 'unavailable');
+    assert.equal(readEvaluation(dir, true), 'unavailable');
+    assert.equal(readEvaluation(path.join(dir, 'missing'), true), 'unavailable');
   } finally { fs.rmSync(dir, { recursive: true }); }
 });
 test('third-party evaluation has no write credential or publisher code', () => {
@@ -167,4 +210,6 @@ test('third-party evaluation has no write credential or publisher code', () => {
   assert.match(publish, /readEvaluation/);
   assert.match(publish, /needs.evaluate.result == 'success'/);
   assert.match(publish, /ref: \$\{\{ matrix.base \}\}/);
+  assert.match(publish, /VOUCH_TRIGGERING_ACTOR: \$\{\{ github.triggering_actor \}\}/);
+  assert.match(publish, /triggeringActor: process\.env\.VOUCH_TRIGGERING_ACTOR/);
 });

@@ -83,7 +83,7 @@ jobs:
           VOUCH_STATUS: ${{ steps.vouch.outputs.status }}
         run: |
           mkdir result
-          node -e "const s=process.env.VOUCH_STATUS; require('fs').writeFileSync('result/status.txt', ['vouched','collaborator','bot','unknown','denounced'].includes(s) ? s : 'unknown')"
+          node -e "const s=process.env.VOUCH_STATUS; require('fs').writeFileSync('result/status.txt', ['vouched','collaborator','bot','unknown','denounced'].includes(s) ? s : 'unavailable')"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
@@ -124,9 +124,11 @@ jobs:
           VOUCH_SNAPSHOT: ${{ toJSON(matrix) }}
           EVALUATION_OK: ${{ needs.evaluate.result == 'success' && steps.result.outcome == 'success' }}
           VOUCH_RESULT_FILE: ${{ runner.temp }}/vouch-result/status.txt
+          VOUCH_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
         with:
           script: |
             const { finalize, readEvaluation } = require('./.github/scripts/vouch-gate.cjs');
             const actionStatus = readEvaluation(process.env.VOUCH_RESULT_FILE, process.env.EVALUATION_OK === 'true');
             await finalize({ github, context, core,
-              snapshot: JSON.parse(process.env.VOUCH_SNAPSHOT), actionStatus });
+              snapshot: JSON.parse(process.env.VOUCH_SNAPSHOT), actionStatus,
+              triggeringActor: process.env.VOUCH_TRIGGERING_ACTOR });
