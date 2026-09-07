@@ -7,29 +7,47 @@ import { STRIPE_API_VERSION, STRIPE_EVENTS } from "../lib/stripe-config"
 export async function setupStripe(args: string[]) {
   if (args.includes("--help")) {
     console.log(
-      "Usage: bun run stripe:setup [--check] [--apply --deployment NAME] [--force-env]\nReads STRIPE_SECRET_KEY, SITE_URL, NEXT_PUBLIC_CONVEX_SITE_URL (or STRIPE_WEBHOOK_URL), optional STRIPE_AGENT_PROFILE_ID and STRIPE_WEBHOOK_SECRET. Creates/reuses a Stripe webhook and writes a private, ignored env file. --apply also sets those values on the explicitly named Convex deployment. --check performs read-only checks."
+      "Usage: bun run stripe:setup [--check | --apply] [--deployment NAME] [--force-env]\nBun loads .env.local automatically. --deployment overrides CONVEX_DEPLOYMENT; both accept a deployment name or dev:/prod:/preview:NAME. Reads STRIPE_SECRET_KEY, SITE_URL, NEXT_PUBLIC_CONVEX_SITE_URL (or STRIPE_WEBHOOK_URL), optional STRIPE_AGENT_PROFILE_ID and STRIPE_WEBHOOK_SECRET. Creates/reuses a Stripe webhook and writes a private, ignored env file. --apply also sets those values on the configured Convex deployment. --check performs read-only checks."
     )
     return
   }
   const deploymentIndex = args.indexOf("--deployment")
-  const deployment =
+  const deploymentArgument =
     deploymentIndex >= 0 ? args[deploymentIndex + 1] : undefined
+  if (
+    deploymentIndex >= 0 &&
+    (!deploymentArgument?.trim() || deploymentArgument.startsWith("--"))
+  )
+    throw new Error(
+      "--deployment needs a value. Shell variables expand before Bun loads .env.local; omit --deployment to use CONVEX_DEPLOYMENT from that file, or pass a literal deployment name."
+    )
   const allowed = new Set([
     "--check",
     "--apply",
     "--deployment",
     "--force-env",
-    ...(deployment ? [deployment] : []),
+    ...(deploymentArgument ? [deploymentArgument] : []),
   ])
   if (
     args.some((arg) => !allowed.has(arg)) ||
-    (deploymentIndex >= 0 && (!deployment || deployment.startsWith("--")))
+    args.filter((arg) => arg === "--deployment").length > 1
   )
     throw new Error("Invalid arguments; use --help.")
   if (args.includes("--check") && args.includes("--apply"))
     throw new Error("Choose --check or --apply.")
+  const configuredDeployment =
+    deploymentArgument ?? process.env.CONVEX_DEPLOYMENT?.trim()
+  const deployment = configuredDeployment?.replace(/^(dev|prod|preview):/, "")
   if (args.includes("--apply") && !deployment)
-    throw new Error("--apply requires an explicit --deployment NAME.")
+    throw new Error(
+      "--apply requires CONVEX_DEPLOYMENT in .env.local or an explicit --deployment NAME."
+    )
+  // The installed Convex CLI treats other strings as project/reference selectors.
+  // Only accept concrete hosted names so applying secrets never selects implicitly.
+  if (deployment && !/^[a-z]+-[a-z]+-[0-9]+$/.test(deployment))
+    throw new Error(
+      "Use a concrete hosted Convex deployment name (optionally prefixed with dev:, prod:, or preview:)."
+    )
   const secret = process.env.STRIPE_SECRET_KEY ?? ""
   if (!/^(sk|rk)_(test|live)_[A-Za-z0-9_]+$/.test(secret))
     throw new Error(
@@ -78,6 +96,14 @@ export async function setupStripe(args: string[]) {
   )
     throw new Error(
       "Stripe webhook URL must be a public HTTPS URL ending in /stripe/webhook. Use Stripe CLI forwarding for a local backend."
+    )
+  if (
+    deployment &&
+    webhook.hostname.endsWith(".convex.site") &&
+    webhook.hostname !== `${deployment}.convex.site`
+  )
+    throw new Error(
+      "Convex deployment does not match the Stripe webhook URL. Check CONVEX_DEPLOYMENT/--deployment and NEXT_PUBLIC_CONVEX_SITE_URL/STRIPE_WEBHOOK_URL."
     )
   const stripe = new Stripe(secret, {
     apiVersion: STRIPE_API_VERSION,
@@ -208,7 +234,7 @@ export async function setupStripe(args: string[]) {
     )
   } else
     console.log(
-      `Stripe ${mode} webhook ready. Private env file: ${envFile}. Rerun with --apply --deployment NAME to configure Convex. Secrets were not printed.`
+      `Stripe ${mode} webhook ready. Private env file: ${envFile}. Rerun with --apply to configure Convex using CONVEX_DEPLOYMENT, or add --deployment NAME. Secrets were not printed.`
     )
   console.log(
     profile

@@ -18,7 +18,7 @@ The user selected comprehensive security hardening on September 6. Application f
 | --- | --- | --- |
 | 002 — Moderation evidence boundaries | DONE, reviewed at `3978957` | None; local only |
 | 003 — Public knowledge visibility | DONE, reviewed at `bd1ff24` (includes002) | 002 DONE; local only |
-| 004 — WorkOS authentication budget | DONE, reviewed at `366b6f2` | None; local only |
+| 004 — Retired provider authentication budget | Historical; integration subsequently removed | None |
 | 005 — Bounded governance jobs | DONE, reviewed at `1f462d6` | None; local only |
 | 006 — Sandbox wallet safety | DONE, reviewed at `7dffea2` | None; local only |
 | 007 — Security automation and supply chain | DONE, reviewed at `030d7c2`;21 dated residual image findings | 001 DONE; local only |

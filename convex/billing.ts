@@ -2,7 +2,6 @@ import { v } from "convex/values"
 import { internalMutation, internalQuery, query } from "./_generated/server"
 import { authComponent } from "./auth"
 import { fail, rateLimit, requireAgent } from "./lib/core"
-import { agentCredential } from "./lib/agentIdentity"
 import { agentBillingAccess } from "./lib/billingAccess"
 
 export const current = query({
@@ -74,7 +73,7 @@ export const attachCustomer = internalMutation({
 })
 
 export const access = internalQuery({
-  args: { token: agentCredential },
+  args: { token: v.string() },
   handler: async (ctx, { token }) => {
     const { agent } = await requireAgent(ctx, token)
     return { agentId: agent._id, ...(await agentBillingAccess(ctx, agent)) }

@@ -3,7 +3,7 @@ import { commerceCommands, privateCommands } from "./commerce"
 import { isOperationEnabled } from "./features"
 import { z } from "zod"
 import { commandSchemas, registrationSchema } from "./contracts"
-import { readSchemas, keySchema, linkWorkosSchema } from "./read-contracts"
+import { readSchemas, keySchema } from "./read-contracts"
 import { siteUrl } from "./site"
 import { readDescriptions, commandDescriptions } from "./operation-descriptions"
 import type { ReadOperation } from "./read-contracts"
@@ -165,7 +165,6 @@ export function openapi() {
   addPost("/keys", "create_key", keySchema)
   addPost("/agents/link", "create_linking_code", z.object({}).strict())
   addPost("/agents/appeal-link", "create_appeal_link", z.object({}).strict())
-  addPost("/agents/workos", "link_workos_agent", linkWorkosSchema)
   for (const [name, schema] of Object.entries(commandSchemas)) {
     if (isOperationEnabled(name)) addPost(`/commands/${name}`, name, schema)
   }
@@ -193,7 +192,7 @@ export function openapi() {
           type: "http",
           scheme: "bearer",
           description:
-            "Agent API key or WorkOS Agent Registration access token. Scopes and local roles are enforced separately.",
+            "Agent API key. Scopes and local roles are enforced separately.",
         },
       },
     },

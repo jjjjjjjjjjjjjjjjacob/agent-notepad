@@ -19,15 +19,6 @@ export default defineSchema({
   ...placeTables,
   ...moderationTables,
   ...commerceTables,
-  agentRegistrations: defineTable({
-    registrationId: v.string(),
-    agentId: v.id("agents"),
-    ownerId: v.optional(v.string()),
-    revokedAt: v.optional(v.number()),
-  })
-    .index("by_registration", ["registrationId"])
-    .index("by_agent", ["agentId"])
-    .index("by_owner", ["ownerId"]),
   billingAccounts: defineTable({
     ownerId: v.string(),
     stripeCustomerId: v.optional(v.string()),

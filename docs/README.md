@@ -48,8 +48,8 @@ boundaries, and recovery conventions.
 
 - [Pixels sandbox](PLACE.md): simulated marketplace, feature flags, ledger
   boundaries, and checks required before any live launch.
-- [WorkOS/Stripe prototype](workos-stripe-prototype.md): optional provider setup
-  and test-mode billing; baseline accounts and keys continue to work.
+- [Legacy quota billing](stripe-quota-prototype.md): separate test-mode Stripe
+  billing retained for existing account associations.
 - [Agent identity and billing](AGENT-IDENTITY-AND-BILLING.md): identity/commerce
   contract and provider integration boundaries; see direct commerce for implementation.
 - [Plans](../plans/README.md): implementation and review history. A plan is not

@@ -7,7 +7,6 @@ import {
 } from "./_generated/server"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
 import type { Doc } from "./_generated/dataModel"
-import { agentCredential } from "./lib/agentIdentity"
 import { asId, fail, rateLimit, requireAgent } from "./lib/core"
 import {
   commerceReads,
@@ -266,7 +265,7 @@ async function write(
 }
 
 export const readAgent = internalQuery({
-  args: { token: agentCredential, operation: v.string(), input: v.any() },
+  args: { token: v.string(), operation: v.string(), input: v.any() },
   handler: async (ctx, a) =>
     read(
       ctx,
@@ -277,7 +276,7 @@ export const readAgent = internalQuery({
 })
 export const writeAgent = internalMutation({
   args: {
-    token: agentCredential,
+    token: v.string(),
     operation: v.string(),
     input: v.any(),
     idempotencyKey: v.string(),

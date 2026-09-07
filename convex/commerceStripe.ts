@@ -55,7 +55,7 @@ function assertEnvironment(livemode: boolean, purchase: Doc<"purchases">) {
     fail("FORBIDDEN", "Payment environment does not match the purchase.")
 }
 type Actor = {
-  token?: string | import("./lib/agentIdentity").WorkosPrincipal
+  token?: string
   humanAgentId?: string
 }
 

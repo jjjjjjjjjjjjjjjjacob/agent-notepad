@@ -91,6 +91,7 @@ export function SectionHeading({
     | "article-subsection"
     | "infobox"
     | "infobox-title"
+    | "empty"
   as?: "h2" | "h3" | "h4" | "h5" | "h6"
 }) {
   return (

@@ -1,0 +1,35 @@
+.empty {
+  gap: 24px;
+  padding: 48px 24px;
+}
+.media {
+  width: 100%;
+  max-width: 320px;
+  margin: 0;
+}
+.header {
+  width: 100%;
+  max-width: 400px;
+  gap: 12px;
+}
+.description {
+  color: var(--muted-foreground);
+  font-size: 15px;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+.actions {
+  max-width: 100%;
+  flex-direction: row;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+@media (max-width: 480px) {
+  .empty {
+    padding: 36px 20px;
+  }
+  .actions {
+    flex-direction: column;
+  }
+}

@@ -58,7 +58,7 @@
   -webkit-user-select: none;
   user-select: none;
 }
-.canvas svg {
+.graphSvg {
   position: absolute;
   inset: 0;
   display: block;
@@ -68,7 +68,7 @@
   touch-action: none;
   outline: none;
 }
-.canvas svg:active {
+.graphSvg:active {
   cursor: grabbing;
 }
 .canvasLabel {
@@ -499,26 +499,73 @@
   cursor: pointer;
   text-decoration: underline;
 }
-.empty {
+.workspace[data-empty="true"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.workspace[data-empty="true"] .canvas {
+  display: flex;
+  min-height: 460px;
+  background-image: none;
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+.seedIllustration {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  aspect-ratio: 320 / 156;
+}
+.seedIllustration::before {
+  content: "";
   position: absolute;
-  inset: 30%;
-  text-align: center;
+  z-index: -1;
+  inset: -24px;
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 16px 16px;
+  mask-image: radial-gradient(ellipse, black 20%, transparent 70%);
+}
+.seedConnections {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: color-mix(in srgb, var(--primary) 32%, var(--border));
+}
+.seedArticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-6deg);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  width: 112px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--background);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+.seedArticle svg {
+  color: var(--primary);
+}
+.seedArticle span {
+  color: var(--foreground);
   font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 3px;
 }
-.empty h2 {
-  font-size: 20px;
-  margin-bottom: 10px;
+.seedArticle i {
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
 }
-.empty p {
-  color: var(--map-muted);
-  line-height: 1.7;
+.seedArticle i:last-child {
+  width: 60%;
 }
-.empty button,
-.empty a {
-  display: inline-block;
-  margin-top: 16px;
-  color: var(--link-color);
-  cursor: pointer;
+.emptySearchIcon {
+  color: var(--muted-foreground);
 }
 .mapPage button:focus-visible,
 .mapPage a:focus-visible,
@@ -573,8 +620,8 @@
     top: 124px;
     left: 18px;
   }
-  .empty {
-    inset: 25% 15%;
+  .workspace[data-empty="true"] .canvas {
+    min-height: 420px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

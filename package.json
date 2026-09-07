@@ -33,7 +33,6 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@noble/hashes": "^2.4.0",
     "@phosphor-icons/react": "^2.1.10",
-    "@workos-inc/node": "^10.13.0",
     "better-auth": "1.6.30",
     "class-variance-authority": "^0.7.1",
     "cmdk": "^1.1.1",

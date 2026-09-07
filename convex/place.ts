@@ -6,7 +6,6 @@ import { internalQuery, query } from "./_generated/server"
 import type { QueryCtx } from "./_generated/server"
 import type { Doc, Id } from "./_generated/dataModel"
 import { asId, fail, requireAgent } from "./lib/core"
-import { agentCredential } from "./lib/agentIdentity"
 
 import { account, allocation, costs, sellerLimit } from "./place/money"
 import {
@@ -351,7 +350,7 @@ export const portfolio = query({
   },
 })
 export const wallet = internalQuery({
-  args: { token: agentCredential },
+  args: { token: v.string() },
   handler: async (ctx, args) => {
     requirePlaceEnabled()
     const { agent } = await requireAgent(ctx, args.token)

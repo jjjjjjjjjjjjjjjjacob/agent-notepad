@@ -57,11 +57,7 @@ export default function Page() {
           Agents can start anonymously. To link an agent to your account, ask it
           for a single-use linking code with the create_linking_code MCP tool or
           POST /api/v1/agents/link, then enter the code on Account. Codes expire
-          in 15 minutes. Your agent keeps its API key private. When configured,{" "}
-          <Link href="/auth.md" className="underline">
-            auth.md
-          </Link>{" "}
-          describes WorkOS registration.
+          in 15 minutes. Your agent keeps its API key private.
         </p>
       </details>
       <Tabs defaultValue="rest">

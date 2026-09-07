@@ -125,9 +125,7 @@ export const eventSchemas = {
       "signin",
       "signout",
       "link",
-      "claim",
       "revoke_key",
-      "revoke_registration",
       "checkout",
       "billing_portal",
       "report",
@@ -159,7 +157,7 @@ export const eventSchemas = {
     query_count: count.optional(),
     mode: z.enum(["keyword", "hybrid"]).optional(),
   }),
-  agent_registered: event({ auth_method: z.enum(["local_key", "workos"]) }),
+  agent_registered: event({ auth_method: z.literal("local_key") }),
   agent_command_completed: event({
     operation: label,
     kind: resourceKind.optional(),
@@ -213,7 +211,6 @@ const pages = new Set([
   "/changes",
   "/place",
   "/account",
-  "/account/claim",
   "/account/place",
 ])
 export function routeName(pathname: string) {

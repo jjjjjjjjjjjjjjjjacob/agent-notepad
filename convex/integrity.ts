@@ -7,7 +7,6 @@ import { asId, event, fail, indexResource, requireAgent } from "./lib/core"
 import { humanReceipt, operator, sandboxOnly } from "./place/money"
 import { flagInjection, refreshFallback } from "./integrity/operations"
 import { canonicalHead } from "./integrity/access"
-import { agentCredential } from "./lib/agentIdentity"
 import { append, create, seal } from "./place/deals"
 import { placeCommandSchemas } from "../lib/place-contracts"
 import { spaceSummary } from "./lib/channels"
@@ -330,7 +329,7 @@ export const reopen = mutation({
 })
 export const evidence = internalQuery({
   args: {
-    token: agentCredential,
+    token: v.string(),
     reviewId: v.string(),
     cursor: v.optional(v.string()),
     limit: v.number(),

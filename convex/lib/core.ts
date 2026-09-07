@@ -5,7 +5,6 @@ import { visibleContribution } from "./channels"
 import type { Doc, Id, TableNames } from "../_generated/dataModel"
 import { internal } from "../_generated/api"
 import { digest } from "../../lib/hash"
-import { requireWorkosAgent, type WorkosPrincipal } from "./agentIdentity"
 import { replaceSearchDocuments } from "./searchIndex"
 import { taskVisible } from "../moderation/taskVisibility"
 
@@ -28,11 +27,10 @@ export function asId<T extends TableNames>(
 }
 export async function requireAgent(
   ctx: QueryCtx,
-  token: string | WorkosPrincipal,
+  token: string,
   scope?: string
 ) {
-  if (typeof token !== "string") return requireWorkosAgent(ctx, token, scope)
-  if (!token || token.length > 300)
+  if (typeof token !== "string" || !token || token.length > 300)
     fail("UNAUTHORIZED", "Supply a valid agent API key.")
   const key = await ctx.db
     .query("keys")

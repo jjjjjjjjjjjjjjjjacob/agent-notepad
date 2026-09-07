@@ -80,16 +80,35 @@ test("wiki evidence, missing-subject handoff, and interactive map work together"
   await expect(page.getByText("125%", { exact: true })).toBeVisible()
   await page.getByRole("button", { name: "Fit map", exact: true }).click()
   await expect(page.getByText("100%", { exact: true })).toBeVisible()
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click()
   await page
     .getByRole("searchbox", { name: "Find a subject" })
     .fill("no-match-at-all")
   await expect(
     page.getByRole("heading", { name: "No matching subjects" })
   ).toBeVisible()
+  await expect(
+    page.getByRole("button", { name: "Zoom in", exact: true })
+  ).toBeHidden()
+  await expect(
+    page.getByRole("complementary", { name: "Subject inspector" })
+  ).toBeHidden()
+  await expect(
+    page.getByRole("searchbox", { name: "Find a subject" })
+  ).toBeVisible()
   await page.getByRole("button", { name: "Clear filters" }).click()
-  await page
-    .getByRole("button", { name: `${gapTitle}, missing article`, exact: true })
-    .click()
+  await expect(
+    page.getByRole("button", { name: "Zoom in", exact: true })
+  ).toBeVisible()
+  await expect(page.getByText("125%", { exact: true })).toBeVisible()
+  const gapNode = page.getByRole("button", {
+    name: `${gapTitle}, missing article`,
+    exact: true,
+  })
+  // Let hover bring the subject to the front before pressing its hit target.
+  await gapNode.hover()
+  await expect(gapNode).toHaveAttribute("data-expanded", "true")
+  await gapNode.locator("circle").first().click()
   await expect(
     page.getByRole("link", { name: "View work request" })
   ).toBeVisible()
@@ -114,4 +133,89 @@ test("wiki evidence, missing-subject handoff, and interactive map work together"
     )
   ).toBe(true)
   expect(errors).toEqual([])
+})
+
+test("an empty map has bounded icons, useful actions and accessible responsive layouts", async ({
+  page,
+}, testInfo) => {
+  const missing = `empty-map-${crypto.randomUUID()}`
+  await page.emulateMedia({ reducedMotion: "reduce" })
+  await page.goto(`/wiki/map?focus=${missing}`)
+  const empty = page.locator('[data-slot="empty"]')
+  const explore = empty.getByRole("link", {
+    name: "Explore the whole map",
+    exact: true,
+  })
+  await expect(
+    empty.getByRole("heading", { name: "This article isn’t on the map yet" })
+  ).toBeVisible()
+  await expect(page.getByRole("button", { name: "Zoom in" })).toHaveCount(0)
+  await expect(
+    page.getByRole("searchbox", { name: "Find a subject" })
+  ).toHaveCount(0)
+  await expect(
+    page.getByRole("complementary", { name: "Subject inspector" })
+  ).toHaveCount(0)
+  await expect(
+    empty.getByRole("link", { name: "Connect an agent" })
+  ).toHaveAttribute("href", "/connect")
+
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 })
+    for (const theme of ["Light", "Dark"]) {
+      await page.getByRole("button", { name: "Account and appearance" }).click()
+      await page.getByRole("menuitem", { name: theme, exact: true }).click()
+      await expect(page.locator("html")).toHaveClass(
+        new RegExp(theme.toLowerCase())
+      )
+      await expect(explore.locator("svg")).toHaveCSS("width", "16px")
+      await expect(explore.locator("svg")).toHaveCSS("height", "16px")
+      await expect(explore.locator("svg")).toHaveCSS("position", "static")
+      await explore.focus()
+      // Enter keyboard modality after the appearance menu was clicked.
+      await page.keyboard.press("Tab")
+      await page.keyboard.press("Shift+Tab")
+      await expect(explore).toBeFocused()
+      await expect(explore).toHaveCSS("outline-style", "solid")
+      await expect(explore).toHaveCSS("outline-width", "2px")
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth
+        )
+      ).toBe(true)
+      const a11y = await new AxeBuilder({ page })
+        .include("#page-content")
+        .analyze()
+      expect(a11y.violations).toEqual([])
+      await page.screenshot({
+        path: testInfo.outputPath(
+          `empty-map-${width}-${theme.toLowerCase()}.png`
+        ),
+        fullPage: true,
+      })
+    }
+  }
+  await explore.press("Enter")
+  await expect(page).toHaveURL(/\/wiki\/map$/)
+  await expect(page.getByRole("button", { name: "Zoom in" })).toBeVisible()
+})
+
+test("empty map guidance and navigation are available without JavaScript", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ javaScriptEnabled: false })
+  try {
+    const page = await context.newPage()
+    await page.goto(`/wiki/map?focus=empty-map-${crypto.randomUUID()}`)
+    const empty = page.locator('[data-slot="empty"]')
+    await expect(empty.getByRole("heading")).toHaveText(
+      "This article isn’t on the map yet"
+    )
+    await empty
+      .getByRole("link", { name: "Explore the whole map", exact: true })
+      .click()
+    await expect(page).toHaveURL(/\/wiki\/map$/)
+  } finally {
+    await context.close()
+  }
 })

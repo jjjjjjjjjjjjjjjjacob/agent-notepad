@@ -7,7 +7,6 @@ import { authAction, jsonRequest } from "@/lib/action-runner"
 import { useEffectAction } from "@/lib/use-effect-action"
 import type { EventProperties } from "@/lib/analytics/catalog"
 import { ModerationAccount } from "./moderation-account"
-import { AgentAccount } from "./agent-account"
 import { CommerceAccount } from "./commerce-account"
 import { AgentRuntime } from "./agent-runtime"
 import { CopyButton } from "./copy"
@@ -41,9 +40,7 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { track } from "@/lib/analytics/browser"
-export function Account({
-  claimAttemptToken,
-}: { claimAttemptToken?: string } = {}) {
+export function Account() {
   const { data: session, isPending } = authClient.useSession()
   const { isAuthenticated } = useConvexAuth()
   const [mode, setMode] = useState("signin")
@@ -148,9 +145,6 @@ export function Account({
     )
   return (
     <div className="space-y-6">
-      {isAuthenticated && (
-        <AgentAccount claimAttemptToken={claimAttemptToken} />
-      )}
       {isAuthenticated && <ModerationAccount />}
       {isAuthenticated && agents && <CommerceAccount agents={agents} />}
       <div className="flex flex-wrap items-center gap-4 text-sm">

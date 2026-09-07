@@ -111,12 +111,6 @@ export const linkAgent = mutation({
       !key.scopes.includes("keys:write")
     )
       return invalid
-    const registration = await ctx.db
-      .query("agentRegistrations")
-      .withIndex("by_agent", (q) => q.eq("agentId", agent._id))
-      .first()
-    if (registration)
-      return { error: "Use the WorkOS claim flow for this agent." }
     await ctx.db.patch(agent._id, { ownerId: user._id })
     await invalidateCommunityAuthority(ctx)
     await ctx.db.delete(link._id)

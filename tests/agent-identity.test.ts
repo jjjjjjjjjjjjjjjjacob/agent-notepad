@@ -150,30 +150,6 @@ describe("agent names and runtime details", () => {
     expect(unicode.name).toBe("研究者")
     expect(unicode.slug).toMatch(/^agent-/)
   })
-
-  it("applies generated identities and runtime fields to WorkOS registration too", async () => {
-    const t = setup()
-    const agent = await t.mutation(internal.workosIdentity.provision, {
-      identity: {
-        registrationId: "agent_reg_generated",
-        scopes: ["profile:write"],
-        expiresAt: Date.now() + 60_000,
-      },
-      input: {
-        provider: "Example AI",
-        model: "example-small",
-        thinkingLevel: "medium",
-      },
-    })
-    expect(agent?.name).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/)
-    expect(
-      await t.query(api.public.getAgent, { slug: agent!.slug })
-    ).toMatchObject({
-      provider: "Example AI",
-      model: "example-small",
-      thinkingLevel: "medium",
-    })
-  })
 })
 
 describe("separate human linking codes", () => {
@@ -276,7 +252,7 @@ describe("separate human linking codes", () => {
     ).toBeUndefined()
   })
 
-  it.each(["revoked", "blocked", "owned", "workos"])(
+  it.each(["revoked", "blocked", "owned"])(
     "rejects redemption when the agent becomes %s",
     async (condition) => {
       const t = setup()
@@ -290,11 +266,6 @@ describe("separate human linking codes", () => {
           await ctx.db.patch(a.agentId, { blocked: true })
         if (condition === "owned")
           await ctx.db.patch(a.agentId, { ownerId: "someone-else" })
-        if (condition === "workos")
-          await ctx.db.insert("agentRegistrations", {
-            agentId: a.agentId,
-            registrationId: "agent_reg_linked",
-          })
       })
       expect(
         await owner.client.mutation(api.auth.linkAgent, {
@@ -348,5 +319,106 @@ describe("separate human linking codes", () => {
     expect(results.filter((result) => result.error)).toHaveLength(1)
     const saved = await t.run((ctx) => ctx.db.get(a.agentId))
     expect([first.id, second.id]).toContain(saved?.ownerId)
+  })
+})
+
+describe("API-key authentication boundaries", () => {
+  it("registers without credentials, permits an existing key, and rejects unknown supplied tokens without creating identities", async () => {
+    const t = setup()
+    const request = (token = "") =>
+      t.fetch("/api/v1/agents", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: "{}",
+      })
+    const response = await request()
+    expect(response.status).toBe(201)
+    const first = (await response.json()).data
+    expect(first.apiKey).toMatch(/^an_/)
+    expect((await request(first.apiKey)).status).toBe(201)
+    for (const token of [
+      "retired.provider.token",
+      "an_unknown",
+      "x".repeat(301),
+    ]) {
+      const denied = await request(token)
+      expect(denied.status).toBe(401)
+      expect(denied.headers.get("WWW-Authenticate")).toBe("Bearer")
+    }
+    expect(await t.run((ctx) => ctx.db.query("agents").collect())).toHaveLength(
+      2
+    )
+  })
+
+  it("rejects provider tokens and caller-supplied principals at read, write, and direct backend boundaries", async () => {
+    const t = setup()
+    const headers = {
+      Authorization: "Bearer retired.provider.token",
+      "Content-Type": "application/json",
+    }
+    for (const path of [
+      "me/work",
+      "me/billing",
+      "purchases",
+      "private_spaces",
+    ]) {
+      expect((await t.fetch(`/api/v1/${path}`, { headers })).status, path).toBe(
+        401
+      )
+    }
+    expect(
+      (
+        await t.fetch("/api/v1/commands/profile", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ bio: "Denied" }),
+        })
+      ).status
+    ).toBe(401)
+    const principal = {
+      registrationId: "retired-registration",
+      scopes: ["profile:write"],
+      expiresAt: Date.now() + 60_000,
+    }
+    await expect(
+      t.mutation(internal.commands.execute, {
+        token: principal,
+        operation: "profile",
+        input: { bio: "Denied" },
+      } as never)
+    ).rejects.toThrow()
+    await expect(
+      t.query(api.public.myWork, { token: principal } as never)
+    ).rejects.toThrow()
+    expect(await t.run((ctx) => ctx.db.query("agents").collect())).toEqual([])
+  })
+
+  it("invalidates governance authority only on successful human linking", async () => {
+    const t = setup()
+    const owner = await human(t)
+    const a = await register(t)
+    const link = await createLink(t, a.token)
+    expect(
+      await t.run((ctx) => ctx.db.query("communityReputationState").unique())
+    ).toBeNull()
+    await owner.client.mutation(api.auth.linkAgent, {
+      linkingCode: link.linkingCode,
+    })
+    const state = await t.run((ctx) =>
+      ctx.db.query("communityReputationState").unique()
+    )
+    expect(state?.authorityVersion).toBe(1)
+    await t.query(internal.agents.lookup, { hash: digest(a.token) })
+    expect(
+      await owner.client.mutation(api.auth.linkAgent, {
+        linkingCode: link.linkingCode,
+      })
+    ).toHaveProperty("error")
+    expect(
+      await t.run((ctx) => ctx.db.query("communityReputationState").unique())
+    ).toEqual(state)
   })
 })

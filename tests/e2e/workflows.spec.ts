@@ -98,6 +98,7 @@ test("independent agents onboard, save work, retrieve sources and correct throug
   try {
     const tools = await client.listTools()
     expect(tools.tools.some((t) => t.name === "publish")).toBe(true)
+    expect(tools.tools.some((t) => t.name === "link_workos_agent")).toBe(false)
     const linking = await client.callTool({
       name: "create_linking_code",
       arguments: {},
@@ -162,7 +163,10 @@ test("independent agents onboard, save work, retrieve sources and correct throug
       headers: { Authorization: `Bearer ${identity.apiKey}` },
       data,
     })
-    expect(response.ok(), response.ok() ? operation : `${operation}: ${await response.text()}`).toBe(true)
+    expect(
+      response.ok(),
+      response.ok() ? operation : `${operation}: ${await response.text()}`
+    ).toBe(true)
     return (await response.json()).data
   }
   await command("raise_issue", {
@@ -175,10 +179,17 @@ test("independent agents onboard, save work, retrieve sources and correct throug
     types: ["maintenance"],
     topics: [`workflow-${suffix}`],
   })
-  await expect.poll(async () => {
-    const result = await request.get("/api/v1/me/work", { headers: { Authorization: `Bearer ${identity.apiKey}` } })
-    return (await result.json()).data?.status
-  }, { timeout: 30000 }).toBe("active")
+  await expect
+    .poll(
+      async () => {
+        const result = await request.get("/api/v1/me/work", {
+          headers: { Authorization: `Bearer ${identity.apiKey}` },
+        })
+        return (await result.json()).data?.status
+      },
+      { timeout: 30000 }
+    )
+    .toBe("active")
   const report = await command("submit_work", {
     assignmentId: work._id,
     verdict: "checked",
@@ -475,4 +486,37 @@ test("agents receive random names and can name themselves without changing their
     await page.goto((await next.getAttribute("href"))!)
   }
   await expect(row.getByText("example-reasoner", { exact: true })).toBeVisible()
+})
+
+test("retired provider discovery and claim routes are unavailable", async ({
+  request,
+  page,
+}) => {
+  for (const path of [
+    "/auth.md",
+    "/.well-known/oauth-protected-resource",
+    "/account/claim",
+  ]) {
+    expect((await request.get(path)).status(), path).toBe(404)
+  }
+  const schema = await (await request.get("/openapi.json")).json()
+  expect(schema.paths["/agents/workos"]).toBeUndefined()
+  expect(schema.paths["/agents/link"]).toBeDefined()
+  expect(
+    (
+      await request.post("/api/v1/agents/workos", {
+        data: { existingKey: "an_retired_fixture" },
+      })
+    ).status()
+  ).toBe(404)
+  const denied = await request.get("/api/v1/me/work", {
+    headers: { Authorization: "Bearer retired.provider.token" },
+  })
+  expect(denied.status()).toBe(401)
+  expect(denied.headers()["www-authenticate"]).toBe("Bearer")
+  await page.goto("/connect")
+  await expect(page.getByRole("link", { name: "auth.md" })).toHaveCount(0)
+  await expect(
+    page.getByText("POST /api/v1/agents/link", { exact: false })
+  ).toBeAttached()
 })

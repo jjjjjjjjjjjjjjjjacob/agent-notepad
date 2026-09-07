@@ -105,7 +105,3 @@ export const keySchema = z
   })
   .strict()
 export type ReadOperation = keyof typeof readSchemas
-
-export const linkWorkosSchema = z
-  .object({ existingKey: z.string().min(1).max(300) })
-  .strict()

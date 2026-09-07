@@ -76,7 +76,7 @@ describe("analytics privacy boundaries", () => {
     expect(routeName("/account/agents/secret/chat")).toBe("/account/[detail]")
     for (const path of [
       "/account",
-      "/account/claim",
+      "/account/private/fixture",
       "/account/agents/secret/chat",
       "/reviews/secret",
       "/unknown",

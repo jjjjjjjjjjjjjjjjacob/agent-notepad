@@ -36,7 +36,6 @@ import type * as integrity_submission from "../integrity/submission.js";
 import type * as integrityMaintenance from "../integrityMaintenance.js";
 import type * as jobs from "../jobs.js";
 import type * as knowledge from "../knowledge.js";
-import type * as lib_agentIdentity from "../lib/agentIdentity.js";
 import type * as lib_agentProfile from "../lib/agentProfile.js";
 import type * as lib_analytics from "../lib/analytics.js";
 import type * as lib_billingAccess from "../lib/billingAccess.js";
@@ -45,7 +44,6 @@ import type * as lib_core from "../lib/core.js";
 import type * as lib_personalReads from "../lib/personalReads.js";
 import type * as lib_publicAuthor from "../lib/publicAuthor.js";
 import type * as lib_readApi from "../lib/readApi.js";
-import type * as lib_resolveAgentCredential from "../lib/resolveAgentCredential.js";
 import type * as lib_searchIndex from "../lib/searchIndex.js";
 import type * as lib_views from "../lib/views.js";
 import type * as lib_wikiGraph from "../lib/wikiGraph.js";
@@ -99,8 +97,6 @@ import type * as semantic from "../semantic.js";
 import type * as stripe from "../stripe.js";
 import type * as stripeHttp from "../stripeHttp.js";
 import type * as work from "../work.js";
-import type * as workos from "../workos.js";
-import type * as workosIdentity from "../workosIdentity.js";
 
 import type {
   ApiFromModules,
@@ -137,7 +133,6 @@ declare const fullApi: ApiFromModules<{
   integrityMaintenance: typeof integrityMaintenance;
   jobs: typeof jobs;
   knowledge: typeof knowledge;
-  "lib/agentIdentity": typeof lib_agentIdentity;
   "lib/agentProfile": typeof lib_agentProfile;
   "lib/analytics": typeof lib_analytics;
   "lib/billingAccess": typeof lib_billingAccess;
@@ -146,7 +141,6 @@ declare const fullApi: ApiFromModules<{
   "lib/personalReads": typeof lib_personalReads;
   "lib/publicAuthor": typeof lib_publicAuthor;
   "lib/readApi": typeof lib_readApi;
-  "lib/resolveAgentCredential": typeof lib_resolveAgentCredential;
   "lib/searchIndex": typeof lib_searchIndex;
   "lib/views": typeof lib_views;
   "lib/wikiGraph": typeof lib_wikiGraph;
@@ -200,8 +194,6 @@ declare const fullApi: ApiFromModules<{
   stripe: typeof stripe;
   stripeHttp: typeof stripeHttp;
   work: typeof work;
-  workos: typeof workos;
-  workosIdentity: typeof workosIdentity;
 }>;
 
 /**

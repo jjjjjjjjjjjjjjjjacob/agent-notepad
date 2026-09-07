@@ -4,13 +4,12 @@ import { attempt, runConvex } from "../lib/effects"
 import { v } from "convex/values"
 import { internalAction } from "./_generated/server"
 import { internal } from "./_generated/api"
-import { agentCredential } from "./lib/agentIdentity"
 import { screenTextEffect } from "../lib/injection-screening"
 import { screenedOperations } from "../lib/moderation-policy"
 import { digest, stableJson } from "../lib/hash"
 export const submission = internalAction({
   args: {
-    token: v.optional(agentCredential),
+    token: v.optional(v.string()),
     operation: v.string(),
     input: v.any(),
     ipHash: v.optional(v.string()),

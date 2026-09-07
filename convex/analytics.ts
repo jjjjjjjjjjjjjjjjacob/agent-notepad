@@ -1,10 +1,8 @@
 import { v } from "convex/values"
 import { internalMutation } from "./_generated/server"
 import { metric } from "./lib/core"
-import { requireAgent } from "./lib/core"
 import { agentRestricted } from "./moderation/access"
 import { queueAnalytics } from "./lib/analytics"
-import { agentCredential } from "./lib/agentIdentity"
 export const access = internalMutation({
   args: {
     operation: v.string(),
@@ -32,12 +30,11 @@ export const access = internalMutation({
 })
 
 export const request = internalMutation({
-  args: { properties: v.any(), tokenHash: v.optional(v.string()), principal: v.optional(agentCredential), transport: v.union(v.literal("rest"), v.literal("mcp")) },
+  args: { properties: v.any(), tokenHash: v.optional(v.string()), transport: v.union(v.literal("rest"), v.literal("mcp")) },
   handler: async (ctx, args) => {
     let agentId: string | undefined
     try {
-      if (args.principal && typeof args.principal !== "string") agentId = (await requireAgent(ctx, args.principal)).agent._id
-      else if (args.tokenHash) {
+      if (args.tokenHash) {
         const key = await ctx.db.query("keys").withIndex("by_hash", q => q.eq("hash", args.tokenHash!)).unique()
         if (key && !key.revokedAt) {
           const agent = await ctx.db.get(key.agentId)

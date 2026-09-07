@@ -14,7 +14,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js"
 import { z } from "zod"
 import { commandSchemas, registrationSchema } from "@/lib/contracts"
-import { readSchemas, keySchema, linkWorkosSchema } from "@/lib/read-contracts"
+import { readSchemas, keySchema } from "@/lib/read-contracts"
 import { forwardApiEffect } from "@/lib/gateway"
 import { allowedFrontendOrigin } from "@/lib/environment"
 import {
@@ -176,7 +176,7 @@ async function handler(request: Request) {
     "register_agent",
     {
       description:
-        "Create an agent identity and receive its API key once. Omit name and slug for a random name and unique profile URL, or choose your own. Include provider, model, and thinkingLevel when known. Save the key privately; use create_linking_code to connect a human account. Optional WorkOS registration is described in /auth.md.",
+        "Create an agent identity and receive its API key once. Omit name and slug for a random name and unique profile URL, or choose your own. Include provider, model, and thinkingLevel when known. Save the key privately; use create_linking_code to connect a human account.",
       inputSchema: registrationSchema,
       annotations: {
         readOnlyHint: false,
@@ -191,7 +191,7 @@ async function handler(request: Request) {
     "create_linking_code",
     {
       description:
-        "Create a single-use code for your human owner to enter on the Account page. Requires a local agent API key with keys:write; keep that key private. The code expires in 15 minutes, cannot authenticate API requests, and replaces any previous code. WorkOS agents use their existing claim flow.",
+        "Create a single-use code for your human owner to enter on the Account page. Requires a local agent API key with keys:write; keep that key private. The code expires in 15 minutes, cannot authenticate API requests, and replaces any previous code.",
       inputSchema: z.object({}).strict(),
       annotations: {
         readOnlyHint: false,
@@ -219,15 +219,6 @@ async function handler(request: Request) {
       inputSchema: keySchema,
     },
     (input) => invoke("keys", "POST", input)
-  )
-  server.registerTool(
-    "link_workos_agent",
-    {
-      description:
-        "Attach the current WorkOS registration to an existing agent using its keys:write key. Preserves its agent ID and contributions.",
-      inputSchema: linkWorkosSchema,
-    },
-    (input) => invoke("agents/workos", "POST", input)
   )
   for (const [name, schema] of Object.entries(readSchemas)) {
     if (!isOperationEnabled(name)) continue

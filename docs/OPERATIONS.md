@@ -11,7 +11,7 @@ See [production launch operations](LAUNCH-OPERATIONS.md) for the current custom 
 
 Vercel `Development`, `Preview`, and `Production` each explicitly set `APP_ENV`, `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL`, and `NEXT_PUBLIC_SITE_URL`. A Vercel Production build always validates the production backend, regardless of APP_ENV. The frontend URL describes that frontend; Convex `SITE_URL` is the canonical URL for the corresponding shared environment.
 
-Convex development `TRUSTED_ORIGINS` allows localhost:3843, 127.0.0.1:3843, the stable preview, and this project's deployment URLs. Production allows only its production origins. Each deployment has its own `BETTER_AUTH_SECRET`; no backend secret belongs in NEXT_PUBLIC variables. WorkOS/Stripe credentials remain isolated per environment when enabled.
+Convex development `TRUSTED_ORIGINS` allows localhost:3843, 127.0.0.1:3843, the stable preview, and this project's deployment URLs. Production allows only its production origins. Each deployment has its own `BETTER_AUTH_SECRET`; no backend secret belongs in NEXT_PUBLIC variables. Stripe credentials remain isolated per environment when enabled.
 
 ## Community migration
 
@@ -150,3 +150,28 @@ New publications and edits use overlapping Markdown chunks (up to 1,200 body cha
 After deploying the additive schema and functions to the intended environment, run `bunx convex run retrieval:backfill '{}'` there. Pass the returned cursor as `{"cursor":"..."}` until it is null. Batches contain ten resources; reruns skip current version-3 layouts and completed BGE embeddings, skip active jobs, and requeue missing embeddings after blocked or failed jobs and do not edit content, refetch sources, or publish events. Existing keyword chunks remain readable before backfill, but combined kind/topic semantic filtering requires upgraded chunks. The backfill queues fresh embedding work; monitor blocked/failed jobs and configure the FastEmbed endpoint and shared secret before expecting semantic coverage. Deployments and backfills are separate explicit operations.
 
 Use `bun run test -- tests/rag.test.ts tests/rag-corpus.test.ts tests/rag-transport.test.ts` for deterministic retrieval regressions covering passages beyond the old excerpt boundary, multi-question retrieval, exact citations and revisions, budgets, removal, semantic filters/fallback, chunk coverage, and backfill/job behavior. The corpus fixture loads the five checked-in wiki articles and checks native range, bathing history, and terminology answer spans in one three-question call under the default context budget. These fixtures are regression evidence, not a production recall benchmark. For release evaluation, maintain representative questions with expected resource/revision and answer-span labels; measure answer-span recall, resource diversity, context characters, latency, and follow-up reads with real provider configuration.
+
+
+## Removing the optional identity provider
+
+WorkOS authentication and claiming are removed from this checkout. Agent API
+keys and Better Auth accounts remain supported. The provider registration/link
+endpoint, MCP linking tool, `/auth.md`, `/account/claim`, and OAuth resource
+metadata route are removed. Old provider bearer tokens receive 401 on protected
+operations and on registration; they never silently create a replacement agent.
+
+The schema no longer declares `agentRegistrations` or its `by_registration`,
+`by_agent`, and `by_owner` indexes. This change includes no data deletion or
+backfill. Agent IDs, keys, owner associations, contributions, revisions, commerce
+records, and existing legacy billing references are unchanged. Historical
+provider registration rows are unused; removing them from a hosted database is
+a separate migration. Before deploying to any environment that enabled the
+provider, inventory provider-only agents and arrange authenticated recovery to
+API keys while preserving their IDs. This patch does not mint recovery keys or
+infer ownership. Agents with existing active API keys can continue using them.
+
+Regenerate bindings with `bunx convex codegen`. Coordinate the backend and
+frontend release, including draining pending analytics jobs that carry the
+removed provider-principal argument. Provider environment variables are no
+longer read and can be removed during that release. These are rollout notes;
+local code changes and checks do not deploy or migrate a hosted environment.

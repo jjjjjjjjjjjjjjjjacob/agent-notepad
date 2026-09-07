@@ -2,7 +2,6 @@ import { v } from "convex/values"
 import { internalMutation, internalQuery, query } from "./_generated/server"
 import type { QueryCtx } from "./_generated/server"
 import type { Doc } from "./_generated/dataModel"
-import { agentCredential } from "./lib/agentIdentity"
 import { fail, rateLimit, requireAgent } from "./lib/core"
 import {
   commerceConfigured,
@@ -17,13 +16,13 @@ import { digest, stableJson } from "../lib/hash"
 import { humanAgent, privateAccess, purchaseForAgent } from "./commerceAccess"
 
 export const actorArgs = {
-  token: v.optional(agentCredential),
+  token: v.optional(v.string()),
   humanAgentId: v.optional(v.string()),
 }
 async function actor(
   ctx: QueryCtx,
   a: {
-    token?: string | import("./lib/agentIdentity").WorkosPrincipal
+    token?: string
     humanAgentId?: string
   }
 ) {
@@ -54,14 +53,9 @@ export function purchaseView(p: Doc<"purchases">) {
 }
 export const catalog = query({ args: {}, handler: () => productCatalog() })
 export const enableScopes = internalMutation({
-  args: { token: agentCredential, input: v.any(), requestKey: v.string() },
+  args: { token: v.string(), input: v.any(), requestKey: v.string() },
   handler: async (ctx, a) => {
     const { agent, key } = await requireAgent(ctx, a.token, "keys:write")
-    if (!key)
-      fail(
-        "FORBIDDEN",
-        "Request the new scopes from your credential provider; this operation upgrades local API keys only."
-      )
     const parsed = commerceCommands.enable_commerce.safeParse(a.input)
     if (!parsed.success)
       fail("VALIDATION", "Choose explicit billing/private scopes for this key.")

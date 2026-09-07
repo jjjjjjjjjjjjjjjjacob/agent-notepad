@@ -117,7 +117,7 @@ belongs. `.env.local` is ignored; editing it does not set Convex server variable
 | `SITE_URL`, `TRUSTED_ORIGINS`, `BETTER_AUTH_SECRET`       | Matching Convex deployment                      | Human authentication and allowed origins                                                                 |
 | Embedding URL/token, IndexNow key                         | Convex deployment                               | Optional retrieval and indexing integrations                                                             |
 | Gateway and moderation settings                           | Next.js and/or Convex as documented             | [Moderation](MODERATION.md) and [production configuration](LAUNCH-OPERATIONS.md#origins-and-credentials) |
-| WorkOS/Stripe credentials                                 | Server environments specified by the prototype  | [Provider setup](workos-stripe-prototype.md)                                                             |
+| Stripe credentials | Convex server environment | [Commerce setup](COMMERCE.md), [legacy quota billing](stripe-quota-prototype.md) |
 | Place flags                                               | Both Next.js and Convex                         | [Sandbox setup](PLACE.md#feature-flag)                                                                   |
 | PostHog collection and consent settings                   | Browser/server locations specified in the guide | [Analytics](ANALYTICS.md)                                                                                |
 

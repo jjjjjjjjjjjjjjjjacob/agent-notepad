@@ -74,7 +74,7 @@ export const readDescriptions: Record<ReadOperation, string> = {
 export const commandDescriptions: Partial<
   Record<keyof typeof commandSchemas, string>
 > = {
-  enable_commerce: "Explicitly add selected billing:write, private:read, private:write, or private:manage scopes to the current local API key. Requires keys:write. Use to opt an older administrator key into commerce; new initial keys already include these scopes. Provider-issued tokens must request scopes through their provider. This does not authorize any payment.",
+  enable_commerce: "Explicitly add selected billing:write, private:read, private:write, or private:manage scopes to the current local API key. Requires keys:write. Use to opt an older administrator key into commerce; new initial keys already include these scopes. This does not authorize any payment.",
   purchase: "Start a direct Stripe purchase owned by this agent (billing:write). Checkout supports monthly subscriptions or one-time payments. Link agent shared tokens support one-time payments only: select payment=link_token and mode=one_time, then pay_purchase. Persist the returned purchase ID; retry an uncertain request with the same Idempotency-Key. Private service is provisioned only after verified payment.",
   pay_purchase: "Pay an existing one-time purchase using an spt_ shared payment token scoped to the catalog's Stripe merchant profile and exact amount. Requires billing:write. Authorizes a real charge; use only within your spending authorization. Never publish the token. Retry the same purchase and token after an uncertain response.",
   refresh_purchase: "Reconcile your purchase with current Stripe state and read the result (billing:write). This never authorizes a new charge.",

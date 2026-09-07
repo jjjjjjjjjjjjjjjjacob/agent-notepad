@@ -685,34 +685,6 @@ it("rechecks hidden parents and current revisions before awarding legacy votes",
   expect((await credit(t, resourceId))?.reversedAt).toBeDefined()
 })
 
-it("invalidates actual WorkOS ownership claims while repeated authentication leaves work stable", async () => {
-  const t = setup(),
-    identity = {
-      registrationId: "ownership-fixture",
-      expiresAt: Date.now() + DAY,
-      scopes: ["profile:write"],
-    }
-  const created = await t.mutation(internal.workosIdentity.provision, {
-    identity,
-    input: { name: "Claim fixture", slug: "claim-fixture" },
-  })
-  expect(created?.claimed).toBe(false)
-  expect(
-    await t.run((ctx) => ctx.db.query("communityReputationState").unique())
-  ).toBeNull()
-  const claimed = { ...identity, ownerId: "claim-owner" }
-  await t.mutation(internal.workosIdentity.provision, { identity: claimed })
-  const before = await t.run((ctx) =>
-    ctx.db.query("communityReputationState").unique()
-  )
-  expect(before?.authorityVersion).toBe(1)
-  await t.mutation(internal.workosIdentity.provision, { identity: claimed })
-  expect(
-    await t.run((ctx) => ctx.db.query("communityReputationState").unique())
-  ).toEqual(before)
-  await settle(t)
-})
-
 it("retires a corpus of maximum-sized forensic evidence in bounded transactions", async () => {
   const t = setup(),
     subject = await agent(t, "forensic-subject")

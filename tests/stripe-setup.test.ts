@@ -28,6 +28,7 @@ beforeEach(async () => {
   vi.resetAllMocks()
   directory = await mkdtemp(join(tmpdir(), "notepad-stripe-setup-"))
   process.chdir(directory)
+  vi.stubEnv("CONVEX_DEPLOYMENT", "")
   vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_setup_fixture")
   vi.stubEnv("STRIPE_WEBHOOK_SECRET", "")
   vi.stubEnv("STRIPE_AGENT_PROFILE_ID", "profile_fixture")
@@ -45,8 +46,9 @@ afterEach(async () => {
   await rm(directory, { recursive: true, force: true })
   vi.restoreAllMocks()
   vi.unstubAllEnvs()
+  vi.unstubAllGlobals()
 })
-it("preflights without writes and refuses an implicit deployment target", async () => {
+it("preflights without writes and requires a configured deployment target", async () => {
   await setupStripe(["--check"])
   expect(provider.create).not.toHaveBeenCalled()
   expect(await readdir(directory)).toEqual([])
@@ -63,6 +65,79 @@ it("preflights without writes and refuses an implicit deployment target", async 
     "Set NEXT_PUBLIC_CONVEX_SITE_URL"
   )
 })
+it.each([[], [""], ["--force-env"]])(
+  "explains a missing --deployment value instead of using the env fallback: %j",
+  async (...suffix) => {
+    vi.stubEnv("CONVEX_DEPLOYMENT", "dev:incredible-boar-27")
+    await expect(
+      setupStripe(["--apply", "--deployment", ...suffix])
+    ).rejects.toThrow("Shell variables expand before Bun loads .env.local")
+    expect(provider.list).not.toHaveBeenCalled()
+    expect(await readdir(directory)).toEqual([])
+  }
+)
+it.each(["", "dev:", "prod:", "preview:"])(
+  "applies the configured deployment with prefix %j without shell expansion",
+  async (prefix) => {
+    vi.stubEnv("CONVEX_DEPLOYMENT", `${prefix}incredible-boar-27`)
+    vi.stubEnv(
+      "STRIPE_WEBHOOK_URL",
+      "https://incredible-boar-27.convex.site/stripe/webhook"
+    )
+    const spawn = vi.fn().mockReturnValue({
+      stdout: new Response("").body,
+      stderr: new Response("").body,
+      exited: Promise.resolve(0),
+    })
+    vi.stubGlobal("Bun", { spawn })
+    await setupStripe(["--check"])
+    expect(console.log).toHaveBeenCalledWith(
+      expect.stringContaining("Convex deployment: incredible-boar-27.")
+    )
+    expect(spawn).not.toHaveBeenCalled()
+    expect(await readdir(directory)).toEqual([])
+    await setupStripe(["--apply"])
+    expect(spawn).toHaveBeenCalledWith(
+      [
+        "bunx",
+        "convex",
+        "env",
+        "set",
+        "--from-file",
+        expect.stringMatching(/\.env$/),
+        "--deployment",
+        "incredible-boar-27",
+      ],
+      { stdout: "pipe", stderr: "pipe" }
+    )
+  }
+)
+it("lets an explicit deployment override env and rejects mismatched webhook targets before writes", async () => {
+  vi.stubEnv("CONVEX_DEPLOYMENT", "prod:gregarious-chickadee-782")
+  vi.stubEnv(
+    "STRIPE_WEBHOOK_URL",
+    "https://incredible-boar-27.convex.site/stripe/webhook"
+  )
+  await expect(setupStripe(["--apply"])).rejects.toThrow(
+    "does not match the Stripe webhook URL"
+  )
+  expect(provider.list).not.toHaveBeenCalled()
+  expect(await readdir(directory)).toEqual([])
+  await setupStripe(["--check", "--deployment", "dev:incredible-boar-27"])
+  expect(console.log).toHaveBeenCalledWith(
+    expect.stringContaining("Convex deployment: incredible-boar-27.")
+  )
+})
+it.each(["prod", "local:test-instance", "project:prod"])(
+  "rejects ambiguous or unsupported deployment selectors: %s",
+  async (deployment) => {
+    vi.stubEnv("CONVEX_DEPLOYMENT", deployment)
+    await expect(setupStripe(["--apply"])).rejects.toThrow(
+      "concrete hosted Convex deployment name"
+    )
+    expect(provider.list).not.toHaveBeenCalled()
+  }
+)
 it("provisions a pinned webhook and keeps generated secrets private", async () => {
   await setupStripe([])
   expect(provider.create).toHaveBeenCalledWith(

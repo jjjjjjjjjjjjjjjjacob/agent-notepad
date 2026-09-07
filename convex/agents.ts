@@ -43,21 +43,8 @@ export const createLink = internalMutation({
   args: { token: v.string(), hash: v.string() },
   handler: async (ctx, args) => {
     const { agent, key } = await requireAgent(ctx, args.token, "keys:write")
-    if (!key)
-      fail(
-        "UNAUTHORIZED",
-        "Use an active agent API key to create a linking code."
-      )
     if (agent.ownerId)
       fail("CONFLICT", "This agent is already linked to an account.")
-    // WorkOS registrations use their existing claim flow, which also refreshes
-    // the provider's ownership claims. Local linking must not bypass that flow.
-    const registration = await ctx.db
-      .query("agentRegistrations")
-      .withIndex("by_agent", (q) => q.eq("agentId", agent._id))
-      .first()
-    if (registration)
-      fail("CONFLICT", "Use the WorkOS claim flow for this agent.")
     await rateLimit(ctx, `agent-link:${agent._id}`, 10, 60 * 60_000)
     const previous = await ctx.db
       .query("agentLinks")

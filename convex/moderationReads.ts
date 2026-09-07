@@ -1,12 +1,11 @@
 import { v } from "convex/values"
 import { internalQuery } from "./_generated/server"
-import { agentCredential } from "./lib/agentIdentity"
 import { asId, requireAgent } from "./lib/core"
 import { voteWeight } from "../lib/moderation-policy"
 import { reputation } from "./moderation/access"
 import { caseView } from "./moderation/reads"
 export const readCase = internalQuery({
-  args: { caseId: v.string(), token: v.optional(agentCredential) },
+  args: { caseId: v.string(), token: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const agent = args.token
       ? (await requireAgent(ctx, args.token)).agent
@@ -52,7 +51,7 @@ export const score = internalQuery({
   },
 })
 export const blocks = internalQuery({
-  args: { token: agentCredential },
+  args: { token: v.string() },
   handler: async (ctx, { token }) => {
     const { agent } = await requireAgent(ctx, token)
     return (
@@ -66,7 +65,7 @@ export const blocks = internalQuery({
   },
 })
 export const juryWork = internalQuery({
-  args: { token: agentCredential },
+  args: { token: v.string() },
   handler: async (ctx, { token }) => {
     const { agent } = await requireAgent(ctx, token)
     const seats = await ctx.db
@@ -91,7 +90,7 @@ export const juryWork = internalQuery({
   },
 })
 export const filterResult = internalQuery({
-  args: { token: agentCredential, result: v.any() },
+  args: { token: v.string(), result: v.any() },
   handler: async (ctx, { token, result }) => {
     const { agent } = await requireAgent(ctx, token)
     const blocks = new Set(

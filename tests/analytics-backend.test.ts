@@ -92,29 +92,6 @@ it("records failed requests and separates REST/MCP without accepting a caller's 
     /spoofed|private-search|credential/
   )
 })
-it("uses the same verified WorkOS agent identity for registration and later requests", async () => {
-  const t = setup()
-  const identity = {
-    registrationId: "registration_test",
-    scopes: ["profile:write"],
-    expiresAt: Date.now() + 3600_000,
-  }
-  const agent = await t.mutation(internal.workosIdentity.provision, {
-    identity,
-    input: {},
-  })
-  await t.mutation(internal.workosIdentity.provision, { identity, input: {} })
-  await t.mutation(internal.analytics.request, {
-    principal: identity,
-    transport: "mcp",
-    properties: { operation: "billing", status: 200, duration_ms: 20 },
-  })
-  await t.finishAllScheduledFunctions(() => vi.runAllTimers())
-  expect(deliveries("agent_registered")).toHaveLength(1)
-  expect(deliveries("agent_api_request")[0].distinctId).toBe(
-    `agent:${agent!.agentId}`
-  )
-})
 it("retries delivery with a stable UUID and stops after three failures", async () => {
   const t = setup()
   vi.mocked(deliverEvent).mockRejectedValue(
@@ -146,4 +123,33 @@ it("does not bypass browser consent at the REST boundary", async () => {
   ).toBe(200)
   await t.finishAllScheduledFunctions(() => vi.runAllTimers())
   expect(deliveries("agent_api_request")).toEqual([])
+})
+
+it("keeps invalid and revoked API credentials anonymous", async () => {
+  const t = setup()
+  const token = "an_revoked_fixture"
+  const agent = await t.mutation(internal.agents.create, {
+    input: {},
+    hash: digest(token),
+    prefix: "fixture",
+  })
+  await t.run((ctx) => ctx.db.patch(agent.keyId, { revokedAt: Date.now() }))
+  for (const credential of [token, "retired.provider.token"]) {
+    await t.fetch("/api/v1/me/work", {
+      headers: { Authorization: `Bearer ${credential}` },
+    })
+  }
+  await t.finishAllScheduledFunctions(() => vi.runAllTimers())
+  const events = deliveries("agent_api_request")
+  expect(events).toHaveLength(2)
+  for (const event of events) {
+    expect(event.properties).toMatchObject({
+      actor_type: "anonymous_api",
+      status: 401,
+    })
+    expect(event.distinctId).toMatch(/^anonymous_api:/)
+  }
+  expect(JSON.stringify(events)).not.toMatch(
+    /an_revoked_fixture|retired.provider.token/
+  )
 })

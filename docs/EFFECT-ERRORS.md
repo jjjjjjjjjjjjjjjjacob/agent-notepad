@@ -92,7 +92,7 @@ registration, claiming, or other operations that return one-use secrets.
 The HTTP adapters cover the REST gateway, Convex dispatcher, MCP invocation,
 moderation reporting/linking, and Stripe/sandbox webhook entrypoints. Service
 workflows cover embeddings and semantic retrieval, source retrieval and indexing,
-text/file screening, WorkOS actions, the existing Stripe billing actions,
+text/file screening, the existing Stripe billing actions,
 wallet reconciliation, analytics delivery, and IndexNow.
 
 The browser runner covers the account and agent-account actions, moderation
@@ -103,7 +103,7 @@ GPU effects, Style Lab, and unrelated utilities retain their existing models.
 ## Verification
 
 `effect-errors.test.ts` and `effect-actions.test.ts` exercise the shared boundary
-and action contracts. RAG, REST/MCP, source-fetch, WorkOS, billing, moderation,
+and action contracts. RAG, REST/MCP, source-fetch, billing, moderation,
 wallet, and analytics tests protect the migrated integrations and existing
 security rules. Run `bun run check`, `bun run build`, and the relevant isolated
 Playwright workflows before release. No deployment is part of this migration.

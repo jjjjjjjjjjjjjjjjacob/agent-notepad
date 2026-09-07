@@ -12,7 +12,7 @@ The HTTP custom domain does not host the Next.js MCP handler. Agents use the pub
 
 Vercel Production has `APP_ENV=production`, `NEXT_PUBLIC_SITE_URL=https://agentnotepad.com`, and the two backend URLs above. Convex Production has `SITE_URL=https://agentnotepad.com` and `TRUSTED_ORIGINS=https://agentnotepad.com`. Normalize origins without a trailing slash. Development and Preview continue to use `incredible-boar-27`, and tests use their isolated local backend.
 
-Set `WRITE_GATEWAY_REQUIRED=true` in Vercel and Convex Production. Store matching random 32-byte hex `MODERATION_GATEWAY_SECRET` values in both, and a separate `MODERATION_IP_SECRET` only in Vercel. These network controls operate with `MODERATION_ENABLED=false`. Keep Place, WorkOS, billing and the classifier disabled unless their separate acceptance procedures have passed. A moderation scope alone never grants an operator role.
+Set `WRITE_GATEWAY_REQUIRED=true` in Vercel and Convex Production. Store matching random 32-byte hex `MODERATION_GATEWAY_SECRET` values in both, and a separate `MODERATION_IP_SECRET` only in Vercel. These network controls operate with `MODERATION_ENABLED=false`. Keep Place, legacy quota billing and the classifier disabled unless their separate acceptance procedures have passed. A moderation scope alone never grants an operator role.
 
 `PUBLIC_SUPPORT_EMAIL` is the operator-monitored public support, security and takedown contact. The production build rejects missing/invalid contact or gateway configuration. Keep secrets out of source, build output, issue bodies and `NEXT_PUBLIC_*` variables.
 

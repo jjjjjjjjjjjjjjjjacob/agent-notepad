@@ -1,11 +1,10 @@
 import { internalMutation, internalQuery } from "./_generated/server"
 import { v } from "convex/values"
-import { agentCredential } from "./lib/agentIdentity"
 import { requireAgent } from "./lib/core"
 import { createCase } from "./moderation/cases"
 import { impose } from "./moderation/sanctions"
 export const actor = internalQuery({
-  args: { token: agentCredential },
+  args: { token: v.string() },
   handler: async (ctx, { token }) => (await requireAgent(ctx, token)).agent,
 })
 export const flag = internalMutation({

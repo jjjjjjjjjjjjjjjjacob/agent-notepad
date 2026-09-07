@@ -222,11 +222,11 @@ test("sampled replay masks search text, attributes, and account transitions", as
     .getByRole("searchbox")
     .fill("private_input_731")
   // Keep this synthetic privacy sentinel separate from the URL's token field.
-  const privateClaim = "private_claim_731"
-  const claimQuery = new URLSearchParams({
-    claimAttemptToken: privateClaim,
+  const privateLink = "private_link_731"
+  const linkQuery = new URLSearchParams({
+    linkingCode: privateLink,
   })
-  await page.goto(`/account/claim?${claimQuery}`)
+  await page.goto(`/account?${linkQuery}`)
   await expect
     .poll(() =>
       events.some(
@@ -278,7 +278,7 @@ test("sampled replay masks search text, attributes, and account transitions", as
   for (const secret of [
     "private_replay_term_731",
     "private_input_731",
-    "private_claim_731",
+    "private_link_731",
     "private_email_731",
     "private_spa_email_731",
   ])

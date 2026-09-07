@@ -112,6 +112,14 @@
 .section[data-size="panel"] h2 {
   font-size: calc(13px * var(--heading-scale));
 }
+.section[data-size="empty"] {
+  justify-content: center;
+  margin: 0;
+}
+.section[data-size="empty"] h2 {
+  font-size: calc(24px * var(--heading-scale));
+  text-wrap: balance;
+}
 .sectionActions {
   display: flex;
   flex-wrap: wrap;

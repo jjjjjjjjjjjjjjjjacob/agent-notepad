@@ -2,24 +2,16 @@ import { requirePlaceEnabled } from "../place/access"
 import type { ActionCtx } from "../_generated/server"
 import type { Id } from "../_generated/dataModel"
 import { api, internal } from "../_generated/api"
-import { resolveAgentCredential } from "./resolveAgentCredential"
 import { readSchemas, type ReadOperation } from "../../lib/read-contracts"
 import { sectionBody, resourcePath } from "../../lib/content"
 import { fail } from "./core"
-import type { WorkosPrincipal } from "./agentIdentity"
 
 export async function readApi(
   ctx: ActionCtx,
   operation: ReadOperation,
   input: unknown,
-  token: string,
-  observeCredential?: (credential: string | WorkosPrincipal) => void
+  token: string
 ) {
-  const credential = async () => {
-    const resolved = await resolveAgentCredential(ctx, token)
-    observeCredential?.(resolved)
-    return resolved
-  }
   if (operation.startsWith("place_")) requirePlaceEnabled()
   const parsed = readSchemas[operation].safeParse(input)
   if (!parsed.success)
@@ -34,14 +26,14 @@ export async function readApi(
   })
   switch (operation) {
     case "products": return ctx.runQuery(api.commerceRecords.catalog, {})
-    case "purchases": return ctx.runQuery(internal.commerceRecords.read, { token: await credential(), ...readSchemas.purchases.parse(input) })
-    case "purchase": return ctx.runQuery(internal.commerceRecords.read, { token: await credential(), ...readSchemas.purchase.parse(input) })
+    case "purchases": return ctx.runQuery(internal.commerceRecords.read, { token, ...readSchemas.purchases.parse(input) })
+    case "purchase": return ctx.runQuery(internal.commerceRecords.read, { token, ...readSchemas.purchase.parse(input) })
     case "private_spaces":
     case "private_space":
     case "private_entries":
     case "private_history":
     case "private_search":
-    case "private_members": return ctx.runQuery(internal.privateSpaces.readAgent, { token: await credential(), operation, input: parsed.data })
+    case "private_members": return ctx.runQuery(internal.privateSpaces.readAgent, { token, operation, input: parsed.data })
     case "place_config": return ctx.runQuery(api.place.config, {})
     case "place_tiles": {
       const tiles = await ctx.runQuery(api.place.tiles, { tiles: readSchemas.place_tiles.parse(input).tiles.split(",").map(Number) })
@@ -58,12 +50,12 @@ export async function readApi(
       const p = readSchemas.place_portfolio.parse(input)
       return ctx.runQuery(api.place.portfolio, { ...p, agentId: p.agentId as Id<"agents"> })
     }
-    case "place_wallet": return ctx.runQuery(internal.place.wallet, { token: await credential() })
-    case "integrity_evidence": return ctx.runQuery(internal.integrity.evidence, { ...readSchemas.integrity_evidence.parse(input), token: await credential() })
-    case "case": return ctx.runQuery(internal.moderationReads.readCase, { ...readSchemas.case.parse(input), ...(token ? { token: await credential() } : {}) })
+    case "place_wallet": return ctx.runQuery(internal.place.wallet, { token })
+    case "integrity_evidence": return ctx.runQuery(internal.integrity.evidence, { ...readSchemas.integrity_evidence.parse(input), token })
+    case "case": return ctx.runQuery(internal.moderationReads.readCase, { ...readSchemas.case.parse(input), ...(token ? { token } : {}) })
     case "reputation": return ctx.runQuery(internal.moderationReads.score, readSchemas.reputation.parse(input))
-    case "jury_work": return ctx.runQuery(internal.moderationReads.juryWork, { token: await credential() })
-    case "personal_blocks": return ctx.runQuery(internal.moderationReads.blocks, { token: await credential() })
+    case "jury_work": return ctx.runQuery(internal.moderationReads.juryWork, { token })
+    case "personal_blocks": return ctx.runQuery(internal.moderationReads.blocks, { token })
     case "graph":
       return ctx.runQuery(api.knowledge.graph, readSchemas.graph.parse(input))
     case "resources": {
@@ -178,15 +170,15 @@ export async function readApi(
       )
     case "billing":
       return ctx.runQuery(internal.billing.access, {
-        token: await credential(),
+        token,
       })
     case "work":
       return ctx.runQuery(internal.personal.work, {
-        token: await credential(),
+        token,
       })
     case "notifications":
       return ctx.runQuery(internal.personal.notifications, {
-        token: await credential(),
+        token,
         ...pagination(readSchemas.notifications.parse(input)),
       })
   }

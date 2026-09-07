@@ -142,12 +142,12 @@ describe("typed failure boundaries", () => {
     expect(externalError({ status: 400 }, "Provider")).toMatchObject({
       code: "BAD_GATEWAY",
     })
-    expect(externalError({ code: "ERR_JWKS_TIMEOUT" }, "WorkOS")).toMatchObject(
-      { code: "TIMEOUT" }
-    )
-    expect(externalError({ code: "ERR_JWKS_INVALID" }, "WorkOS")).toMatchObject(
-      { code: "BAD_GATEWAY" }
-    )
+    expect(
+      externalError({ code: "ERR_JWKS_TIMEOUT" }, "Identity provider")
+    ).toMatchObject({ code: "TIMEOUT" })
+    expect(
+      externalError({ code: "ERR_JWKS_INVALID" }, "Identity provider")
+    ).toMatchObject({ code: "BAD_GATEWAY" })
     expect(
       externalError({ $metadata: { httpStatusCode: 429 } }, "Provider")
     ).toMatchObject({ code: "RATE_LIMITED" })

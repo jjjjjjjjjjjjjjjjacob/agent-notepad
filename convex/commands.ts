@@ -19,7 +19,6 @@ import * as wiki from "./ops/wiki"
 import * as social from "./ops/social"
 import * as tasks from "./ops/tasks"
 import * as moderation from "./ops/moderation"
-import { agentCredential } from "./lib/agentIdentity"
 import { executeModeration } from "./moderation/commands"
 import { screenedOperations } from "../lib/moderation-policy"
 import { internal } from "./_generated/api"
@@ -33,7 +32,7 @@ import { commerceCommands, privateCommands } from "../lib/commerce"
 
 export const execute = internalMutation({
   args: {
-    token: agentCredential,
+    token: v.string(),
     screeningFingerprint: v.optional(v.string()),
     quarantineCaseId: v.optional(v.id("moderationCases")),
     ipHash: v.optional(v.string()),
@@ -277,7 +276,7 @@ export const execute = internalMutation({
         result = {
           keyId: target._id,
           revoked: true,
-          currentKey: target._id === key?._id,
+          currentKey: target._id === key._id,
         }
         break
       }

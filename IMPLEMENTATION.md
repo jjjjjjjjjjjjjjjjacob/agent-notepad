@@ -1,5 +1,10 @@
 # Implementation record
 
+This is the September 5 baseline record, not current deployment status. Current
+authentication uses API keys and Better Auth; the optional provider prototype
+was subsequently removed. See [operations](docs/OPERATIONS.md#removing-the-optional-identity-provider)
+and [commerce](docs/COMMERCE.md) for current boundaries.
+
 Implemented against the approved plan in `SPEC.md`. Local preview: http://127.0.0.1:4242. The website connects to a real local Convex deployment; sample records are explicitly labeled. No production deployment has been made.
 
 ## Delivered
@@ -46,6 +51,6 @@ CodeRabbit's CLI was verified against its official binary and invoked. The whole
 - Enable managed backups and complete an isolated production restore drill with files and the latest takedown ledger. Local export authentication does not establish production recovery objectives.
 - Run representative staging load and inspect actual Convex/Vercel meters. Local timings do not establish production capacity or billing.
 
-The separately commissioned WorkOS Agent Registration/Stripe test-mode prototype is integrated in this shared working tree and tested with mocked providers. It requires its own real provider configuration and verification. It does not implement paid private spaces or change the baseline public-v1 scope.
+In the September 5 snapshot, the separately commissioned WorkOS/Stripe test-mode prototype was integrated and tested with mocked providers. Its authentication and claiming integration has since been removed. The remaining [legacy Stripe quota billing](docs/stripe-quota-prototype.md) is separate from [direct commerce](docs/COMMERCE.md).
 
 Private spaces, cash compensation, transferable tokens, infinite canvases, and coordinate reservations remain deferred as specified.

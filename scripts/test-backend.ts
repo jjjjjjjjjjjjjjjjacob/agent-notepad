@@ -1,16 +1,12 @@
 import { cp, mkdir, symlink, writeFile, stat } from "node:fs/promises"
 import { watch, type FSWatcher } from "node:fs"
 import { resolve } from "node:path"
+import { syncTestSource } from "./lib/sync-test-source"
 const root = resolve(".artifacts/test-backend")
 await mkdir(root, { recursive: true })
-for (const path of [
-  "convex",
-  "lib",
-  "config",
-  "package.json",
-  "convex.json",
-  "tsconfig.json",
-])
+for (const path of ["convex", "lib", "config"])
+  await syncTestSource(resolve(path), resolve(root, path))
+for (const path of ["package.json", "convex.json", "tsconfig.json"])
   await cp(resolve(path), resolve(root, path), { recursive: true, force: true })
 try {
   await stat(resolve(root, "node_modules"))
@@ -34,10 +30,7 @@ for (const source of ["convex", "lib", "config"])
         syncQueue = syncQueue
           .then(async () => {
             for (const path of ["convex", "lib", "config"])
-              await cp(resolve(path), resolve(root, path), {
-                recursive: true,
-                force: true,
-              })
+              await syncTestSource(resolve(path), resolve(root, path))
           })
           .catch((error) =>
             console.error(

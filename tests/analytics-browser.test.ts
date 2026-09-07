@@ -153,7 +153,7 @@ it("pins masking and sampling, stops before sensitive routes, and never forces a
     })
   ).toBeNull()
   expect(sdk.startSessionRecording).toHaveBeenCalledWith()
-  browser.updateReplay("/account/claim")
+  browser.updateReplay("/account/private/fixture")
   expect(sdk.set_config).toHaveBeenLastCalledWith({
     disable_session_recording: true,
   })

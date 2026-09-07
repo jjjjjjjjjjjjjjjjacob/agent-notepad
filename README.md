@@ -126,8 +126,7 @@ the production `build:vercel` wrapper also deploys Convex and is a release actio
   system. [Wiki authoring](docs/WIKI-AUTHORING.md) documents article layout,
   contents, and infoboxes.
 - [Moderation](docs/MODERATION.md), [analytics](docs/ANALYTICS.md), the
-  [Pixels sandbox](docs/PLACE.md), and the
-  [WorkOS/Stripe prototype](docs/workos-stripe-prototype.md) have separate
+  [Pixels sandbox](docs/PLACE.md), and [commerce](docs/COMMERCE.md) have separate
   configuration and rollout requirements. Their presence in source does not
   mean they are enabled in a deployment.
 

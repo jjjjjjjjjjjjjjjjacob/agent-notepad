@@ -14,7 +14,6 @@ import { commerceCommands, privateCommands } from "../lib/commerce"
 import {
   readSchemas,
   keySchema,
-  linkWorkosSchema,
   type ReadOperation,
 } from "../lib/read-contracts"
 import { digest } from "../lib/hash"
@@ -24,10 +23,8 @@ import {
   registrationSchema,
   type Operation,
 } from "../lib/contracts"
-import { resolveAgentCredential } from "./lib/resolveAgentCredential"
 import { analyticsConfig } from "../lib/analytics/config"
 import { clientFamily } from "../lib/analytics/catalog"
-import type { WorkosPrincipal } from "./lib/agentIdentity"
 
 const http = httpRouter()
 authComponent.registerRoutes(http, createAuth)
@@ -52,10 +49,6 @@ const route = httpAction(async (ctx, request) => {
     operation: "unknown",
     status: 500,
     client_family: clientFamily(request.headers.get("user-agent") ?? ""),
-  }
-  let analyticsPrincipal: WorkosPrincipal | undefined
-  const observeCredential = (credential: string | WorkosPrincipal) => {
-    if (typeof credential !== "string") analyticsPrincipal = credential
   }
   try {
     return await runHttp(
@@ -159,13 +152,7 @@ const route = httpAction(async (ctx, request) => {
               1 + (Array.isArray(input.queries) ? input.queries.length : 0)
           }
           result = yield* attempt(() =>
-            readApi(
-              ctx,
-              operation as ReadOperation,
-              input,
-              token,
-              observeCredential
-            )
+            readApi(ctx, operation as ReadOperation, input, token)
           )
           if (result === null)
             return yield* Effect.fail(
@@ -177,13 +164,9 @@ const route = httpAction(async (ctx, request) => {
               operation
             )
           ) {
-            const credential = yield* attempt(() =>
-              resolveAgentCredential(ctx, token)
-            )
-            observeCredential(credential)
             result = yield* attempt(() =>
               ctx.runQuery(internal.moderationReads.filterResult, {
-                token: credential,
+                token,
                 result,
               })
             )
@@ -304,6 +287,19 @@ const route = httpAction(async (ctx, request) => {
             )
           }
           if (path[0] === "agents" && path.length === 1) {
+            if (
+              token &&
+              (token.length > 300 ||
+                !(yield* attempt(() =>
+                  ctx.runQuery(internal.agents.lookup, { hash: digest(token) })
+                )))
+            )
+              return yield* Effect.fail(
+                appError(
+                  "UNAUTHORIZED",
+                  "Supply a valid agent API key or omit Authorization to register."
+                )
+              )
             const parsed = registrationSchema.safeParse(input)
             if (!parsed.success)
               return yield* Effect.fail(
@@ -324,26 +320,9 @@ const route = httpAction(async (ctx, request) => {
                   "This profile was withheld for prompt-injection review."
                 )
               )
-            if (token && !token.startsWith("an_")) {
-              const identity = yield* attempt(() =>
-                ctx.runAction(internal.workos.authenticate, {
-                  token,
-                })
-              )
-              observeCredential(identity)
-              result = yield* attempt(() =>
-                ctx.runMutation(internal.workosIdentity.provision, {
-                  identity,
-                  input,
-                })
-              )
-            } else {
-              result = yield* attempt(() =>
-                ctx.runAction(internal.registration.register, {
-                  input,
-                })
-              )
-            }
+            result = yield* attempt(() =>
+              ctx.runAction(internal.registration.register, { input })
+            )
             if (
               ipHash &&
               result &&
@@ -359,28 +338,6 @@ const route = httpAction(async (ctx, request) => {
                 })
               )
             status = 201
-          } else if (
-            path[0] === "agents" &&
-            path[1] === "workos" &&
-            path.length === 2
-          ) {
-            const parsed = linkWorkosSchema.safeParse(input)
-            if (!parsed.success)
-              return yield* Effect.fail(
-                appError("VALIDATION", "Supply the existing agent key.")
-              )
-            const identity = yield* attempt(() =>
-              ctx.runAction(internal.workos.authenticate, {
-                token,
-              })
-            )
-            observeCredential(identity)
-            result = yield* attempt(() =>
-              ctx.runMutation(internal.workosIdentity.provision, {
-                identity,
-                existingKey: parsed.data.existingKey,
-              })
-            )
           } else if (
             path[0] === "agents" &&
             path[1] === "link" &&
@@ -437,10 +394,6 @@ const route = httpAction(async (ctx, request) => {
                 appError("VALIDATION", "Invalid command input.")
               )
             input = parsed.data
-            const credential = yield* attempt(() =>
-              resolveAgentCredential(ctx, token)
-            )
-            observeCredential(credential)
             if (
               Object.hasOwn(commerceCommands, path[1]) ||
               Object.hasOwn(privateCommands, path[1])
@@ -455,7 +408,7 @@ const route = httpAction(async (ctx, request) => {
               result = Object.hasOwn(commerceCommands, path[1])
                 ? yield* attempt(() =>
                     ctx.runAction(internal.commerceStripe.agentExecute, {
-                      token: credential,
+                      token,
                       operation: path[1],
                       input,
                       requestKey: idempotencyKey,
@@ -463,7 +416,7 @@ const route = httpAction(async (ctx, request) => {
                   )
                 : yield* attempt(() =>
                     ctx.runMutation(internal.privateSpaces.writeAgent, {
-                      token: credential,
+                      token,
                       operation: path[1],
                       input,
                       idempotencyKey,
@@ -472,7 +425,7 @@ const route = httpAction(async (ctx, request) => {
             } else {
               const scan = yield* attempt(() =>
                 ctx.runAction(internal.screening.submission, {
-                  token: credential,
+                  token,
                   operation: path[1],
                   input,
                   ...(ipHash ? { ipHash } : {}),
@@ -488,7 +441,7 @@ const route = httpAction(async (ctx, request) => {
                 )
               result = yield* attempt(() =>
                 ctx.runMutation(internal.commands.execute, {
-                  token: credential,
+                  token,
                   screeningFingerprint: scan.fingerprint,
                   ...(scan.quarantine && scan.caseId
                     ? {
@@ -546,12 +499,8 @@ const route = httpAction(async (ctx, request) => {
         analyticsProperties.error_code = error.code.toLowerCase()
         return errorResponse(error, {
           ...headers,
-          ...(error.code === "UNAUTHORIZED" &&
-          process.env.WORKOS_CLIENT_ID &&
-          process.env.SITE_URL
-            ? {
-                "WWW-Authenticate": `Bearer resource_metadata="${process.env.SITE_URL}/.well-known/oauth-protected-resource"`,
-              }
+          ...(error.code === "UNAUTHORIZED"
+            ? { "WWW-Authenticate": "Bearer" }
             : {}),
         })
       }
@@ -569,10 +518,7 @@ const route = httpAction(async (ctx, request) => {
             ...analyticsProperties,
             duration_ms: Date.now() - analyticsStarted,
           },
-          ...(token && !token.includes(".")
-            ? { tokenHash: digest(token) }
-            : {}),
-          ...(analyticsPrincipal ? { principal: analyticsPrincipal } : {}),
+          ...(token ? { tokenHash: digest(token) } : {}),
           transport: analyticsTransport,
         })
       }

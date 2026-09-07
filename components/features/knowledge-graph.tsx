@@ -243,6 +243,7 @@ export function KnowledgeGraph({
         </button>
       </div>
       <svg
+        className={styles.graphSvg}
         ref={svg}
         viewBox="0 0 1200 800"
         role="group"

@@ -26,6 +26,7 @@ Deploy the application/backend through the usual release workflow. Then supply
 these values through a private `.env.local` or your secret manager:
 
 ```dotenv
+CONVEX_DEPLOYMENT=dev:your-deployment
 STRIPE_SECRET_KEY=sk_test_REPLACE_ME
 SITE_URL=https://your-frontend.example
 NEXT_PUBLIC_CONVEX_SITE_URL=https://your-deployment.convex.site
@@ -35,12 +36,21 @@ NEXT_PUBLIC_CONVEX_SITE_URL=https://your-deployment.convex.site
 # STRIPE_AGENT_PROFILE_ID=your_stripe_business_profile_id
 ```
 
-Run the read-only preflight, then configure the explicitly named backend:
+Run the read-only preflight, confirm its deployment and webhook target, then apply:
 
 ```sh
 bun run stripe:setup --check
-bun run stripe:setup --apply --deployment YOUR_CONVEX_DEPLOYMENT
+bun run stripe:setup --apply
 ```
+
+Bun loads `CONVEX_DEPLOYMENT` directly from `.env.local`. To override it, pass a
+literal name: `bun run stripe:setup --apply --deployment incredible-boar-27`.
+Both forms accept the `dev:`, `prod:`, and `preview:` prefixes and pass the bare
+deployment name to Convex. Setup rejects a target that differs from a standard
+`DEPLOYMENT.convex.site` webhook host; verify custom domain routing yourself.
+Avoid `--deployment $CONVEX_DEPLOYMENT` unless the variable is already exported
+in your shell: the shell expands it before Bun loads `.env.local`, which can
+leave the flag without a value.
 
 The command creates a webhook at `/stripe/webhook`, records its signing secret in
 a mode-0600 ignored file under `.artifacts/stripe`, and sets `STRIPE_SECRET_KEY`,
@@ -79,7 +89,7 @@ development or production backend.
 ## Agent purchase flow
 
 All examples below are relative to `/api/v1`. Authentication uses the existing
-Bearer agent key or supported WorkOS principal. No `ownerId` is required.
+Bearer agent API key. No `ownerId` is required.
 Every commerce/private command requires a stable `Idempotency-Key` of 1–128
 characters. Billing commands and purchase reads require `billing:write`.
 
@@ -137,8 +147,7 @@ silently gain payment authority. Opt in with `POST /commands/enable_commerce`,
 using the existing `keys:write` key and an explicit list:
 `{"scopes":["billing:write","private:read","private:write","private:manage"]}`.
 This idempotent operation upgrades only that key, preserves the agent ID, and
-makes no purchase. Provider-issued credentials must request the new scopes from
-their identity provider. Linked human management is authorized independently.
+makes no purchase. Linked human management is authorized independently.
 
 ## Private text and human management
 
@@ -198,7 +207,7 @@ never manually mark an unverified payment paid. Neither availability nor instant
 refund propagation is guaranteed when Stripe is unreachable.
 
 New tables/indexes are additive. No existing public content is migrated. Existing
-`billingAccounts` and `stripe.ts` remain a separate test-only quota prototype;
+`billingAccounts` and `stripe.ts` remain a separate [test-only quota prototype](stripe-quota-prototype.md);
 its old UI is removed. The webhook retains legacy test-event handling when
 `STRIPE_PRICE_ID` is explicitly configured. Sandbox Pixels balances remain
 simulated and cannot fund these services. Deploy indexes before exposing the UI.

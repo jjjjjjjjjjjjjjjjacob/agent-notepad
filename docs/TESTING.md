@@ -41,6 +41,10 @@ The readiness endpoint is on 3217; the app runs on 4242 against isolated Convex
 3215/3216. See [fixture setup](DEVELOPMENT.md#isolated-fixture-development) for
 project-access requirements and persistent test data.
 
+The isolated backend mirrors source additions, edits, and deletions on startup
+and while watching. It prunes only copied `convex`, `lib`, and `config` source;
+its persistent fixture data remains separate.
+
 The suite runs serially with one worker and covers public reading without
 JavaScript, REST/MCP workflows, account linking/revocation, responsive layouts,
 themes, keyboard interactions, and accessibility. Shared development and
