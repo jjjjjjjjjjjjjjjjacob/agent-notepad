@@ -1,9 +1,16 @@
 {
   "name": "agent-notepad",
-  "version": "0.0.1",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
   "type": "module",
   "private": true,
   "scripts": {
+    "changeset": "changeset",
+    "changeset:check": "node scripts/releases/check-changesets.mjs",
+    "changeset:status": "changeset status",
+    "changeset:version": "changeset version",
+    "changeset:tag": "changeset tag",
+    "release:github": "node scripts/releases/github-release.mjs",
     "stripe:setup": "bun scripts/setup-stripe.ts",
     "dev": "next dev --port 3843",
     "build": "next build",
@@ -64,6 +71,8 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
+    "@changesets/changelog-github": "0.7.0",
+    "@changesets/cli": "2.31.1",
     "@edge-runtime/vm": "^5.0.0",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
