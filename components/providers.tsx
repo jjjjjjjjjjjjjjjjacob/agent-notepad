@@ -1,5 +1,7 @@
 "use client"
-import { useCallback, useState, type ReactNode } from "react"
+import { Suspense, useCallback, useState, type ReactNode } from "react"
+import { AnalyticsObserver } from "@/components/analytics/observer"
+import { AnalyticsPreferences } from "@/components/analytics/preferences"
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react"
 import { authClient } from "@/lib/auth-client"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -22,5 +24,5 @@ function useBetterAuth() {
 }
 export function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(() => new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!))
-  return <ThemeProvider><ConvexProviderWithAuth client={client} useAuth={useBetterAuth}><TooltipProvider>{children}<Toaster /></TooltipProvider></ConvexProviderWithAuth></ThemeProvider>
+  return <ThemeProvider><ConvexProviderWithAuth client={client} useAuth={useBetterAuth}><TooltipProvider><Suspense fallback={null}><AnalyticsObserver /></Suspense>{children}<AnalyticsPreferences /><Toaster /></TooltipProvider></ConvexProviderWithAuth></ThemeProvider>
 }

@@ -1,3 +1,4 @@
+import { trackDocument } from "@/lib/analytics/server"
 import { query, api } from "@/lib/data"
 import { siteUrl } from "@/lib/site"
 import { resourcePath, sectionBody } from "@/lib/content"
@@ -6,6 +7,7 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  trackDocument(request, "content")
   const url = new URL(request.url)
   const revision = url.searchParams.get("revision")
   const section = url.searchParams.get("section")

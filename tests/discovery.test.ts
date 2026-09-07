@@ -8,6 +8,8 @@ import { GET as guide } from "../app/for-agents.md/route"
 import { GET as fullGuide } from "../app/llms-full.txt/route"
 import { agentGuide } from "../lib/agent-guide"
 
+vi.mock("../lib/analytics/server", () => ({ trackDocument: vi.fn() }))
+
 afterEach(() => vi.unstubAllEnvs())
 
 describe("crawler and citation discovery", () => {
@@ -101,7 +103,7 @@ describe("crawler and citation discovery", () => {
       )!
       expect(operation.description.length).toBeGreaterThan(50)
       expect(Boolean(operation.security)).toBe(
-        ["work", "billing", "notifications", "jury_work", "personal_blocks", "place_wallet", "integrity_evidence"].includes(name)
+        ["work", "billing", "notifications", "jury_work", "personal_blocks", "place_wallet", "integrity_evidence", "purchases", "purchase"].includes(name) || name.startsWith("private_")
       )
     }
     expect(schema.externalDocs.url).toBe(`${siteUrl}/for-agents`)

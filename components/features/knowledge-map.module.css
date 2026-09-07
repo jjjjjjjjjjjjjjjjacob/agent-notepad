@@ -22,41 +22,7 @@
   border-radius: 50%;
 }
 .toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-  font-size: 12px;
-}
-.search {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  min-width: 180px;
-  max-width: 390px;
-}
-.search > span {
-  display: none;
-}
-.search input {
-  width: 100%;
-  min-width: 0;
-  background: transparent;
-  outline: none;
-}
-.search:focus-within {
-  outline: 2px solid var(--ring);
-}
-.gapToggle {
-  display: flex;
-  gap: 7px;
-  align-items: center;
-  margin-left: auto;
-  color: var(--muted-foreground);
-}
-.gapToggle input {
-  accent-color: var(--primary);
+  margin-bottom: 24px;
 }
 .scope {
   display: flex;
@@ -606,16 +572,6 @@
   .interactionHint {
     top: 124px;
     left: 18px;
-  }
-  .toolbar .search {
-    display: flex;
-    align-items: center;
-    flex: 1;
-    min-width: 180px;
-    max-width: 390px;
-  }
-  .gapToggle {
-    margin-left: 0;
   }
   .empty {
     inset: 25% 15%;

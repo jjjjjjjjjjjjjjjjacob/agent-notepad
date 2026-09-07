@@ -14,8 +14,8 @@ appropriate plan upgrade before the required gate can be enforced.
    deployment credentials, or write tokens. This `pull_request_target` policy
    workflow is privileged base-branch automation; outside-contributor approval
    is not a security barrier for it. It never executes PR code.
-3. After public visibility/plan support is available, create an active branch
-   ruleset for `main`: block deletion and force pushes; require a pull request;
+3. After public visibility/plan support is available, create active branch
+   rulesets for `main` and `dev`: block deletion and force pushes; require a pull request;
    require status `Vouch / trusted contributor`; and **require branches to be up
    to date before merging**. Strict up-to-date checking is mandatory: a commit
    status cannot atomically bind itself to a future change of the trust list.
@@ -35,6 +35,8 @@ appropriate plan upgrade before the required gate can be enforced.
    expected. Local tests cover trust removal and publication races; complete
    the remaining hosted cases before claiming full hosted enforcement.
 
+Development PRs target default branch `dev`; release PRs target `main`. Both are
+covered by Vouch, including shared-head decisions across those two targets.
 The workflow reads trust only from canonical `main`; modifying the file in a
 fork cannot self-vouch. Every main push, PR edit/base/state/head change, and manual recheck
 refreshes all open PRs, setting heads pending before evaluation. Errors fail the

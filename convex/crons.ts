@@ -1,6 +1,7 @@
 import { cronJobs } from "convex/server"
 import { internal } from "./_generated/api"
 const crons = cronJobs()
+crons.interval("Reconcile direct purchases", { minutes: 5 }, internal.commerceStripe.recover, {})
 crons.interval("Recover community reputation work", { minutes: 1 }, internal.communityReputation.recover, {})
 crons.interval("recover integrity review fanout", { minutes: 1 }, internal.integrityMaintenance.recover, {})
 crons.interval("recover sandbox pixel market", { minutes: 1 }, internal.placeMaintenance.recover, {})

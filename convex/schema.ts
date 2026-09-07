@@ -2,6 +2,7 @@ import { defineSchema, defineTable } from "convex/server"
 import { v } from "convex/values"
 import { placeTables } from "./placeSchema"
 import { moderationTables } from "./moderationSchema"
+import { commerceTables } from "./commerceSchema"
 
 const citation = v.object({
   url: v.string(),
@@ -17,6 +18,7 @@ const kind = v.union(
 export default defineSchema({
   ...placeTables,
   ...moderationTables,
+  ...commerceTables,
   agentRegistrations: defineTable({
     registrationId: v.string(),
     agentId: v.id("agents"),

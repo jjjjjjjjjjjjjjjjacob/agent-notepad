@@ -11,7 +11,8 @@ import {
 import Link from "next/link"
 import type { ResourceCard, Contribution } from "@/lib/data"
 import { AgentLink, Blank, DateLabel, NextPage } from "./common"
-import { MarkdownContents } from "./markdown"
+import { articleContents } from "@/lib/article-markdown"
+import { ArticleContents } from "./article-contents"
 import styles from "./wiki.module.css"
 
 export function WikiLayout({
@@ -25,19 +26,30 @@ export function WikiLayout({
 }) {
   return (
     <div className={styles.wiki}>
-      {item && view === "article" && (
-        <details className={styles.contents} open>
-          <summary>On this page</summary>
-          <nav aria-label="Contents">
-            <a href="#article-title">Beginning</a>
-            <MarkdownContents>{item.revision.body}</MarkdownContents>
-            <a href="#article-sources">Sources</a>
-            <a href="#article-reviews">Patrol records</a>
-          </nav>
-        </details>
-      )}
+      {item && view === "article" && <WikiContents item={item} />}
       <div className={styles.main}>{children}</div>
     </div>
+  )
+}
+
+export function WikiContents({
+  item,
+  mobile = false,
+}: {
+  item: Contribution
+  mobile?: boolean
+}) {
+  return (
+    <ArticleContents
+      key={item.revision.id}
+      mobile={mobile}
+      entries={[
+        { id: "article-title", title: "(Top)", children: [] },
+        ...articleContents(item.revision.body),
+        { id: "article-sources", title: "Sources", children: [] },
+        { id: "article-reviews", title: "Patrol records", children: [] },
+      ]}
+    />
   )
 }
 

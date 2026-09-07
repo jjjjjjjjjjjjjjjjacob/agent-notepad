@@ -1,4 +1,6 @@
 "use client"
+import { attempt } from "@/lib/effects"
+import { useEffectAction, useIdempotentMutation } from "@/lib/use-effect-action"
 import { useState } from "react"
 import { useMutation, useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
@@ -15,23 +17,19 @@ export function PlaceOperations() {
     afterRegion,
     ...(reviewCursor ? { reviewCursor } : {}),
   })
-  const ban = useMutation(api.integrity.ban),
-    auction = useMutation(api.integrity.auctionLot),
-    grant = useMutation(api.integrity.grantAuctioneer),
-    flag = useMutation(api.integrity.flag)
+  const ban = useIdempotentMutation(useMutation(api.integrity.ban)),
+    auction = useIdempotentMutation(useMutation(api.integrity.auctionLot)),
+    grant = useIdempotentMutation(useMutation(api.integrity.grantAuctioneer)),
+    flag = useIdempotentMutation(useMutation(api.integrity.flag))
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState("")
-  async function perform(action: () => Promise<unknown>) {
-    setBusy(true)
-    try {
-      await action()
-      setMessage("Operator decision recorded.")
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Request failed.")
-    } finally {
-      setBusy(false)
-    }
-  }
+  const runAction = useEffectAction()
+  const perform = (action: () => Promise<unknown>) =>
+    runAction(attempt(action), {
+      setBusy,
+      setError: setMessage,
+      onSuccess: () => setMessage("Operator decision recorded."),
+    })
   return (
     <section>
       <h2>Human operator controls</h2>
@@ -59,7 +57,6 @@ export function PlaceOperations() {
                   .split("\n")
                   .map((v) => v.trim())
                   .filter(Boolean),
-                idempotencyKey: crypto.randomUUID(),
               })
             )
           }}
@@ -94,7 +91,6 @@ export function PlaceOperations() {
                 resourceId: String(data.get("resource")),
                 agentId: String(data.get("agent")),
                 reason: String(data.get("reason")),
-                idempotencyKey: crypto.randomUUID(),
               })
             )
           }}
@@ -124,7 +120,6 @@ export function PlaceOperations() {
               grant({
                 agentId: String(data.get("agent")) as Id<"agents">,
                 enabled: data.get("enabled") === "on",
-                idempotencyKey: crypto.randomUUID(),
               })
             )
           }}
@@ -174,7 +169,6 @@ export function PlaceOperations() {
                   title: `Forfeiture region ${lot.region}`,
                   priceCents: Math.round(Number(data.get("price")) * 100),
                   durationMs: Math.round(Number(data.get("minutes")) * 60000),
-                  idempotencyKey: crypto.randomUUID(),
                 })
               )
             }}
@@ -243,21 +237,17 @@ function Review({ id }: { id: Id<"integrityReviews"> }) {
     reviewId: id,
     ...(cursor ? { cursor } : {}),
   })
-  const resolve = useMutation(api.integrity.resolve),
-    reopen = useMutation(api.integrity.reopen)
+  const resolve = useIdempotentMutation(useMutation(api.integrity.resolve)),
+    reopen = useIdempotentMutation(useMutation(api.integrity.reopen))
   const [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false)
-  async function perform(action: () => Promise<unknown>) {
-    setBusy(true)
-    try {
-      await action()
-      setMessage("Review decision recorded.")
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Request failed.")
-    } finally {
-      setBusy(false)
-    }
-  }
+  const runAction = useEffectAction()
+  const perform = (action: () => Promise<unknown>) =>
+    runAction(attempt(action), {
+      setBusy,
+      setError: setMessage,
+      onSuccess: () => setMessage("Review decision recorded."),
+    })
   return (
     <div>
       {message && (
@@ -338,7 +328,6 @@ function Review({ id }: { id: Id<"integrityReviews"> }) {
                         inspectedRevisionId: report.revisionId!,
                         applyCorrection: data.get("correction") === "on",
                         reason: String(data.get("reason")),
-                        idempotencyKey: crypto.randomUUID(),
                       })
                     )
                 }}
@@ -378,7 +367,6 @@ function Review({ id }: { id: Id<"integrityReviews"> }) {
                 reopen({
                   reviewId: id,
                   reason: String(data.get("reason")),
-                  idempotencyKey: crypto.randomUUID(),
                 })
               )
             }}

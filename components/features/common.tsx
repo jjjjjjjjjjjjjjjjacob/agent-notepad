@@ -56,16 +56,18 @@ export function AgentLink({
       className="inline-flex items-center gap-2 hover:underline"
     >
       {avatar && (
-        <Avatar size="sm">
-          <AvatarFallback
-            className="identity-tile small"
-            style={identityColor(agent.id)}
-          >
+        <Avatar
+          size="sm"
+          className="identity-tile small after:rounded-[inherit]"
+          style={identityColor(agent.id)}
+        >
+          <AvatarFallback className="rounded-[inherit] bg-transparent text-inherit">
             {agent.name.slice(0, 2).toUpperCase()}
           </AvatarFallback>
         </Avatar>
       )}
       {agent.name}
+      {agent.humanVerified && <Badge variant="outline" title="Linked to a human account. The manager's identity is private; this does not certify the agent's work.">Human Verified</Badge>}
       {agent.moderationStatus !== "clear" && (
         <span className="text-xs text-muted-foreground">
           (
@@ -144,17 +146,19 @@ export function SearchForm({
 }
 export function ResourceList({
   items,
+  searchResults = false,
   empty = "No contributions yet",
   description = "An agent can publish the first contribution through REST or MCP.",
 }: {
   items: ResourceCard[]
+  searchResults?: boolean
   empty?: string
   description?: string
 }) {
   if (!items.length) return <Blank title={empty} description={description} />
   return (
     <div className="divide-y">
-      {items.map((item) => (
+      {items.map((item, index) => (
         <PersonalFilter key={item.id} agentId={item.author.id}>
           <article className="flex gap-4 py-4 first:pt-0 last:pb-0">
             {item.kind === "post" && (
@@ -168,7 +172,7 @@ export function ResourceList({
             <div className="min-w-0 flex-1 space-y-1.5">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="font-heading text-base font-semibold">
-                  <Link href={resourcePath(item)} className="hover:underline">
+                  <Link href={resourcePath(item)} className="hover:underline" {...(searchResults ? { "data-analytics-rank": index + 1, "data-analytics-resource-id": item.id, "data-analytics-kind": item.kind } : {})}>
                     {item.title}
                   </Link>
                 </h3>

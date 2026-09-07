@@ -1,12 +1,40 @@
+```infobox
+# Onsen
+
+Hot springs and their bathing settings in [Japan](/wiki/japan) [Overview](https://www.japan.travel/en/see-and-do/onsen/)
+
+## At a glance
+
+| Feature | Details |
+| --- | --- |
+| Water source | Natural hot-spring water [Overview](https://www.japan.travel/en/see-and-do/onsen/) |
+| Settings | Communal baths, inns, and resort facilities [Overview](https://www.japan.travel/en/see-and-do/onsen/) |
+| Cultural connections | Bathing, hospitality, travel, and local identity [History](https://en.wikipedia.org/wiki/Onsen) |
+
+## Related terms
+
+| Term | Meaning |
+| --- | --- |
+| Sentō | Public bathhouse; need not use spring water [Terminology](https://en.wikipedia.org/wiki/Onsen) |
+| Rotenburo | Open-air bath [Terminology](https://en.wikipedia.org/wiki/Onsen) |
+| Ryokan | Traditional Japanese inn [Tourism](https://www.japan.travel/en/see-and-do/onsen/) |
+
+## Animal bathing imagery
+
+[Capybaras in Japan](/wiki/capybaras-in-japan) · [Izu Shaboten Zoo](/wiki/izu-shaboten-zoo)
+```
+
 **Onsen** are hot springs in [Japan](/wiki/japan), and the word also refers to bathing facilities and resort settings associated with them. They connect geology with bathing, hospitality, local identity, and tourism. An onsen may be a small communal bath, part of an inn, or a larger resort facility. The term should be distinguished from a generic bath or public bathhouse: not every heated bath uses natural hot-spring water. [Overview](https://www.japan.travel/en/see-and-do/onsen/) [Terminology and history](https://en.wikipedia.org/wiki/Onsen)
 
-## Geology and water
+## Water and terminology
+
+### Geology and water
 
 Hot-spring water is groundwater that has been heated and emerges at the surface or is brought up through development of a source. Japan's geological setting contributes to the abundance and variety of its springs. Volcanic activity is important to many of them, but the relationship between a particular spring, underground heat, geological formations, and dissolved substances needs site-specific investigation. One cannot infer the water's composition solely from a photograph of steam or rocks. [Geological background](https://en.wikipedia.org/wiki/Onsen)
 
 Water properties vary between locations. Dissolved minerals can influence color, smell, and the experience of bathing, while facilities may cool, heat, mix, circulate, or otherwise manage the water. The words used in visitor advertising may describe either a source or a treatment practice, so they should not automatically be treated as a complete technical specification. A careful account separates the spring itself, the water supplied to the bath, and the bathing environment. [Water and facilities](https://en.wikipedia.org/wiki/Onsen)
 
-## Onsen, sentō, and rotenburo
+### Onsen, sentō, and rotenburo
 
 Several related terms describe different aspects of bathing. **Sentō** generally refers to a public bathhouse, which need not use hot-spring water. **Rotenburo** describes an open-air bath. A bath can therefore be both part of an onsen and a rotenburo, but being outdoors does not by itself establish that its water comes from a hot spring. Facilities may combine indoor baths, outdoor baths, and other bathing spaces. [Bathing terminology](https://en.wikipedia.org/wiki/Onsen)
 
@@ -20,9 +48,15 @@ Modern transport and tourism changed the scale and accessibility of many destina
 
 ## The bathing environment
 
+### Washing and soaking
+
 Bathing is usually organized around a distinction between washing and soaking. In shared facilities, visitors wash before entering the bath. Clothing rules, towel use, changing areas, and gender arrangements depend on the facility. It is better to check the establishment's own guidance than assume that every location follows identical rules. The experience is social as well as physical: consideration for other bathers forms an important part of the setting. [Visitor guidance](https://www.japan-guide.com/e/e2292.html)
 
+### Facility rules
+
 Policies concerning tattoos, private baths, children, and other practical matters vary and can change. The Japan National Tourism Organization notes this variation in its guidance. Rules stated for one inn should not be generalized to every onsen. For an actual visit, current facility information is more useful than an undated claim that all establishments either allow or prohibit a particular practice. [JNTO guidance](https://www.japan.travel/en/see-and-do/onsen/)
+
+### Design and setting
 
 The physical environment can include views, outdoor air, planting, stonework, timber, or other materials. These elements shape the experience, but they are not proof of water quality or geological origin. A visually traditional bath can still involve modern water management. Conversely, a plain facility can be associated with a significant natural spring. Description should distinguish aesthetic design from measurable properties.
 

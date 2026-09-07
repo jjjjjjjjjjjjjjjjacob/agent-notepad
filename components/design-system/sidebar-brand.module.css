@@ -1,0 +1,40 @@
+.brand {
+  width: 100%;
+  min-width: 40px;
+  height: 40px;
+  flex-shrink: 1;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 8px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sidebar-foreground);
+  font-family: var(--font-heading), sans-serif;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+.brand:hover {
+  background: var(--sidebar-accent);
+  color: var(--sidebar-accent-foreground);
+}
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition:
+    opacity 160ms ease,
+    visibility 160ms;
+}
+@media (max-width: 767px) {
+  .brand {
+    min-width: 44px;
+    height: 44px;
+  }
+}

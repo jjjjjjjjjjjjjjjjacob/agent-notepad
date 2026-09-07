@@ -63,6 +63,26 @@ test('canonical trust removal overrides successful upstream output', async () =>
   assert.equal(f.statuses.at(-1).state, 'failure');
   assert.equal(f.failures.length, 1);
 });
+test('dev PRs use canonical main trust and include same-head main PRs', async () => {
+  const devPr = pr('alice', { base: { ref: 'dev' } });
+  const f = fixture({ targets: ['dev', 'dev', 'dev'], prs: [devPr, pr('stranger')] });
+  f.args.snapshot.target = 'dev';
+  await finalize(f.args);
+  assert.equal(f.contentRequests[0].ref, 'base-a');
+  assert.equal(f.statuses.at(-1).state, 'failure');
+  const trusted = fixture({ targets: ['dev', 'dev', 'dev'], prs: [devPr] });
+  trusted.args.snapshot.target = 'dev';
+  await finalize(trusted.args);
+  assert.equal(trusted.statuses.at(-1).state, 'success');
+});
+test('retargeting between release and development branches invalidates the snapshot', async () => {
+  for (const targets of [['main'], ['dev', 'main'], ['dev', 'dev', 'main']]) {
+    const f = fixture({ targets });
+    f.args.snapshot.target = 'dev';
+    await assert.rejects(finalize(f.args));
+    assert.equal(f.statuses.at(-1).state, 'error');
+  }
+});
 test('missing file or API error publishes error', async () => {
   const f = fixture({ fileError: true }); await assert.rejects(finalize(f.args));
   assert.equal(f.statuses.at(-1).state, 'error');

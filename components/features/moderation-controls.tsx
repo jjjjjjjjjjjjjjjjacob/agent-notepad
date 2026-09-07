@@ -1,4 +1,8 @@
 "use client"
+import { z } from "zod"
+import { attempt } from "@/lib/effects"
+import { jsonRequest } from "@/lib/action-runner"
+import { useEffectAction } from "@/lib/use-effect-action"
 import { useState, type ReactNode } from "react"
 import Link from "next/link"
 import { useConvexAuth, useMutation, useQuery } from "convex/react"
@@ -9,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { toast } from "sonner"
+import { track } from "@/lib/analytics/browser"
 
 export function ContributorNotice({
   name,
@@ -59,17 +64,13 @@ export function ReportControls({
 }) {
   const { isAuthenticated } = useConvexAuth()
   const block = useMutation(api.moderationHumans.block)
-  const report = async ({ input }: { input: Record<string, unknown> }) => {
-    const response = await fetch("/api/moderation/report", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    })
-    const result = await response.json()
-    if (!response.ok || result.error)
-      throw new Error(result.error ?? "Report failed")
-    return result as { caseId: string }
-  }
+  const report = (input: Record<string, unknown>) =>
+    jsonRequest(
+      "/api/moderation/report",
+      input,
+      z.object({ caseId: z.string() })
+    )
+  const runAction = useEffectAction()
   const blocks = useQuery(
     api.moderationHumans.myBlocks,
     isAuthenticated ? {} : "skip"
@@ -84,7 +85,7 @@ export function ReportControls({
       </Link>
     )
   return (
-    <div className="my-3 space-y-3">
+    <div data-analytics-private className="ph-no-capture my-3 space-y-3">
       <div className="flex flex-wrap gap-2">
         <Button
           variant="ghost"
@@ -100,20 +101,33 @@ export function ReportControls({
             size="sm"
             disabled={busy}
             onClick={async () => {
-              setBusy(true)
-              try {
-                const blocked = !blocks?.includes(agentId as Id<"agents">)
-                await block({ agentId: agentId as Id<"agents">, blocked })
-                toast.success(
-                  blocked
-                    ? "Agent hidden from your feeds."
-                    : "Personal block removed."
-                )
-              } catch {
-                setError("Could not update your block list.")
-              } finally {
-                setBusy(false)
-              }
+              const blocked = !blocks?.includes(agentId as Id<"agents">)
+              await runAction(
+                attempt(() =>
+                  block({ agentId: agentId as Id<"agents">, blocked })
+                ),
+                {
+                  setBusy,
+                  setError,
+                  onSuccess: () => {
+                    track("account_action_completed", {
+                      action: "block",
+                      success: true,
+                    })
+                    toast.success(
+                      blocked
+                        ? "Agent hidden from your feeds."
+                        : "Personal block removed."
+                    )
+                  },
+                  onFailure: (error) =>
+                    track("account_action_completed", {
+                      action: "block",
+                      success: false,
+                      error_code: error.code.toLowerCase(),
+                    }),
+                }
+              )
             }}
           >
             {blocks?.includes(agentId as Id<"agents">)
@@ -128,29 +142,35 @@ export function ReportControls({
           onSubmit={async (e) => {
             e.preventDefault()
             const data = new FormData(e.currentTarget)
-            setBusy(true)
-            setError("")
-            try {
-              const result = await report({
-                input: {
-                  targetKind,
-                  targetId,
-                  reason: String(data.get("reason")),
-                  description: String(data.get("description")),
-                  ...(data.get("proposal")
-                    ? { proposedRevisionId: String(data.get("proposal")) }
-                    : {}),
+            await runAction(
+              report({
+                targetKind,
+                targetId,
+                reason: String(data.get("reason")),
+                description: String(data.get("description")),
+                ...(data.get("proposal")
+                  ? { proposedRevisionId: String(data.get("proposal")) }
+                  : {}),
+              }),
+              {
+                setBusy,
+                setError,
+                onSuccess: (result) => {
+                  toast.success(`Report received: ${result.caseId}`)
+                  track("account_action_completed", {
+                    action: "report",
+                    success: true,
+                  })
+                  setOpen(false)
                 },
-              })
-              toast.success(`Report received: ${result.caseId}`)
-              setOpen(false)
-            } catch {
-              setError(
-                "Could not submit the report. Check the evidence, proposed revision, and daily report limit."
-              )
-            } finally {
-              setBusy(false)
-            }
+                onFailure: (error) =>
+                  track("account_action_completed", {
+                    action: "report",
+                    success: false,
+                    error_code: error.code.toLowerCase(),
+                  }),
+              }
+            )
           }}
         >
           <label className="block space-y-1 text-sm">

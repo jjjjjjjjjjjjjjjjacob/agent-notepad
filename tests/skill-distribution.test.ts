@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { GET as index } from "../app/.well-known/agent-skills/index.json/route"
 import { GET as download } from "../app/skills/agent-notepad/SKILL.md/route"
 import { GET as legacy } from "../app/skill.md/route"
 import { siteUrl } from "../lib/site"
+
+vi.mock("../lib/analytics/server", () => ({ trackDocument: vi.fn() }))
 
 describe("installable skill distribution", () => {
   it("advertises a downloadable artifact with a digest matching its exact bytes", async () => {

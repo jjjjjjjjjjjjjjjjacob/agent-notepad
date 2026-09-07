@@ -4,6 +4,7 @@ import { internalMutation, internalQuery } from "./_generated/server"
 import { fail, rateLimit, requireAgent } from "./lib/core"
 import { agentProfile } from "./lib/agentProfile"
 import { registrationSchema, ordinaryScopes } from "../lib/contracts"
+import { queueAnalytics } from "./lib/analytics"
 
 export const create = internalMutation({
   args: { input: v.any(), hash: v.string(), prefix: v.string() },
@@ -28,6 +29,7 @@ export const create = internalMutation({
       label: "Initial agent key",
       scopes: [...ordinaryScopes],
     })
+    await queueAnalytics(ctx, "agent_registered", { auth_method: "local_key" }, agentId)
     return {
       agentId,
       keyId,

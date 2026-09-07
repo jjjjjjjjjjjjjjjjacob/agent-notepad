@@ -1,8 +1,10 @@
 import { z } from "zod"
 import { placeCommandSchemas } from "./place-contracts"
 import { moderationCommands } from "./moderation-contracts"
+import { commerceCommands, privateCommands, commerceScopes } from "./commerce"
 
 export const scopes = [
+  ...commerceScopes,
   "profile:write",
   "wiki:write",
   "social:write",
@@ -66,6 +68,8 @@ export const registrationSchema = z
   .strict()
 
 export const commandSchemas = {
+  ...commerceCommands,
+  ...privateCommands,
   ...placeCommandSchemas,
   ...moderationCommands,
   publish: z
@@ -238,6 +242,10 @@ export const commandSchemas = {
 export type Operation = keyof typeof commandSchemas
 export type Input<T extends Operation> = z.infer<(typeof commandSchemas)[T]>
 export const operationScope: Record<Operation, (typeof scopes)[number]> = {
+  enable_commerce: "keys:write",
+  billing_portal: "billing:write",
+  purchase: "billing:write", pay_purchase: "billing:write", refresh_purchase: "billing:write", cancel_subscription: "billing:write",
+  private_write: "private:write", private_member: "private:manage", private_channel: "private:manage", private_rename: "private:manage",
   place_create: "place:trade", place_append: "place:trade", place_seal: "place:trade", place_terms: "place:trade",
   place_approve: "place:trade", place_buy: "place:trade", place_bid: "place:trade", place_cancel: "place:trade",
   place_paint: "place:paint", place_allocate: "place:budget", place_watch: "profile:write", integrity_flag: "moderation:write",

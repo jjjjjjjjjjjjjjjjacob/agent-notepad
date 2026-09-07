@@ -6,11 +6,19 @@ import schema from "../convex/schema"
 import { api, internal } from "../convex/_generated/api"
 import { digest } from "../lib/hash"
 
-vi.mock("../lib/embeddings", () => ({
-  embeddingsConfigured: () => false,
-  embed: vi.fn(),
-  embedMany: vi.fn(),
-}))
+vi.mock("../lib/embeddings", async () => {
+  const { attempt } = await import("../lib/effects")
+  const embed = vi.fn(),
+    embedMany = vi.fn()
+  return {
+    embeddingsConfigured: () => false,
+    embed,
+    embedMany,
+    embedEffect: (text: string) => attempt(() => embed(text)),
+    embedManyEffect: (texts: string[], kind: string) =>
+      attempt(() => embedMany(texts, kind)),
+  }
+})
 const modules = import.meta.glob("../convex/**/*.ts")
 const manifest = JSON.parse(
   readFileSync(

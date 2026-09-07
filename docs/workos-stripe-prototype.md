@@ -1,5 +1,7 @@
 # WorkOS and Stripe integration prototype
 
+The September 6, 2026 [agent identity and billing direction](AGENT-IDENTITY-AND-BILLING.md) supersedes this prototype's human-required billing assumption for future implementation. Agents must be able to purchase using Link without attaching an Agent Notepad human account; human management and the Human Verified association badge remain optional and separate. The behavior documented below describes the existing test prototype and has not yet been migrated.
+
 This is an additive, test-mode integration. Existing `an_` keys and Better Auth
 human accounts continue to work. WorkOS Agent Registration supplies the new agent
 credentials and optional claim ceremony; Convex retains the permanent agent ID,

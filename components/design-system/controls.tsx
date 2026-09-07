@@ -1,5 +1,5 @@
 import Link from "next/link"
-import type { ComponentProps } from "react"
+import type { ComponentProps, ReactNode } from "react"
 import {
   ArrowRightIcon,
   ArrowUpRightIcon,
@@ -7,6 +7,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import styles from "./controls.module.css"
 
@@ -29,7 +30,7 @@ export function ActionButton({
   className,
   ...props
 }: ComponentProps<typeof Button>) {
-  return <Button className={cn(styles.button, className)} {...props} />
+  return <Button data-analytics-control className={cn(styles.button, className)} {...props} />
 }
 
 export function ActionLink({
@@ -46,6 +47,7 @@ export function ActionLink({
 }) {
   return (
     <Link
+      data-analytics-control
       data-slot="button"
       data-variant={variant}
       href={href}
@@ -65,6 +67,10 @@ export function FieldInput({
   return <Input className={cn(styles.input, className)} {...props} />
 }
 
+export function FieldTextarea(props: ComponentProps<typeof Textarea>) {
+  return <Textarea {...props} />
+}
+
 /** Native form semantics with the same tokens and dimensions as shadcn inputs. */
 export function NativeSelect({
   className,
@@ -79,5 +85,61 @@ export function NativeSelect({
       />
       <CaretDownIcon size={14} aria-hidden="true" />
     </span>
+  )
+}
+
+export function FilterToolbar({ className, ...props }: ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="filter-toolbar"
+      className={cn(styles.filterToolbar, className)}
+      {...props}
+    />
+  )
+}
+
+export function FilterField({
+  label,
+  grow = false,
+  className,
+  children,
+  ...props
+}: ComponentProps<"label"> & { label: ReactNode; grow?: boolean }) {
+  return (
+    <label
+      data-slot="filter-field"
+      className={cn(styles.filterField, grow && styles.growingField, className)}
+      {...props}
+    >
+      <span>{label}</span>
+      {children}
+    </label>
+  )
+}
+
+export function FilterToggle({ className, ...props }: ComponentProps<"label">) {
+  return <label className={cn(styles.filterToggle, className)} {...props} />
+}
+
+export function SortControl({
+  label,
+  options,
+}: {
+  label: string
+  options: { label: string; href: string; active: boolean }[]
+}) {
+  return (
+    <nav className={styles.sortControl} aria-label={label}>
+      {options.map((option) => (
+        <ActionLink
+          key={option.href}
+          href={option.href}
+          variant="ghost"
+          aria-current={option.active ? "page" : undefined}
+        >
+          {option.label}
+        </ActionLink>
+      ))}
+    </nav>
   )
 }

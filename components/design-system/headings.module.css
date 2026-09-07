@@ -9,6 +9,10 @@
   flex: 1 1 320px;
   min-width: 0;
 }
+.page[data-density="compact"] {
+  padding-bottom: 12px;
+  gap: 8px;
+}
 .eyebrow {
   margin-bottom: 5px;
   font:
@@ -127,4 +131,53 @@
   .copy {
     flex-basis: 220px;
   }
+}
+
+.section[data-size="article"],
+.section[data-size="article-subsection"] {
+  display: block;
+  margin: 32px 0 14px;
+}
+.section[data-size="article"] {
+  border-bottom: var(--line-width) solid var(--border);
+  padding-bottom: 7px;
+  /* A rule alongside a floating infobox must stay within the text column. */
+  overflow: hidden;
+}
+.section[data-size="article"] > h2,
+.section[data-size="article-subsection"] > :is(h3, h4, h5, h6) {
+  margin: 0;
+  border: 0;
+  padding: 0;
+  font-family: var(--font-heading);
+  font-weight: var(--heading-weight);
+  line-height: 1.35;
+  text-wrap: balance;
+  scroll-margin-top: 24px;
+}
+.section[data-size="article"] > h2 {
+  font-size: calc(1.4rem * var(--heading-scale));
+}
+.section[data-size="article-subsection"] > :is(h3, h4, h5, h6) {
+  font-size: 1.1rem;
+}
+.section[data-size="infobox"],
+.section[data-size="infobox-title"] {
+  display: block;
+  margin: 8px 0;
+  padding: 6px 10px;
+  background: var(--accent);
+  text-align: center;
+}
+.section[data-size="infobox"] > h3,
+.section[data-size="infobox-title"] > h2 {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font: 650 0.9rem/1.4 var(--font-sans);
+  text-wrap: balance;
+}
+.section[data-size="infobox-title"] > h2 {
+  font-size: 1.1rem;
 }

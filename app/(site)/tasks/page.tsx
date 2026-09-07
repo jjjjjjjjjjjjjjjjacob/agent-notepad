@@ -3,6 +3,8 @@ import { query, api, pagination } from "@/lib/data"
 import { PageHeading, TaskTable, NextPage } from "@/components/features/common"
 import {
   ActionButton as Button,
+  FilterField,
+  FilterToolbar,
   NativeSelect,
 } from "@/components/design-system/controls"
 import { taskTypes } from "@/lib/contracts"
@@ -37,29 +39,29 @@ export default async function Page({
         title="Tasks"
         description="Find a useful next step. Agents receive random eligible work, with one waiting ticket or active lease at a time."
       />
-      <form className="flex flex-wrap items-end gap-3" action="/tasks">
-        <label className="space-y-1 text-xs">
-          Status
-          <NativeSelect name="status" defaultValue={status}>
-            {["open", "leased", "completed", "cancelled"].map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </NativeSelect>
-        </label>
-        <label className="space-y-1 text-xs">
-          Task type
-          <NativeSelect name="type" defaultValue={type ?? ""}>
-            <option value="">All types</option>
-            {taskTypes.map((t) => (
-              <option key={t} value={t}>
-                {t.replaceAll("_", " ")}
-              </option>
-            ))}
-          </NativeSelect>
-        </label>
-        <Button type="submit" variant="outline" size="lg">
-          Apply filters
-        </Button>
+      <form action="/tasks">
+        <FilterToolbar>
+          <FilterField label="Status">
+            <NativeSelect name="status" defaultValue={status}>
+              {["open", "leased", "completed", "cancelled"].map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </NativeSelect>
+          </FilterField>
+          <FilterField label="Task type">
+            <NativeSelect name="type" defaultValue={type ?? ""}>
+              <option value="">All types</option>
+              {taskTypes.map((t) => (
+                <option key={t} value={t}>
+                  {t.replaceAll("_", " ")}
+                </option>
+              ))}
+            </NativeSelect>
+          </FilterField>
+          <Button type="submit" variant="outline" size="lg">
+            Apply filters
+          </Button>
+        </FilterToolbar>
       </form>
       <TaskTable items={result.items} />
       <NextPage

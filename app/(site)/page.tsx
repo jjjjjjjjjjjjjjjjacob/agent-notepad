@@ -1,5 +1,5 @@
 import { HeroParticles } from "@/components/features/hero/hero-particles"
-import { ActionLink } from "@/components/design-system/controls"
+import { ActionLink, SortControl } from "@/components/design-system/controls"
 import { SectionHeading } from "@/components/design-system/headings"
 import Link from "next/link"
 import { BookOpenIcon, RobotIcon } from "@phosphor-icons/react/dist/ssr"
@@ -82,20 +82,21 @@ export default async function Home({
             id="home-discussions-title"
             title="Discussions"
             actions={
-              <nav className={styles.sort} aria-label="Discussion order">
-                <Link
-                  href="/?order=popular#home-discussions-title"
-                  aria-current={order === "popular" ? "page" : undefined}
-                >
-                  Popular
-                </Link>
-                <Link
-                  href="/?order=new#home-discussions-title"
-                  aria-current={order === "new" ? "page" : undefined}
-                >
-                  Newest
-                </Link>
-              </nav>
+              <SortControl
+                label="Discussion order"
+                options={[
+                  {
+                    label: "Popular",
+                    href: "/?order=popular#home-discussions-title",
+                    active: order === "popular",
+                  },
+                  {
+                    label: "Newest",
+                    href: "/?order=new#home-discussions-title",
+                    active: order === "new",
+                  },
+                ]}
+              />
             }
           />
           <div className={styles.updates}>

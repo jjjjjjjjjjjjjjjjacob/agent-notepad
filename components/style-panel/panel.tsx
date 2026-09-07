@@ -9,6 +9,7 @@ import {
   fonts,
   type StyleKey,
 } from "@/lib/style-config"
+import { heroParticleCount } from "@/lib/hero-settings"
 import styles from "./panel.module.css"
 import { useUiStyle, setUiStyle, loadStyleOverrides } from "./style-store"
 import { ActionButton, NativeSelect } from "@/components/design-system/controls"
@@ -186,74 +187,105 @@ export default function StylePanel() {
                 >
                   Reset
                 </ActionButton>
-                <div className={styles.fields}>
-                  {Object.entries(styleFields)
-                    .filter(([, f]) => f.group === group)
-                    .map(([key, field]) => (
-                      <label key={key}>
-                        <span>
-                          {field.label}
-                          {field.kind === "number" && (
-                            <output aria-hidden="true">
-                              {Number(values[key as StyleKey]).toFixed(
-                                field.step! < 1 ? 2 : 0
-                              )}
-                              {field.unit}
-                            </output>
+                {[
+                  ...new Set(
+                    Object.values(styleFields)
+                      .filter((f) => f.group === group)
+                      .map((f) => f.section ?? "")
+                  ),
+                ].map((section) => (
+                  <fieldset className={styles.fields} key={section}>
+                    {section && <legend>{section}</legend>}
+                    {section === "Liquid motion" && (
+                      <p className={styles.hint}>
+                        Current controls apply to Liquid currents.
+                      </p>
+                    )}
+                    {Object.entries(styleFields)
+                      .filter(
+                        ([, f]) =>
+                          f.group === group && (f.section ?? "") === section
+                      )
+                      .map(([key, field]) => (
+                        <label key={key}>
+                          <span>
+                            {field.label}
+                            {field.kind === "number" && (
+                              <output aria-hidden="true">
+                                {Number(values[key as StyleKey]).toFixed(
+                                  field.step! < 1 ? 2 : 0
+                                )}
+                                {field.unit}
+                              </output>
+                            )}
+                          </span>
+                          {field.kind === "font" || field.kind === "select" ? (
+                            <StyleSelect
+                              label={field.label}
+                              value={String(values[key as StyleKey])}
+                              options={
+                                field.kind === "font"
+                                  ? Object.fromEntries(
+                                      Object.entries(fonts).map(
+                                        ([id, font]) => [id, font.label]
+                                      )
+                                    )
+                                  : field.options!
+                              }
+                              onChange={(value) =>
+                                setValues((v) => ({ ...v, [key]: value }))
+                              }
+                            />
+                          ) : field.kind === "boolean" ? (
+                            <input
+                              aria-label={field.label}
+                              type="checkbox"
+                              checked={Boolean(values[key as StyleKey])}
+                              onChange={(e) =>
+                                setValues((v) => ({
+                                  ...v,
+                                  [key]: e.target.checked,
+                                }))
+                              }
+                            />
+                          ) : (
+                            <input
+                              aria-label={field.label}
+                              aria-describedby={
+                                field.description || key === "heroDensity"
+                                  ? `style-${key}-hint`
+                                  : undefined
+                              }
+                              type={field.kind === "color" ? "color" : "range"}
+                              value={String(values[key as StyleKey])}
+                              min={field.min}
+                              max={field.max}
+                              step={field.step}
+                              onChange={(e) =>
+                                setValues((v) => ({
+                                  ...v,
+                                  [key]:
+                                    field.kind === "number"
+                                      ? Number(e.target.value)
+                                      : e.target.value,
+                                }))
+                              }
+                            />
                           )}
-                        </span>
-                        {field.kind === "font" || field.kind === "select" ? (
-                          <StyleSelect
-                            label={field.label}
-                            value={String(values[key as StyleKey])}
-                            options={
-                              field.kind === "font"
-                                ? Object.fromEntries(
-                                    Object.entries(fonts).map(([id, font]) => [
-                                      id,
-                                      font.label,
-                                    ])
-                                  )
-                                : field.options!
-                            }
-                            onChange={(value) =>
-                              setValues((v) => ({ ...v, [key]: value }))
-                            }
-                          />
-                        ) : field.kind === "boolean" ? (
-                          <input
-                            aria-label={field.label}
-                            type="checkbox"
-                            checked={Boolean(values[key as StyleKey])}
-                            onChange={(e) =>
-                              setValues((v) => ({
-                                ...v,
-                                [key]: e.target.checked,
-                              }))
-                            }
-                          />
-                        ) : (
-                          <input
-                            aria-label={field.label}
-                            type={field.kind === "color" ? "color" : "range"}
-                            value={String(values[key as StyleKey])}
-                            min={field.min}
-                            max={field.max}
-                            step={field.step}
-                            onChange={(e) =>
-                              setValues((v) => ({
-                                ...v,
-                                [key]:
-                                  field.kind === "number"
-                                    ? Number(e.target.value)
-                                    : e.target.value,
-                              }))
-                            }
-                          />
-                        )}
-                      </label>
-                    ))}
-                </div>
+                          {(field.description || key === "heroDensity") && (
+                            <small
+                              id={`style-${key}-hint`}
+                              className={styles.hint}
+                            >
+                              {key === "heroDensity"
+                                ? `${heroParticleCount(Number(values.heroDensity), false).toLocaleString("en-US")} desktop · ${heroParticleCount(Number(values.heroDensity), true).toLocaleString("en-US")} mobile`
+                                : field.description}
+                            </small>
+                          )}
+                        </label>
+                      ))}
+                  </fieldset>
+                ))}
               </details>
             )
           )}

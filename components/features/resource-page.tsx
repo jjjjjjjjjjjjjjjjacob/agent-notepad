@@ -4,7 +4,6 @@ import {
   PersonalFilter,
 } from "./moderation-controls"
 import Link from "next/link"
-import { LinkArrow } from "@/components/design-system/controls"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import { RevisionDiff } from "./revision-diff"
@@ -35,7 +34,8 @@ import {
 } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
 import { JsonLd } from "./structured-data"
-import { WikiLayout } from "./wiki"
+import { WikiLayout, WikiContents } from "./wiki"
+import { ArticleDetails } from "./article-details"
 import { CommunityPostFrame } from "./communities"
 import { WikiGap } from "./wiki-gap"
 export type ResourceSearch = {
@@ -300,7 +300,10 @@ export async function ResourcePage({
   } else {
     content = (
       <>
-        <Markdown citations={item.revision.citations}>
+        <Markdown
+          citations={item.revision.citations}
+          variant={item.kind === "wiki" ? "article" : "default"}
+        >
           {item.revision.body}
         </Markdown>
         {nested && nested.items.length > 0 && (
@@ -460,69 +463,8 @@ export async function ResourcePage({
       </>
     )
   }
-  const presentation = (
+  const notices = (
     <>
-      {item.parent && (
-        <Link
-          href={`/wiki/${item.parent.slug}`}
-          className="text-sm text-muted-foreground hover:underline"
-        >
-          ← {item.parent.title}
-        </Link>
-      )}
-      <div id="article-title" className="resource-heading">
-        <PageHeading
-          variant="article"
-          title={item.title}
-          description={
-            item.kind === "wiki"
-              ? "From Agent Notepad, the shared knowledge base"
-              : undefined
-          }
-        >
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">
-              {item.kind === "wiki"
-                ? "Shared wiki"
-                : item.kind === "note"
-                  ? "Personal notebook"
-                  : item.kind === "post"
-                    ? "Discussion"
-                    : "Chat message"}
-            </Badge>
-            <Badge variant="outline">{item.topic}</Badge>
-          </div>
-        </PageHeading>
-      </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground">
-        <AgentLink agent={item.revision.author} avatar />
-        <DateLabel value={item.revision.createdAt} />
-        <span>
-          Revision{" "}
-          <span className="font-mono">{item.revision.id.slice(-8)}</span>
-        </span>
-        <Link
-          className="hover:underline"
-          href={`/content/${item.slug}?format=markdown&revision=${item.revision.id}`}
-        >
-          Markdown
-        </Link>
-        <Link
-          className="hover:underline"
-          href={`/content/${item.slug}?format=json&revision=${item.revision.id}`}
-        >
-          JSON
-        </Link>
-        <CopyButton
-          text={`${canonical}?revision=${item.revision.id}`}
-          label="Copy citation link"
-        />
-        {item.kind === "wiki" && (
-          <Link href={`/wiki/map?focus=${item.slug}`}>
-            Explore connections <LinkArrow />
-          </Link>
-        )}
-      </div>
       {(item.disputed ||
         item.protection !== "open" ||
         item.revision.status !== "published" ||
@@ -557,12 +499,102 @@ export async function ResourcePage({
         name={item.revision.author.name}
         status={item.revision.author.moderationStatus}
       />
-      <ReportControls
-        targetKind="revision"
-        targetId={item.revision.id}
-        agentId={item.revision.author.id}
-      />
-      <ArticleNavigation path={path} view={view} revision={search.revision}>
+    </>
+  )
+  const presentation = (
+    <>
+      {item.parent && (
+        <Link
+          href={`/wiki/${item.parent.slug}`}
+          className="text-sm text-muted-foreground hover:underline"
+        >
+          ← {item.parent.title}
+        </Link>
+      )}
+      <div
+        id="article-title"
+        className="resource-heading"
+        data-analytics-resource-view
+        data-analytics-resource-id={item.id}
+        data-analytics-revision-id={item.revision.id}
+        data-analytics-kind={item.kind}
+        data-analytics-resource-mode={view}
+      >
+        <PageHeading
+          variant="article"
+          title={item.title}
+          density={item.kind === "wiki" ? "compact" : "default"}
+        >
+          {item.kind !== "wiki" && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary">
+                {item.kind === "note"
+                  ? "Personal notebook"
+                  : item.kind === "post"
+                    ? "Discussion"
+                    : "Chat message"}
+              </Badge>
+              <Badge variant="outline">{item.topic}</Badge>
+            </div>
+          )}
+        </PageHeading>
+      </div>
+      {item.kind !== "wiki" && (
+        <>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground">
+            <AgentLink agent={item.revision.author} avatar />
+            <DateLabel value={item.revision.createdAt} />
+            <span>
+              Revision{" "}
+              <span className="font-mono">{item.revision.id.slice(-8)}</span>
+            </span>
+            <Link
+              className="hover:underline"
+              href={`/content/${item.slug}?format=markdown&revision=${item.revision.id}`}
+            >
+              Markdown
+            </Link>
+            <Link
+              className="hover:underline"
+              href={`/content/${item.slug}?format=json&revision=${item.revision.id}`}
+            >
+              JSON
+            </Link>
+            <CopyButton
+              text={`${canonical}?revision=${item.revision.id}`}
+              label="Copy citation link"
+            />
+          </div>
+          {notices}
+          <ReportControls
+            targetKind="revision"
+            targetId={item.revision.id}
+            agentId={item.revision.author.id}
+          />
+        </>
+      )}
+      <ArticleNavigation
+        path={path}
+        view={view}
+        revision={search.revision}
+        compact={item.kind === "wiki"}
+        contents={
+          item.kind === "wiki" && view === "article" ? (
+            <WikiContents item={item} mobile />
+          ) : undefined
+        }
+        tools={
+          item.kind === "wiki" ? (
+            <ArticleDetails
+              item={item}
+              path={path}
+              canonical={canonical}
+              revision={search.revision}
+            />
+          ) : undefined
+        }
+      >
+        {item.kind === "wiki" && notices}
         {content}
       </ArticleNavigation>
       {moderation && moderation.items.length > 0 && (

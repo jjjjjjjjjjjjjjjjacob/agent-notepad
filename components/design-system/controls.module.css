@@ -23,35 +23,111 @@
 .input {
   min-height: 40px;
   height: auto;
-  padding: 8px 12px;
+  padding: 8px 14px;
   background: var(--background);
   border: var(--line-width) solid var(--input);
   border-radius: var(--radius-md);
   font: inherit;
   font-size: 14px;
+  line-height: 20px;
   color: var(--foreground);
 }
 .select {
   display: inline-flex;
   position: relative;
   min-width: 0;
+  max-width: 100%;
 }
 .select select {
   width: 100%;
   appearance: none;
-  padding-right: 32px;
+  padding-inline-end: 40px;
 }
 .select > svg {
   position: absolute;
-  right: 10px;
+  inset-inline-end: 14px;
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;
   color: var(--muted-foreground);
 }
+.filterToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 16px 20px;
+}
+.filterField {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 180px;
+  gap: 8px;
+  min-width: min(100%, 160px);
+  max-width: 100%;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.filterField .input,
+.filterField .select {
+  width: 100%;
+  min-width: 0;
+  font-weight: 400;
+}
+.growingField {
+  flex: 1 1 240px;
+}
+.filterToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding-block: 8px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 20px;
+  cursor: pointer;
+}
+.filterToggle input {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+.sortControl {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px;
+  border: var(--line-width) solid var(--border);
+  border-radius: calc(var(--radius-md) + 4px);
+  background: var(--card);
+}
+.sortControl .button {
+  flex: 1;
+  color: var(--muted-foreground);
+}
+.sortControl .button[aria-current="page"] {
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+}
 @media (max-width: 767px) {
   .button,
-  .input {
+  .input,
+  .filterToggle {
     min-height: 44px;
+  }
+  .filterToolbar {
+    column-gap: 16px;
+  }
+  .filterField {
+    flex: 1 1 160px;
+  }
+  .growingField,
+  .filterToolbar > .button {
+    flex: 1 1 100%;
   }
 }

@@ -15,10 +15,10 @@ import {
   SidebarFooter,
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { LinkArrow } from "@/components/design-system/controls"
+import { ActionLink, LinkArrow } from "@/components/design-system/controls"
+import { SidebarBrand } from "@/components/design-system/sidebar-brand"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -44,6 +44,8 @@ import {
   commandNavigation,
 } from "./primary-navigation"
 import styles from "./shell.module.css"
+import { track } from "@/lib/analytics/browser"
+import { beginSearch } from "@/lib/analytics/journey"
 
 export function AppShell({
   children,
@@ -55,10 +57,14 @@ export function AppShell({
   placeEnabled?: boolean
 }) {
   const pathname = usePathname()
+  const readingPage = pathname.startsWith("/wiki/") && pathname !== "/wiki/map"
   const router = useRouter()
   const { setTheme } = useTheme()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
+  useEffect(() => {
+    if (open) track("command_palette_opened", {})
+  }, [open])
   const immersive =
     pathname === "/" ||
     pathname === "/wiki/map" ||
@@ -79,6 +85,7 @@ export function AppShell({
   return (
     <SidebarProvider
       className={styles.shell}
+      data-reading-page={readingPage}
       style={
         {
           "--sidebar-width": "var(--nav-width)",
@@ -91,10 +98,7 @@ export function AppShell({
       </a>
       <header className={styles.header}>
         <div className={styles.brandRow}>
-          <SidebarTrigger className={styles.sidebarToggle} />
-          <Link href="/" className={styles.brand}>
-            <span>Agent Notepad</span>
-          </Link>
+          <SidebarBrand className={styles.brand} />
         </div>
         <form
           action="/search"
@@ -122,6 +126,27 @@ export function AppShell({
           </button>
         </form>
         <div className={styles.utilities}>
+          {readingPage && (
+            <ActionLink
+              href="/search"
+              variant="ghost"
+              className={styles.mobileSearch}
+              aria-label="Search and navigate"
+              onClick={(event) => {
+                if (
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  event.shiftKey ||
+                  event.altKey
+                )
+                  return
+                event.preventDefault()
+                setOpen(true)
+              }}
+            >
+              <MagnifyingGlassIcon className="size-5" aria-hidden="true" />
+            </ActionLink>
+          )}
           <Link href="/connect" className={styles.connect}>
             Connect agent <LinkArrow />
           </Link>
@@ -146,6 +171,11 @@ export function AppShell({
               <DropdownMenuItem render={<Link href="/account" />}>
                 Account
               </DropdownMenuItem>
+              {readingPage && (
+                <DropdownMenuItem render={<Link href="/connect" />}>
+                  Connect agent
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
                 <DropdownMenuLabel>Appearance</DropdownMenuLabel>
@@ -162,6 +192,9 @@ export function AppShell({
       <div className={styles.workspace}>
         <Sidebar collapsible="icon" className={styles.sidebar}>
           <CloseSidebarOnNavigate>
+            <div className={styles.mobileBrandRow}>
+              <SidebarBrand />
+            </div>
             <SidebarContent className={styles.sidebarContent}>
               <PrimaryNavigation
                 context={sidebar}
@@ -222,6 +255,10 @@ export function AppShell({
             onValueChange={setSearch}
             onKeyDown={(event) => {
               if (event.key === "Enter" && search.trim()) {
+                beginSearch({
+                  surface: "command",
+                  query_length: Math.min(search.length, 300),
+                })
                 event.preventDefault()
                 setOpen(false)
                 router.push(`/search?q=${encodeURIComponent(search)}`)
@@ -237,6 +274,11 @@ export function AppShell({
                 <CommandItem
                   key={item.href}
                   onSelect={() => {
+                    track("navigation_clicked", {
+                      destination: item.href,
+                      location: "command",
+                      action: "navigate",
+                    })
                     router.push(item.href)
                     setOpen(false)
                   }}

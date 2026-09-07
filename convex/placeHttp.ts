@@ -1,3 +1,7 @@
+import { Effect } from "effect"
+import { appError, errorStatuses } from "../lib/errors"
+import { attempt, parseJson, runHttp, validate } from "../lib/effects"
+import { boundedBody } from "../lib/gateway-security"
 import { z } from "zod"
 import { httpAction } from "./_generated/server"
 import { internal } from "./_generated/api"
@@ -13,45 +17,40 @@ const paymentEvent = z
     mode: z.literal("sandbox"),
   })
   .strict()
-export const webhook = httpAction(async (ctx, request) => {
-  const secret = process.env.PLACE_SANDBOX_WEBHOOK_SECRET
-  if (!secret || (process.env.PLACE_MODE ?? "sandbox") !== "sandbox")
-    return new Response("Sandbox callback disabled", { status: 503 })
-  const reader = request.body?.getReader(),
-    chunks: Uint8Array[] = []
-  let size = 0
-  if (reader)
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      size += value.byteLength
-      if (size > 8192) {
-        await reader.cancel()
-        return new Response("Event too large", { status: 413 })
-      }
-      chunks.push(value)
-    }
-  const bytes = new Uint8Array(size)
-  let offset = 0
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset)
-    offset += chunk.length
-  }
-  const body = new TextDecoder().decode(bytes)
-  if (
-    !verifyPaymentSignature(
-      body,
-      request.headers.get("X-Place-Signature") ?? "",
-      secret
-    )
+export const webhook = httpAction((ctx, request) =>
+  runHttp(
+    Effect.gen(function* () {
+      const secret = process.env.PLACE_SANDBOX_WEBHOOK_SECRET
+      if (!secret || (process.env.PLACE_MODE ?? "sandbox") !== "sandbox")
+        return yield* Effect.fail(
+          appError("NOT_CONFIGURED", "Sandbox callback disabled")
+        )
+      const body = yield* attempt(() => boundedBody(request.body, 8192))
+      if (
+        !verifyPaymentSignature(
+          body,
+          request.headers.get("X-Place-Signature") ?? "",
+          secret
+        )
+      )
+        return yield* Effect.fail(appError("UNAUTHORIZED", "Invalid signature"))
+      const event = yield* validate(
+        paymentEvent,
+        yield* parseJson(body),
+        "Invalid sandbox event"
+      )
+      yield* attempt(() =>
+        ctx.runMutation(internal.placeWallet.applyEvent, { event })
+      )
+      return new Response("Recorded", {
+        headers: { "Cache-Control": "no-store" },
+      })
+    }),
+    "sandbox_webhook",
+    (error) =>
+      new Response(error.message, {
+        status: errorStatuses[error.code],
+        headers: { "Cache-Control": "no-store" },
+      })
   )
-    return new Response("Invalid signature", { status: 401 })
-  let event: z.infer<typeof paymentEvent>
-  try {
-    event = paymentEvent.parse(JSON.parse(body))
-  } catch {
-    return new Response("Invalid sandbox event", { status: 400 })
-  }
-  await ctx.runMutation(internal.placeWallet.applyEvent, { event })
-  return new Response("Recorded", { headers: { "Cache-Control": "no-store" } })
-})
+)

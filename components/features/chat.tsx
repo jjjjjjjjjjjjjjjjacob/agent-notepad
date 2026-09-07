@@ -3,6 +3,9 @@ import {
   ActionLink,
   ActionButton,
   FieldInput,
+  FilterField,
+  FilterToggle,
+  FilterToolbar,
   NativeSelect,
 } from "@/components/design-system/controls"
 import { Badge } from "@/components/ui/badge"
@@ -14,6 +17,7 @@ import { DateLabel, NextPage } from "./common"
 import { ConnectPrompt } from "./connect-prompt"
 import { identityColor } from "@/lib/identity-color"
 import styles from "./chat.module.css"
+import { SearchResultAnalytics } from "@/components/analytics/observer"
 
 export type Channel = FunctionReturnType<
   typeof api.channels.list
@@ -43,23 +47,45 @@ export function channelQuery(
     paginationOpts: pagination(params.cursor),
   }
 }
-export function ChannelRows({ items }: { items: Channel[] }) {
+export function ChannelRows({
+  items,
+  searchResults = false,
+}: {
+  items: Channel[]
+  searchResults?: boolean
+}) {
   return (
     <div className={styles.channelRows}>
-      {items.map((channel) => (
+      {items.map((channel, index) => (
         <article key={channel.id} className={styles.channelRow}>
           <Link
             href={`/chat/${channel.slug}`}
             className="identity-tile"
             style={identityColor(channel.community.id)}
             aria-label={`Open ${channel.name}`}
+            data-analytics-rank={searchResults ? index + 1 : undefined}
+            data-analytics-search-surface={
+              searchResults ? "channels" : undefined
+            }
+            data-analytics-resource-id={searchResults ? channel.id : undefined}
           >
             <HashIcon size={24} />
           </Link>
           <div className={styles.channelText}>
             <div className={styles.channelTitle}>
               <h2>
-                <Link href={`/chat/${channel.slug}`}>#{channel.name}</Link>
+                <Link
+                  href={`/chat/${channel.slug}`}
+                  data-analytics-rank={searchResults ? index + 1 : undefined}
+                  data-analytics-search-surface={
+                    searchResults ? "channels" : undefined
+                  }
+                  data-analytics-resource-id={
+                    searchResults ? channel.id : undefined
+                  }
+                >
+                  #{channel.name}
+                </Link>
               </h2>
               <Link
                 href={`/communities/${channel.community.slug}?view=chat`}
@@ -87,6 +113,11 @@ export function ChannelRows({ items }: { items: Channel[] }) {
             className={styles.openChannel}
             href={`/chat/${channel.slug}`}
             aria-label={`Read #${channel.name}`}
+            data-analytics-rank={searchResults ? index + 1 : undefined}
+            data-analytics-search-surface={
+              searchResults ? "channels" : undefined
+            }
+            data-analytics-resource-id={searchResults ? channel.id : undefined}
           >
             <ArrowRightIcon size={18} />
           </Link>
@@ -104,70 +135,89 @@ export async function ChannelDirectory({
   community?: string
   path?: string
 }) {
-  const result = await query(api.channels.list, channelQuery(params, community))
+  const args = channelQuery(params, community)
+  const { result, duration_ms } = await timedChannels(args)
   const values = { ...params, ...(community ? { view: "chat" } : {}) }
   return (
     <>
+      {!!params.q?.trim() && (
+        <SearchResultAnalytics
+          surface="channels"
+          query_length={Math.min(params.q.length, 300)}
+          has_community={!!(community || params.community)}
+          sort_order={args.order}
+          activity_window={
+            params.window === "24h" ||
+            params.window === "7d" ||
+            params.window === "30d"
+              ? params.window
+              : "all"
+          }
+          include_empty={args.includeEmpty}
+          result_count={result.items.length}
+          mode="keyword"
+          duration_ms={duration_ms}
+        />
+      )}
       <form
         action={path}
         className={styles.filters}
         role="search"
         aria-label="Find channels"
+        data-analytics-search-surface="channels"
       >
         {community && <input type="hidden" name="view" value="chat" />}
-        <label className={styles.searchField}>
-          Search channels
-          <FieldInput
-            name="q"
-            defaultValue={params.q}
-            placeholder="Find a conversation…"
-            type="search"
-          />
-        </label>
-        {!community && (
-          <label>
-            Community
+        <FilterToolbar>
+          <FilterField label="Search channels" grow>
             <FieldInput
-              name="community"
-              defaultValue={params.community}
-              placeholder="All communities (slug)"
+              name="q"
+              defaultValue={params.q}
+              placeholder="Find a conversation…"
+              type="search"
             />
-          </label>
-        )}
-        <label>
-          Sort
-          <NativeSelect name="order" defaultValue={params.order ?? "active"}>
-            <option value="active">Latest activity</option>
-            <option value="new">Newest channels</option>
-            <option value="name">Alphabetical</option>
-          </NativeSelect>
-        </label>
-        <label>
-          Activity
-          <NativeSelect name="window" defaultValue={params.window ?? "all"}>
-            <option value="all">Any time</option>
-            <option value="24h">Past 24 hours</option>
-            <option value="7d">Past week</option>
-            <option value="30d">Past month</option>
-          </NativeSelect>
-        </label>
-        <label className={styles.checkbox}>
-          <input
-            name="empty"
-            type="checkbox"
-            value="true"
-            defaultChecked={params.empty === "true"}
-          />
-          Include empty channels
-        </label>
-        <ActionButton type="submit">Apply</ActionButton>
+          </FilterField>
+          {!community && (
+            <FilterField label="Community">
+              <FieldInput
+                name="community"
+                defaultValue={params.community}
+                placeholder="All communities (slug)"
+              />
+            </FilterField>
+          )}
+          <FilterField label="Sort">
+            <NativeSelect name="order" defaultValue={params.order ?? "active"}>
+              <option value="active">Latest activity</option>
+              <option value="new">Newest channels</option>
+              <option value="name">Alphabetical</option>
+            </NativeSelect>
+          </FilterField>
+          <FilterField label="Activity">
+            <NativeSelect name="window" defaultValue={params.window ?? "all"}>
+              <option value="all">Any time</option>
+              <option value="24h">Past 24 hours</option>
+              <option value="7d">Past week</option>
+              <option value="30d">Past month</option>
+            </NativeSelect>
+          </FilterField>
+          <FilterToggle>
+            <input
+              name="empty"
+              type="checkbox"
+              value="true"
+              defaultChecked={params.empty === "true"}
+            />
+            Include empty channels
+          </FilterToggle>
+          <ActionButton type="submit">Apply</ActionButton>
+        </FilterToolbar>
       </form>
       {params.q && (
         <p className={styles.resultNote}>
           Search results are ordered by relevance.
         </p>
       )}
-      <ChannelRows items={result.items} />
+      <ChannelRows items={result.items} searchResults={!!params.q?.trim()} />
       {!result.items.length && (
         <div className={styles.empty}>
           <HashIcon size={32} />
@@ -194,6 +244,11 @@ export async function ChannelDirectory({
       />
     </>
   )
+}
+async function timedChannels(args: FunctionArgs<typeof api.channels.list>) {
+  const started = Date.now()
+  const result = await query(api.channels.list, args)
+  return { result, duration_ms: Date.now() - started }
 }
 export function ChatWorkspace({
   space,

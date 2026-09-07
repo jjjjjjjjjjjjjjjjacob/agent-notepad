@@ -6,16 +6,18 @@ test("desktop sidebar collapses smoothly to usable icons and preserves mobile na
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto("/wiki")
-  const toggle = page.locator('[data-slot="sidebar-trigger"]')
+  const toggle = page
+    .getByRole("banner")
+    .locator('[data-slot="sidebar-trigger"]')
   const sidebar = page.locator('[data-slot="sidebar-container"]')
   const panel = page.locator('[data-slot="sidebar-inset"]')
   const search = page.getByRole("search", { name: "Search Agent Notepad" })
   const nav = page.getByRole("navigation", { name: "Primary navigation" })
-  const wordmark = page
-    .getByRole("banner")
-    .getByRole("link", { name: "Agent Notepad" })
+  const wordmark = toggle.locator('[data-slot="sidebar-brand-label"]')
   await expect(toggle).toHaveAttribute("aria-expanded", "true")
-  await expect(wordmark.locator("svg")).toHaveCount(0)
+  await expect(toggle).toHaveAccessibleName("Agent Notepad: Collapse sidebar")
+  await expect(toggle.locator("svg")).toHaveCount(1)
+  await expect(toggle).toHaveCount(1)
   const expandedWidth = (await sidebar.boundingBox())!.width
 
   // Sample the real layout through the transition: header, rail and panel
@@ -30,7 +32,9 @@ test("desktop sidebar collapses smoothly to usable icons and preserves mobile na
       'form[aria-label="Search Agent Notepad"]'
     )!
     const frames: { width: number; panelX: number; searchX: number }[] = []
-    toggle.click()
+    toggle
+      .querySelector<HTMLElement>('[data-slot="sidebar-brand-label"]')!
+      .click()
     const start = performance.now()
     while (performance.now() - start < 400) {
       await new Promise(requestAnimationFrame)
@@ -50,9 +54,15 @@ test("desktop sidebar collapses smoothly to usable icons and preserves mobile na
     expect(Math.abs(frame.width - frame.searchX)).toBeLessThan(1)
   }
   await expect(sidebar).toHaveCSS("width", "60px")
-  await expect(toggle).toHaveAccessibleName("Expand sidebar")
+  await expect(toggle).toHaveAccessibleName("Agent Notepad: Expand sidebar")
   await expect(toggle).toHaveAttribute("aria-expanded", "false")
   await expect(wordmark).toBeHidden()
+  await expect(toggle.locator("svg")).toBeVisible()
+  await expect(page).toHaveURL(/\/wiki$/)
+  await toggle.press("Enter")
+  await expect(sidebar).toHaveCSS("width", `${expandedWidth}px`)
+  await toggle.press("Space")
+  await expect(sidebar).toHaveCSS("width", "60px")
   const articles = nav.getByRole("link", { name: "All articles", exact: true })
   await expect(articles).toHaveAttribute("aria-current", "page")
   await articles.hover()
@@ -94,6 +104,14 @@ test("desktop sidebar collapses smoothly to usable icons and preserves mobile na
   await expect(wordmark).toBeVisible()
   await toggle.click()
   const drawer = page.getByRole("dialog", { name: "Sidebar", exact: true })
+  const drawerBrand = drawer.getByRole("button", {
+    name: "Agent Notepad: Collapse sidebar",
+  })
+  await expect(drawerBrand).toHaveAttribute("aria-expanded", "true")
+  await drawerBrand.getByText("Agent Notepad", { exact: true }).click()
+  await expect(drawer).toBeHidden()
+  await expect(toggle).toHaveAttribute("aria-expanded", "false")
+  await toggle.getByText("Agent Notepad", { exact: true }).click()
   await expect(
     drawer
       .getByRole("link", { name: "All articles", exact: true })

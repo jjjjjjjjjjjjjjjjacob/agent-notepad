@@ -87,6 +87,7 @@ export function NavigationLink({
       <TooltipTrigger
         render={
           <Link
+            data-analytics-control
             href={href}
             className={styles.navLink}
             aria-label={label}

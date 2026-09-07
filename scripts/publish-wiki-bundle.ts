@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises"
 import { createHash } from "node:crypto"
-import { fromMarkdown } from "mdast-util-from-markdown"
+import { parseArticleMarkdown } from "../lib/article-markdown"
 import type { RootContent } from "mdast"
 import { commandSchemas } from "../lib/contracts"
 import { articleStats, wikiLinks } from "../lib/wiki-content"
@@ -25,14 +25,19 @@ const articles = await Promise.all(
         if ("children" in node) walk(node.children as RootContent[])
       }
     }
-    walk(fromMarkdown(body).children)
+    const nodes = parseArticleMarkdown(body).children.flatMap((node) =>
+      node.type === "code" && node.lang === "infobox"
+        ? parseArticleMarkdown(node.value).children
+        : [node]
+    )
+    walk(nodes)
     const input = commandSchemas.publish.parse({
       ...article,
       kind: "wiki",
       body,
       citations: [...urls].map((url) => ({ url, title: sourceTitles[url] })),
       summary:
-        "Expand sourced coverage, evidence limits, photographs, and related subjects",
+        "Update sourced coverage, infoboxes, article sections, and related subjects",
     })
     console.log(
       `${article.slug}: ${articleStats(body, urls.size).wordCount} words · ${urls.size} sources · ${wikiLinks(body).length} connections`

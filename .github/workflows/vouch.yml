@@ -1,10 +1,10 @@
 name: Vouch contributor policy
 on:
   pull_request_target:
-    branches: [main]
+    branches: [main, dev]
     types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, edited, closed]
   push:
-    branches: [main]
+    branches: [main, dev]
   workflow_dispatch:
 
 # Serialize refreshes and never cancel a run while it is invalidating statuses.
@@ -41,7 +41,8 @@ jobs:
               await github.rest.repos.createCommitStatus({ ...repo, sha: eventHead, state: 'pending',
                 context: 'Vouch / trusted contributor', description: 'Refreshing PR author and head policy' });
             }
-            const prs = await github.paginate(github.rest.pulls.list, { ...repo, state: 'open', base: 'main', per_page: 100 });
+            const open = await github.paginate(github.rest.pulls.list, { ...repo, state: 'open', per_page: 100 });
+            const prs = open.filter(pr => ['main', 'dev'].includes(pr.base.ref));
             for (const sha of new Set(prs.map(pr => pr.head.sha))) {
               await github.rest.repos.createCommitStatus({ ...repo, sha, state: 'pending',
                 context: 'Vouch / trusted contributor', description: 'Checking canonical contributor trust' });
@@ -49,7 +50,7 @@ jobs:
             // Leave every head pending if a repository outgrows matrix capacity.
             if (prs.length > 256) throw new Error('More than 256 open PRs: all pending; expand refresh batching');
             const base = (await github.rest.repos.getBranch({ ...repo, branch: 'main' })).data.commit.sha;
-            const include = prs.map(pr => ({ number: pr.number, sha: pr.head.sha, author: pr.user.login, base }));
+            const include = prs.map(pr => ({ number: pr.number, sha: pr.head.sha, author: pr.user.login, target: pr.base.ref, base }));
             core.setOutput('matrix', JSON.stringify({ include }));
             core.setOutput('any', include.length > 0 ? 'true' : 'false');
   evaluate:

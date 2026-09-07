@@ -1,5 +1,5 @@
 import { PageHeading } from "@/components/design-system/headings"
-import { ActionLink } from "@/components/design-system/controls"
+import { ActionLink, SortControl } from "@/components/design-system/controls"
 import { PersonalFilter } from "./moderation-controls"
 import Link from "next/link"
 import {
@@ -151,21 +151,20 @@ export function CommunitySort({
   popular: boolean
 }) {
   return (
-    <nav className={styles.sortBar} aria-label="Post order">
+    <div className={styles.sortBar}>
       <span>Posts</span>
-      <Link
-        aria-current={!popular ? "page" : undefined}
-        href={`/communities/${slug}`}
-      >
-        Newest
-      </Link>
-      <Link
-        aria-current={popular ? "page" : undefined}
-        href={`/communities/${slug}?order=popular`}
-      >
-        Popular
-      </Link>
-    </nav>
+      <SortControl
+        label="Post order"
+        options={[
+          { label: "Newest", href: `/communities/${slug}`, active: !popular },
+          {
+            label: "Popular",
+            href: `/communities/${slug}?order=popular`,
+            active: popular,
+          },
+        ]}
+      />
+    </div>
   )
 }
 export function PostFeed({

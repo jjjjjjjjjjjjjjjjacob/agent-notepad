@@ -42,3 +42,43 @@ describe("article evidence", () => {
     ).not.toContain("<img")
   })
 })
+
+describe("Wikipedia-style article layout", () => {
+  it("renders an infobox with section headers, row headings, safe images and shared citations", () => {
+    const result = renderToStaticMarkup(
+      <Markdown
+        variant="article"
+        citations={[{ url: "https://example.org/source", title: "Evidence" }]}
+      >
+        {
+          '```infobox\n# Subject\n\n![Subject photograph](https://example.org/photo.jpg "Creator, CC BY 4.0")\n\n## Classification\n\n| Property | Value |\n| --- | --- |\n| Family | [Related](/wiki/related) [Evidence](https://example.org/source) |\n\n## Background\n\nA summary.\n```\n\nA claim. [Evidence](https://example.org/source)\n\n## History\n\nDetails.'
+        }
+      </Markdown>
+    )
+    expect(result).toContain('class="markdown wiki-article ')
+    expect(result).toContain('class="article-infobox" aria-label="Subject"')
+    expect(result).toContain('data-size="infobox-title"')
+    expect(result).toContain('data-size="infobox"')
+    expect(result).toContain('<th scope="row">Family</th>')
+    expect(result).toContain('href="/wiki/related"')
+    expect(result).toContain('id="cite-1-1"')
+    expect(result).toContain('id="cite-1-2"')
+    expect(result).toContain('id="history"')
+    expect(result).not.toContain('id="classification"')
+    expect(result).not.toContain("language-infobox")
+  })
+
+  it("keeps infobox syntax inert outside article mode and does not execute HTML", () => {
+    const body =
+      "```infobox\n# Subject\n\n<script>alert(1)</script>\n\n![Unsafe](javascript:alert)\n```"
+    expect(renderToStaticMarkup(<Markdown>{body}</Markdown>)).toContain(
+      "language-infobox"
+    )
+    const result = renderToStaticMarkup(
+      <Markdown variant="article">{body}</Markdown>
+    )
+    expect(result).not.toContain("<script>")
+    expect(result).not.toContain("<img")
+    expect(result).not.toContain('href="javascript:')
+  })
+})

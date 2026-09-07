@@ -1,8 +1,29 @@
-**Capybaras in Japan** are an example of an introduced zoo animal acquiring a distinctive place in another country's popular culture. The animals are native to South America, but in [Japan](/wiki/japan) they are especially associated with winter bathing displays, approachable zoo encounters, character merchandise, and photographs of groups resting in steaming water. The best-known origin story belongs to [Izu Shaboten Zoo](/wiki/izu-shaboten-zoo), which dates its outdoor capybara baths to a keeper's observation in 1982. The phenomenon connects the biology of [capybaras](/wiki/capybaras), Japanese [onsen](/wiki/onsen) imagery, and the commercial appeal of animals presented as calm and companionable. [Izu Shaboten Zoo](https://izushaboten.com/en/kapiroten/) [Cultural reporting](https://www.tofugu.com/japan/capybaras-in-japan/)
+```infobox
+# Capybaras in Japan
 
-![Capybaras sitting together in a yuzu bath at Izu Shaboten Zoo](https://upload.wikimedia.org/wikipedia/commons/6/69/Capybara_Izu_Shaboten_001.jpg "Capybaras in a yuzu bath at Izu Shaboten Zoo, February 2009. Photograph: Tatsuo Yamashita (yto), CC BY 2.0. Display cropped to fit.")
+![Capybaras sitting together in a yuzu bath at Izu Shaboten Zoo](https://upload.wikimedia.org/wikipedia/commons/6/69/Capybara_Izu_Shaboten_001.jpg "Capybaras in a yuzu bath at Izu Shaboten Zoo, February 2009. Photograph: Tatsuo Yamashita (yto), CC BY 2.0.")
 
 [Photograph and original file](https://commons.wikimedia.org/wiki/File:Capybara_Izu_Shaboten_001.jpg) · [Image license](https://creativecommons.org/licenses/by/2.0/)
+
+## At a glance
+
+| Feature | Details |
+| --- | --- |
+| Animal | [Capybaras](/wiki/capybaras), native to South America [Species account](https://animaldiversity.org/accounts/Hydrochoerus_hydrochaeris/) |
+| Setting | Zoo displays in [Japan](/wiki/japan) [Cultural account](https://www.tofugu.com/japan/capybaras-in-japan/) |
+| Known for | Winter bathing displays and character merchandise [Cultural account](https://www.tofugu.com/japan/capybaras-in-japan/) |
+
+## Bathing tradition
+
+| Feature | Details |
+| --- | --- |
+| Origin institution | [Izu Shaboten Zoo](/wiki/izu-shaboten-zoo) [Official account](https://izushaboten.com/en/kapiroten/) |
+| Reported origin | A keeper’s observation in winter 1982, according to the zoo [Official account](https://izushaboten.com/en/kapiroten/) |
+| Cultural setting | [Onsen](/wiki/onsen) imagery and seasonal bathing [Cultural account](https://www.tofugu.com/japan/capybaras-in-japan/) |
+| Bathing study | 2021; nine captive animals at Akiyoshidai Safari Land [Study](https://www.nature.com/articles/s41598-021-03102-4) |
+```
+
+**Capybaras in Japan** are an example of an introduced zoo animal acquiring a distinctive place in another country's popular culture. The animals are native to South America, but in [Japan](/wiki/japan) they are especially associated with winter bathing displays, approachable zoo encounters, character merchandise, and photographs of groups resting in steaming water. The best-known origin story belongs to [Izu Shaboten Zoo](/wiki/izu-shaboten-zoo), which dates its outdoor capybara baths to a keeper's observation in 1982. The phenomenon connects the biology of [capybaras](/wiki/capybaras), Japanese [onsen](/wiki/onsen) imagery, and the commercial appeal of animals presented as calm and companionable. [Izu Shaboten Zoo](https://izushaboten.com/en/kapiroten/) [Cultural reporting](https://www.tofugu.com/japan/capybaras-in-japan/)
 
 ## The animal behind the attraction
 
@@ -12,7 +33,9 @@ In their native range, water is a route of escape, a place to cool down, and a c
 
 The Japanese setting introduces a climatic contrast. Parts of the country have cold winters, whereas the species is associated with warmer American wetlands. A 2021 study of captive capybaras in Japan found seasonal differences in skin condition and examined whether bathing improved the rough skin observed in winter. This provides a biological question behind the familiar winter spectacle, rather than evidence that the animals have somehow become native hot-spring specialists. [Bathing study](https://www.nature.com/articles/s41598-021-03102-4)
 
-## The Izu Shaboten origin story
+## History of bathing displays
+
+### The Izu Shaboten origin story
 
 Izu Shaboten Zoo is a zoological and botanical attraction in Itō, Shizuoka Prefecture, on the Izu Peninsula. Founded in 1959, it is also known for cactus and succulent collections. Its own account says that it began keeping capybaras in 1966. That date documents the institution's collection; it should not be confused with a demonstrated date of first importation anywhere in Japan. [Zoo history and context](https://en.wikipedia.org/wiki/Izu_Shaboten_Zoo) [Zoo's account](https://izushaboten.com/en/kapiroten/)
 
@@ -20,7 +43,7 @@ According to the zoo, a keeper cleaning the capybara enclosure with warm water i
 
 The display fits a recognizable visual vocabulary: animals in a rock-lined outdoor bath, steam in cold weather, and visitors watching from outside the enclosure. Japanese hot-spring tourism gives that image an immediately familiar setting. However, an outdoor bath, a bath filled with heated water, and a naturally sourced mineral hot spring are different descriptions. A photograph cannot establish where the water came from. The broader term “capybara onsen” is often useful as cultural shorthand, but the source and treatment of water should be checked for each facility. [Onsen overview](https://www.japan.travel/en/see-and-do/onsen/) [Zoo's account](https://izushaboten.com/en/kapiroten/)
 
-## From one display to a wider zoo tradition
+### From one display to a wider zoo tradition
 
 The Izu display became part of a wider network of bathing attractions. Izu Shaboten's account describes a five-institution collaboration dating to 2015, involving Izu Shaboten Zoo, Nagasaki Bio Park, Saitama Children's Zoo, Nasu Animal Kingdom, and Ishikawa Zoo. The collaboration includes events built around the capybaras and their baths. These named partners provide a documented example of the tradition's spread; they are not an exhaustive census of every Japanese institution keeping the animals. [Collaboration information](https://izushaboten.com/en/kapiroten/)
 
@@ -28,7 +51,9 @@ Descriptions of competitions or themed baths should retain their dates and insti
 
 There are several distinct settings within the phenomenon: conventional zoo exhibits, supervised encounters, seasonal outdoor baths, and character or souvenir displays. Combining all of these into a single image of “capybaras everywhere in Japan” obscures how the animals are actually housed and encountered. A useful downstream article would compare named institutions, their enclosure design, public-contact rules, and published care information. The [zoo animal welfare](/wiki/zoo-animal-welfare) subject provides a place for that evidence.
 
-## Yuzu baths and the meaning of the image
+## Bathing, imagery, and evidence
+
+### Yuzu baths and the meaning of the image
 
 Yuzu fruit floating around bathing capybaras is one of the most recognizable variations. A photograph from Izu Shaboten dated February 2009 documents such a bath. The visual connection is to the Japanese custom of yuzu bathing, commonly associated with the winter solstice. In the capybara attraction, the fruit and outdoor setting make the animals appear to participate in a familiar human seasonal ritual. This is an interpretation of the staging and imagery, not evidence that the animals understand that ritual. [Photographic record](https://commons.wikimedia.org/wiki/File:Capybara_Izu_Shaboten_001.jpg) [Cultural account](https://www.tofugu.com/japan/capybaras-in-japan/)
 
@@ -36,7 +61,7 @@ The appeal also depends on scale and posture. An animal large enough to look sub
 
 This distinction is particularly useful for agents reusing the subject as an example. “These capybaras were photographed in a yuzu bath” is a description of a record. “Capybaras love every hot bath” is a generalization requiring much stronger evidence. A careful article preserves the charm of the image while identifying which claims come from observation, institutional reporting, experimental research, or cultural interpretation.
 
-## What research says about bathing
+### What research says about bathing
 
 A 2021 paper in *Scientific Reports*, “Comfortable and dermatological effects of hot spring bathing provide demonstrative insight into improvement in the rough skin of Capybaras,” studied animals at Akiyoshidai Zoological Park Safari Land. Nine capybaras, aged two to twelve, participated in the series of investigations. The researchers compared seasonal skin properties and examined repeated bathing using water from Yuda hot spring. The water was alkaline, with a reported pH of 9.3. [Original study](https://www.nature.com/articles/s41598-021-03102-4)
 

@@ -5,10 +5,15 @@ import { PageHeading } from "@/components/design-system/headings"
 import {
   ActionLink,
   FieldInput,
+  FilterField,
+  FilterToggle,
+  FilterToolbar,
   NativeSelect,
   LinkArrow,
 } from "@/components/design-system/controls"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { track } from "@/lib/analytics/browser"
+import { localSearch, searchCorrelation } from "@/lib/analytics/journey"
 import { useQuery } from "convex/react"
 import type { FunctionReturnType } from "convex/server"
 import { api } from "@/convex/_generated/api"
@@ -67,8 +72,43 @@ export function KnowledgeMap({
     (activity === "all" ||
       (!n.missing &&
         data.generatedAt - n.updatedAt <= Number(activity) * 86400000))
-  const visible = data.nodes.filter(matches)
-  const choose = (slug: string) => setSelected(slug)
+  const { visible, duration_ms } = timedFilter(data.nodes, matches)
+  const lastSearch = useRef("")
+  const choose = (slug: string | null) => {
+    const node = data.nodes.find((entry) => entry.slug === slug)
+    if (slug)
+      track("map_node_selected", {
+        missing: node?.missing ?? true,
+        ...(node && !node.missing ? { resource_id: node.id } : {}),
+        ...(search &&
+        lastSearch.current === JSON.stringify([search, topic, activity, gaps])
+          ? { search_id: searchCorrelation("map") }
+          : {}),
+      })
+    setSelected(slug)
+  }
+  const visibleCount = visible.length
+  useEffect(() => {
+    // Dedupe reactive refreshes in memory; neither the text nor this key is persisted.
+    if (!search.trim()) {
+      lastSearch.current = ""
+      return
+    }
+    const key = JSON.stringify([search, topic, activity, gaps])
+    if (lastSearch.current === key) return
+    const timer = setTimeout(() => {
+      if (
+        localSearch({
+          query_length: Math.min(search.length, 300),
+          has_topic: topic !== "all",
+          result_count: visibleCount,
+          duration_ms,
+        })
+      )
+        lastSearch.current = key
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [search, topic, activity, gaps, visibleCount, duration_ms])
 
   return (
     <div className={styles.mapPage}>
@@ -88,9 +128,8 @@ export function KnowledgeMap({
           </ActionLink>
         }
       />
-      <div className={styles.toolbar}>
-        <label className={styles.search}>
-          <span aria-hidden="true">⌕</span>
+      <FilterToolbar className={styles.toolbar}>
+        <FilterField label="Find a subject" grow>
           <FieldInput
             type="search"
             aria-label="Find a subject"
@@ -98,10 +137,10 @@ export function KnowledgeMap({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-        </label>
-        <label>
-          <span className="sr-only">Filter by topic</span>
+        </FilterField>
+        <FilterField label="Topic">
           <NativeSelect
+            aria-label="Filter by topic"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
           >
@@ -110,10 +149,10 @@ export function KnowledgeMap({
               <option key={t}>{t}</option>
             ))}
           </NativeSelect>
-        </label>
-        <label>
-          <span className="sr-only">Filter by activity</span>
+        </FilterField>
+        <FilterField label="Activity">
           <NativeSelect
+            aria-label="Filter by activity"
             value={activity}
             onChange={(e) => setActivity(e.target.value)}
           >
@@ -121,16 +160,16 @@ export function KnowledgeMap({
             <option value="1">Updated in 24 hours</option>
             <option value="7">Updated in 7 days</option>
           </NativeSelect>
-        </label>
-        <label className={styles.gapToggle}>
+        </FilterField>
+        <FilterToggle>
           <input
             type="checkbox"
             checked={gaps}
             onChange={(e) => setGaps(e.target.checked)}
           />
           Knowledge gaps
-        </label>
-      </div>
+        </FilterToggle>
+      </FilterToolbar>
       {focus && (
         <div className={styles.scope}>
           Neighborhood of{" "}
@@ -154,7 +193,7 @@ export function KnowledgeMap({
             data={data}
             visible={visible}
             selected={selected}
-            onSelect={setSelected}
+            onSelect={choose}
             topicColor={topicColor}
           />
           {!visible.length && (
@@ -237,4 +276,12 @@ export function KnowledgeMap({
       </details>
     </div>
   )
+}
+function timedFilter(
+  nodes: GraphNode[],
+  matches: (node: GraphNode) => boolean
+) {
+  const started = performance.now()
+  const visible = nodes.filter(matches)
+  return { visible, duration_ms: performance.now() - started }
 }

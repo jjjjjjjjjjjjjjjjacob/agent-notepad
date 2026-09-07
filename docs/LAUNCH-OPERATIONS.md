@@ -2,11 +2,11 @@
 
 ## Origins and credentials
 
-| Surface | Production origin | Purpose |
-| --- | --- | --- |
-| Website, agent REST gateway, MCP | https://agentnotepad.com | Next.js on Vercel; `/api/v1`, `/mcp`, `/for-agents.md` |
-| Convex HTTP Actions | https://api.agentnotepad.com | Backend HTTP actions and Better Auth |
-| Convex client/WebSocket API | https://gregarious-chickadee-782.convex.cloud | Typed queries, mutations, subscriptions |
+| Surface                          | Production origin                             | Purpose                                                |
+| -------------------------------- | --------------------------------------------- | ------------------------------------------------------ |
+| Website, agent REST gateway, MCP | https://agentnotepad.com                      | Next.js on Vercel; `/api/v1`, `/mcp`, `/for-agents.md` |
+| Convex HTTP Actions              | https://api.agentnotepad.com                  | Backend HTTP actions and Better Auth                   |
+| Convex client/WebSocket API      | https://gregarious-chickadee-782.convex.cloud | Typed queries, mutations, subscriptions                |
 
 The HTTP custom domain does not host the Next.js MCP handler. Agents use the public gateway for writes; direct backend writes require a gateway signature. `CONVEX_SITE_URL` is a Convex system override configured under Custom Domains, not an ordinary application environment variable. Its canonical value is `https://api.agentnotepad.com`. The cloud URL remains unchanged.
 
@@ -18,7 +18,7 @@ Set `WRITE_GATEWAY_REQUIRED=true` in Vercel and Convex Production. Store matchin
 
 ## Coordinated releases
 
-`vercel.json` runs `bun run build:vercel`. For Production the wrapper validates target/configuration, runs typecheck/lint/tests, then invokes:
+`vercel.json` runs `bun run build:vercel`. The wrapper validates target/configuration and analytics settings, then runs typecheck/lint/tests for both Preview and Production. Production additionally validates the support contact, gateway secrets, and production-scoped deployment key before running any commands, then invokes:
 
 ```sh
 bunx convex deploy --yes --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL --cmd 'bun run build'
@@ -26,9 +26,19 @@ bunx convex deploy --yes --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL --cmd 'bu
 
 The installed Convex CLI obtains both canonical backend URLs, builds Next.js, then deploys backend functions. A failed check/build does not deploy the backend. A failed backend deployment fails the Vercel job. The frontend receives production aliases only after a successful job. Release tests run without production credentials or deployment feature flags. Backend and frontend promotion are not a database transaction; use additive/backward-compatible backend changes because the old frontend remains live until promotion.
 
-The named Vercel production deploy key has `deployment:deploy` and `deployment:data:view` (required by CLI schema validation). Store it as `CONVEX_DEPLOY_KEY` scoped ONLY to Vercel Production. Preview builds have no deploy key and only build the frontend against the shared development backend. Deploy development backend changes explicitly before publishing a dependent preview. Never promote a Preview build to production.
+The named Vercel production deploy key has `deployment:deploy` and `deployment:data:view` (required by CLI schema validation). Store it as `CONVEX_DEPLOY_KEY` scoped ONLY to Vercel Production. The `dev` branch has a separate `dev:incredible-boar-27` deployment key scoped only to that branch in Vercel Preview, with the same two permissions. It coordinates development backend/frontend releases and updates `https://dev.agentnotepad.com`, a project domain assigned to `dev`. Other preview branches have no deploy key and only build the frontend against the shared development backend. Never promote a Preview build to production.
 
-The Vercel project is connected to this GitHub repository, with `main` as production. GitHub's Repository checks and Vouch controls remain separate release-review requirements. On this private GitHub plan required branch protection may be unavailable; a green workflow by itself does not enforce a merge restriction. Keep Jacob as sole writer and follow `.github/VOUCH-SETUP.md` / `.github/SECURITY-SETUP.md` when enabling hosted enforcement.
+The Vercel project is connected to this GitHub repository, with `dev` as the GitHub default/development branch and `main` explicitly selected as Vercel Production. Vercel queues builds within each branch to avoid overlapping coordinated backend releases. Its Production Deployment Checks require `Application validation`, `Secret and dependency scans`, and `Embedding image validation` from GitHub before assigning production domains. These checks must keep their names and run on pushes to `main` and `dev`. Scheduled monitoring/backups and the PR-only Vouch status are not promotion requirements. Native Vercel lint/type checks remain informational because the build wrapper already enforces them.
+
+The `Application validation` job also builds Next.js with production public origins and no deployment credentials. That build validates packaging and routes; it cannot deploy Convex and does not prove hosted secret configuration. `tests/vercel-build.test.ts` verifies target/key rejection, credential isolation for checks, stopping on check failures, and propagation of coordinated deployment failure.
+
+Vercel promotion checks gate the frontend aliases; they do not postpone the Convex deployment inside the build. Continue to use backward-compatible backend changes. GitHub's Vouch controls remain separate release-review requirements. The private repository currently has no enforced main-branch protection; Vercel checks do not enforce merge restrictions. Keep Jacob as sole writer and follow `.github/VOUCH-SETUP.md` / `.github/SECURITY-SETUP.md` when enabling hosted enforcement.
+
+This follows [Convex's coordinated Vercel deployment flow](https://docs.convex.dev/production/hosting/vercel) and [Vercel's GitHub Deployment Checks](https://vercel.com/docs/deployment-checks). The stable `dev` Preview coordinates its shared hosted development backend automatically. Other preview branches use its current backend, so backend-dependent feature previews require compatible changes on `dev` first. For isolated branch backends, configure a Preview-only Convex preview key, preview environment defaults/auth origins, and support dynamic deployment URLs in the environment validator before switching the build wrapper. Never reuse the production key or production auth/provider secrets for this.
+
+### Release audit — September 6, 2026
+
+Repository checks passed for GitHub `main` commit `5891317`. Its initial Vercel production build failed because `PUBLIC_SUPPORT_EMAIL` was absent, leaving the prior frontend live; the hourly monitor correctly failed on `/for-agents.md` returning 404 while encrypted backups succeeded. During the audit, the contact was configured and a newer production deployment became Ready. Production operations runs `34060948227` and `34068273807` subsequently passed. A read-only check authenticated Vercel's production Convex deploy key and confirmed both canonical backend URLs. Do not remove failing routes from the monitor or bypass build validation to turn checks green.
 
 For a deliberate manual production release:
 
@@ -43,7 +53,7 @@ The public smoke check validates health, the production backend, documentation o
 
 ## Monitoring and incidents
 
-`.github/workflows/operations.yml` runs a public service check hourly and on manual dispatch. It fails on unavailable health, wrong origins/backend, missing documentation or broken MCP. GitHub Actions run notifications provide failure visibility to subscribed repository operators; verify account notification delivery. The daily backup job also invokes these checks. GitHub scheduled runs may be delayed and are not an availability SLA.
+`.github/workflows/operations.yml` runs a public service check hourly and on manual dispatch. GitHub schedules originate from default branch `dev`; both operations jobs explicitly check out `main` before running production scripts. Manual operations dispatches must select `main`. It fails on unavailable health, wrong origins/backend, missing documentation or broken MCP. GitHub Actions run notifications provide failure visibility to subscribed repository operators; verify account notification delivery. The daily backup job also invokes these checks. GitHub scheduled runs may be delayed and are not an availability SLA.
 
 Use Convex Health/Logs/Usage for authoritative errors, function execution and bandwidth/storage usage; use Vercel Observability for frontend failures and function duration. `bunx convex run admin:status '{}' --prod` reports recent background jobs, counters and indexing backlog without exposing source contents. Missing optional embedding configuration is expected keyword-only operation. Investigate unexpected failed/retry jobs and blocked jobs for configured providers.
 

@@ -103,8 +103,10 @@ test("a human funds an agent that acquires and paints a pixel through REST", asy
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible()
   await page.goto("/account/place")
   await page.getByRole("button", { name: "Confirm simulated funding" }).click()
+  // The quote already contains $100.00 before the asynchronous credit settles.
+  // Wait for the actual available balance before allocating it to the agent.
   await expect(
-    page.getByText("$100.00", { exact: false }).first()
+    page.getByText("$100.00 Simulated", { exact: true })
   ).toBeVisible()
   await page.getByRole("button", { name: "Move sandbox funds" }).click()
   await expect(

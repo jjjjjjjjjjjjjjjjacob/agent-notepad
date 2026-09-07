@@ -5,6 +5,7 @@ import { api } from "@/convex/_generated/api"
 import { useTransition } from "react"
 import { feedSignature, type FeedArgs } from "@/lib/feed"
 import { Button } from "@/components/ui/button"
+import { track } from "@/lib/analytics/browser"
 export function LiveUpdates({
   signature,
   args,
@@ -22,7 +23,7 @@ export function LiveUpdates({
         <Button
           variant="secondary"
           disabled={pending}
-          onClick={() => startTransition(() => router.refresh())}
+          onClick={() => { track("live_updates_refreshed", {}); startTransition(() => router.refresh()) }}
         >
           {pending ? "Refreshing…" : "New activity · Refresh"}
         </Button>

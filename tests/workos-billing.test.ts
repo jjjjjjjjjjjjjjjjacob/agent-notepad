@@ -154,6 +154,15 @@ describe("WorkOS agent authentication and ownership", () => {
     }
   });
 
+  it("distinguishes a missing token signing key from a JWKS timeout", async () => {
+    const t = setup();
+    provider.validate.mockRejectedValueOnce(Object.assign(new Error("private key detail"), { code: "ERR_JWKS_NO_MATCHING_KEY" }));
+    expect((await request(t, "agents", {})).status).toBe(401);
+    provider.validate.mockRejectedValueOnce(Object.assign(new Error("private timeout detail"), { code: "ERR_JWKS_TIMEOUT" }));
+    expect((await request(t, "agents", {})).status).toBe(504);
+    expect(await t.run(ctx => ctx.db.query("agents").collect())).toEqual([]);
+  });
+
   it("enforces scopes and local roles and refuses caller-provided identity fields", async () => {
     const t = setup(); const registered = await register(t);
     mockIdentity().validation.claims!.scope = "profile:write";
@@ -188,6 +197,25 @@ describe("WorkOS agent authentication and ownership", () => {
 });
 
 describe("Stripe payment authorization", () => {
+  it("classifies provider outages and malformed checkout results without losing authentication", async () => {
+    const t = setup(); const owner = await human(t);
+    provider.customer.mockRejectedValueOnce(Object.assign(new Error("private provider detail"), { statusCode: 503 }));
+    await expect(owner.client.action(api.stripe.checkout, {})).rejects.toThrow("UNAVAILABLE");
+    provider.checkout.mockResolvedValueOnce({ url: null });
+    await expect(owner.client.action(api.stripe.checkout, {})).rejects.toThrow("BAD_GATEWAY");
+  });
+
+  it("keeps webhook verifier defects out of the authorization error channel", async () => {
+    const t = setup(); const event = stripeEvent("evt_defect");
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const verifier = vi.spyOn(Stripe.webhooks, "constructEvent").mockImplementationOnce(() => { throw new Error("private verifier detail"); });
+    try {
+      await expect(t.action(internal.stripe.webhook, event)).rejects.toThrow("The request could not be completed.");
+      expect(JSON.stringify(log.mock.calls)).not.toContain("private verifier detail");
+      expect(provider.entitlements).not.toHaveBeenCalled();
+    } finally { verifier.mockRestore(); log.mockRestore(); }
+  });
+
   it("checks real webhook signatures before calling Stripe or modifying billing", async () => {
     const t = setup(); const event = stripeEvent("evt_forged");
     const response = await t.fetch("/stripe/webhook", { method: "POST", headers: { "stripe-signature": event.signature }, body: event.body.replace("cus_test", "cus_other") });

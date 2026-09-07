@@ -8,10 +8,9 @@ import {
   frameLoop,
   type FrameLoopHandle,
 } from "vgpu"
-import type { HeroSettings } from "@/lib/hero-settings"
+import { HERO_MAX_PARTICLES, type HeroSettings } from "@/lib/hero-settings"
 import shader from "./particles.wgsl"
 import flowShader from "./flow.wgsl"
-import prismShader from "./prism.wgsl"
 import { createHeroPointer } from "./pointer"
 
 export type HeroStatus = "initializing" | "running" | "paused" | "fallback"
@@ -37,6 +36,8 @@ export async function createHeroRenderer(
   const cursor = createHeroPointer()
   const pointer = cursor.position
   const pointerMotion = cursor.motion
+  const scatter = [-10, -10, 0, 0]
+  let settling = 0
   const stop = () => {
     loop?.stop()
     loop = undefined
@@ -60,11 +61,12 @@ export async function createHeroRenderer(
       clearColor: [0, 0, 0, 0],
     })
     // Allocate the full desktop budget once; density changes reuse the device
-    // and preserve existing trajectories. Each vec4 holds position + velocity.
-    const seeds = new Float32Array(4000 * 4)
-    for (let i = 0; i < 4000; i++) {
-      seeds[i * 4] = Math.random()
-      seeds[i * 4 + 1] = Math.random()
+    // and preserve existing trajectories. Each particle holds its position,
+    // current velocity, layout displacement, and interaction velocity.
+    const seeds = new Float32Array(HERO_MAX_PARTICLES * 8)
+    for (let i = 0; i < HERO_MAX_PARTICLES; i++) {
+      seeds[i * 8] = Math.random()
+      seeds[i * 8 + 1] = Math.random()
     }
     const particleState = storage(gpu, seeds.byteLength)
     particleState.write(seeds)
@@ -78,7 +80,13 @@ export async function createHeroRenderer(
       response: settings.response,
       particleState,
       pointerMotion,
-      optics: [settings.prism, settings.dark ? 1 : 0],
+      appearance: [
+        settings.sizeVariation,
+        settings.opacityVariation,
+        settings.softness,
+        settings.centerFade,
+      ],
+      hover: [settings.pointerRadius, settings.highlight],
     }
     const flow = compute(gpu, flowShader, { label: "hero-liquid" })
     const particles = draw(gpu, {
@@ -87,16 +95,7 @@ export async function createHeroRenderer(
       blend: "alpha",
       set: uniforms,
     })
-    const prism = draw(gpu, {
-      shader: prismShader,
-      vertices: 3,
-      blend: "alpha",
-      label: "hero-prism",
-    })
-    await Promise.all([
-      particles.compile({ colors: [target.format] }),
-      prism.compile({ colors: [target.format] }),
-    ])
+    await particles.compile({ colors: [target.format] })
     if (signal.aborted) throw new DOMException("Aborted", "AbortError")
     const render = (pass: import("vgpu").Frame) => {
       const now = performance.now()
@@ -115,34 +114,44 @@ export async function createHeroRenderer(
         [uniforms.resolution[0] / 360, uniforms.resolution[1] / 360],
         settings.response > 0 && !settings.mobile
       )
-      if (settings.mode === 0 && delta > 0) {
+      if (cursor.active) settling = settings.settling * 1.5
+      else settling = Math.max(0, settling - frameDelta)
+      if (settings.speed > 0 || cursor.active || settling > 0) {
         flow.set({
           particleState,
           resolution: uniforms.resolution,
           time: elapsed,
-          delta,
-          wind: settings.wind,
-          convection: settings.convection,
-          viscosity: settings.viscosity,
+          delta: frameDelta,
+          liquid: [
+            settings.wind,
+            settings.convection,
+            settings.viscosity,
+            settings.speed,
+          ],
+          flowShape: [
+            360 / settings.currentSize,
+            settings.turbulence,
+            settings.evolution,
+            0,
+          ],
+          interaction: [
+            settings.pointerRadius / 360,
+            settings.pointerSwirl,
+            settings.scatterRadius / 360,
+            settings.settling,
+          ],
           pointer,
           pointerMotion,
           response: settings.response,
           count: settings.count,
+          mode: settings.mode,
+          scatter,
         })
         flow.dispatch(Math.ceil(settings.count / 64))
+        scatter[2] = 0
       }
       particles.set(uniforms)
-      const illuminate = pointerMotion[2] > 0 && settings.prism > 0
-      if (illuminate)
-        prism.set({
-          resolution: uniforms.resolution,
-          pointer,
-          pointerMotion,
-          optics: uniforms.optics,
-          response: settings.response,
-        })
       pass.pass(target, (commands) => {
-        if (illuminate) commands.draw(prism)
         commands.draw(particles, { instances: settings.count })
       })
     }
@@ -156,13 +165,14 @@ export async function createHeroRenderer(
       }
       try {
         frame(gpu, render)
-        if (settings.speed > 0 || cursor.active)
+        if (settings.speed > 0 || cursor.active || settling > 0)
           loop = frameLoop(
             gpu,
             (pass) => {
               try {
                 render(pass)
-                if (settings.speed === 0 && !cursor.active) stop()
+                if (settings.speed === 0 && !cursor.active && settling === 0)
+                  stop()
               } catch (error) {
                 pass.cancel()
                 fail(error)
@@ -182,7 +192,12 @@ export async function createHeroRenderer(
     observer.observe(canvas)
     const host = canvas.closest<HTMLElement>("[data-particle-stage]")!
     const move = (event: PointerEvent) => {
-      if (event.pointerType !== "mouse" || settings.mobile) return
+      if (
+        event.pointerType !== "mouse" ||
+        settings.mobile ||
+        settings.response === 0
+      )
+        return
       const rect = canvas.getBoundingClientRect()
       cursor.move(
         (event.clientX - rect.left) / rect.width,
@@ -193,7 +208,34 @@ export async function createHeroRenderer(
     const leave = () => {
       cursor.leave()
     }
+    const scatterParticles = (event: PointerEvent) => {
+      if (
+        event.pointerType !== "mouse" ||
+        event.button !== 0 ||
+        settings.mobile ||
+        settings.scatter === 0
+      )
+        return
+      // Leave links, forms, text editing, and their native behavior alone.
+      if (
+        event.target instanceof Element &&
+        event.target.closest(
+          'a, button, input, textarea, select, [role="button"], [contenteditable="true"]'
+        )
+      )
+        return
+      const rect = canvas.getBoundingClientRect()
+      const x = (event.clientX - rect.left) / rect.width
+      const y = (event.clientY - rect.top) / rect.height
+      if (x < 0 || x > 1 || y < 0 || y > 1) return
+      scatter[0] = x
+      scatter[1] = y
+      scatter[2] = settings.scatter
+      settling = settings.settling * 1.5
+      if (!loop) syncLoop()
+    }
     host.addEventListener("pointermove", move, { passive: true })
+    host.addEventListener("pointerdown", scatterParticles, { passive: true })
     host.addEventListener("pointerleave", leave)
     window.addEventListener("blur", leave)
     document.addEventListener("visibilitychange", syncLoop)
@@ -205,13 +247,20 @@ export async function createHeroRenderer(
       update(next: HeroSettings) {
         const restart =
           next.mobile !== settings.mobile || next.speed !== settings.speed
+        if (settling > 0 && next.settling !== settings.settling)
+          settling = Math.max(settling, next.settling * 1.5)
         settings = next
         uniforms.mode = next.mode
         uniforms.pointSize = next.size
         uniforms.response = next.response
         uniforms.tint = [...next.color.slice(0, 3), next.opacity]
-        uniforms.optics[0] = next.prism
-        uniforms.optics[1] = next.dark ? 1 : 0
+        uniforms.appearance = [
+          next.sizeVariation,
+          next.opacityVariation,
+          next.softness,
+          next.centerFade,
+        ]
+        uniforms.hover = [next.pointerRadius, next.highlight]
         if (next.mobile || next.response === 0) cursor.leave()
         if (restart || !loop) syncLoop()
       },
@@ -221,6 +270,7 @@ export async function createHeroRenderer(
         observer.disconnect()
         resize.disconnect()
         host.removeEventListener("pointermove", move)
+        host.removeEventListener("pointerdown", scatterParticles)
         host.removeEventListener("pointerleave", leave)
         window.removeEventListener("blur", leave)
         document.removeEventListener("visibilitychange", syncLoop)

@@ -62,7 +62,7 @@ URL installation uses the [skills CLI's well-known provider](https://github.com/
 4. Connect a fresh MCP client without a key. List tools and resources, read the agent guide, and call `get_search` then `get_resource`. Configure a private Bearer key only when testing authorized writes.
 5. If IndexNow is configured, verify the existing publication/revision/removal jobs and public key endpoint. IndexNow complements sitemap submission; it does not guarantee indexing.
 
-Measure indexed pages, relevant search queries, visits to useful articles and the agent guide, and completed contributions. Track real returning use and useful source-backed edits, not raw signup or content-volume quotas. No new analytics vendor or tracking cookie is added by this change.
+Measure indexed pages, relevant search queries, visits to useful articles and the agent guide, and completed contributions. Track real returning use and useful source-backed edits, not raw signup or content-volume quotas. Product measurement uses PostHog with opt-in browser analytics and separate sanitized agent API events. See [Analytics](ANALYTICS.md) for event definitions, consent, US hosting, and retention.
 
 ## Verification
 

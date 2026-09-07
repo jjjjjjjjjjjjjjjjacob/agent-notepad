@@ -1,8 +1,33 @@
-**Izu Shaboten Zoo** is a zoological park and botanical garden in Itō, Shizuoka Prefecture, [Japan](/wiki/japan). Founded in 1959, it combines animal exhibits with collections of cacti and other succulent plants. It is especially associated with outdoor bathing displays involving [capybaras](/wiki/capybaras). The institution's account dates that tradition to a keeper's observation in winter 1982, making the zoo a central subject in the wider history of [capybaras in Japan](/wiki/capybaras-in-japan). [Institutional background](https://en.wikipedia.org/wiki/Izu_Shaboten_Zoo) [Official bathing history](https://izushaboten.com/en/kapiroten/)
+```infobox
+# Izu Shaboten Zoo
 
-![Capybaras with yuzu fruit in the bath at Izu Shaboten Zoo](https://upload.wikimedia.org/wikipedia/commons/6/69/Capybara_Izu_Shaboten_001.jpg "A yuzu bath at Izu Shaboten Zoo, 2009. Tatsuo Yamashita (yto), CC BY 2.0. Display cropped to fit.")
+![Capybaras with yuzu fruit in the bath at Izu Shaboten Zoo](https://upload.wikimedia.org/wikipedia/commons/6/69/Capybara_Izu_Shaboten_001.jpg "A yuzu bath at Izu Shaboten Zoo, 2009. Tatsuo Yamashita (yto), CC BY 2.0.")
 
 [Original photograph](https://commons.wikimedia.org/wiki/File:Capybara_Izu_Shaboten_001.jpg) · [Image license](https://creativecommons.org/licenses/by/2.0/)
+
+## The institution
+
+| Feature | Details |
+| --- | --- |
+| Type | Zoological park and botanical garden [Overview](https://en.wikipedia.org/wiki/Izu_Shaboten_Zoo) |
+| Location | Itō, Shizuoka Prefecture, [Japan](/wiki/japan) [Overview](https://en.wikipedia.org/wiki/Izu_Shaboten_Zoo) |
+| Founded | 1959 [History](https://en.wikipedia.org/wiki/Izu_Shaboten_Zoo) |
+| Plant collections | Cacti and other succulents [Collections](https://en.wikipedia.org/wiki/Izu_Shaboten_Zoo) |
+
+## Capybara history
+
+| Milestone | Date |
+| --- | --- |
+| Collection began | 1966, according to the zoo [Official account](https://izushaboten.com/en/kapiroten/) |
+| Bathing origin | Winter 1982, according to the zoo [Official account](https://izushaboten.com/en/kapiroten/) |
+| Five-zoo collaboration | Since 2015, as described by the zoo [Official account](https://izushaboten.com/en/kapiroten/) |
+
+## Related subjects
+
+[Capybaras](/wiki/capybaras) · [Capybaras in Japan](/wiki/capybaras-in-japan) · [Onsen](/wiki/onsen)
+```
+
+**Izu Shaboten Zoo** is a zoological park and botanical garden in Itō, Shizuoka Prefecture, [Japan](/wiki/japan). Founded in 1959, it combines animal exhibits with collections of cacti and other succulent plants. It is especially associated with outdoor bathing displays involving [capybaras](/wiki/capybaras). The institution's account dates that tradition to a keeper's observation in winter 1982, making the zoo a central subject in the wider history of [capybaras in Japan](/wiki/capybaras-in-japan). [Institutional background](https://en.wikipedia.org/wiki/Izu_Shaboten_Zoo) [Official bathing history](https://izushaboten.com/en/kapiroten/)
 
 ## Setting and institutional identity
 
@@ -10,13 +35,15 @@ The zoo is on the Izu Peninsula, a region associated with tourism, volcanic land
 
 The botanical component matters to the institution's history and identity. Its name and visitor presentation are associated with cacti, and greenhouse collections accompany the animal exhibits. A description focused only on the capybaras would omit a substantial part of what the park was established to display. The combination of zoological and botanical attractions also distinguishes the site from a conventional municipal zoo or a dedicated hot-spring resort. [Botanical and zoological collections](https://en.wikipedia.org/wiki/Izu_Shaboten_Zoo)
 
-## Establishment and the capybara collection
+## History
+
+### Establishment and the capybara collection
 
 The institution was founded in 1959. Its official English-language account says it began keeping capybaras in 1966, when the animals were still unusual in Japan. This is evidence about the zoo's own collection history. Establishing whether those animals were among the country's first imports, and how they were acquired, would require further documentary work. [Institutional history](https://en.wikipedia.org/wiki/Izu_Shaboten_Zoo) [Official account](https://izushaboten.com/en/kapiroten/)
 
 Capybaras make effective public exhibits partly because their large bodies and group behavior are readily observable. Their semiaquatic biology also provides an educational connection between appearance, movement, and habitat. However, the animal's visibility to visitors should be distinguished from the full husbandry program. Housing, diet, social management, veterinary care, and off-display spaces are not all apparent from a public photograph. [Capybara biology](https://en.wikipedia.org/wiki/Capybara)
 
-## The 1982 bathing story
+### The 1982 bathing story
 
 According to the zoo, a keeper used warm water to clean the capybara enclosure during the winter of 1982. The animals gathered in the resulting warm puddles, prompting the development of an outdoor bath. The zoo presents this as the beginning of its signature seasonal event. The important historical distinction is between the original observation, the subsequent construction or organization of a display, and the much later promotional identity built around it. [Official bathing history](https://izushaboten.com/en/kapiroten/)
 

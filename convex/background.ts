@@ -1,123 +1,177 @@
 "use node"
+import { Effect, Exit, Cause } from "effect"
 import { internalAction } from "./_generated/server"
 import { internal } from "./_generated/api"
 import { v } from "convex/values"
-import { safeFetchText, plainText } from "../lib/safe-fetch"
+import { safeFetchTextEffect, plainText } from "../lib/safe-fetch"
 import { digest } from "../lib/hash"
-import { embedMany, embeddingsConfigured } from "../lib/embeddings"
+import { embedManyEffect } from "../lib/embeddings"
 import { EMBEDDING_MODEL } from "../lib/embedding-config"
+import { AppError, appError, externalError, isTransient } from "../lib/errors"
+import {
+  attempt,
+  failureError,
+  fetchEffect,
+  isExpectedCause,
+  runConvex,
+} from "../lib/effects"
 
 export const run = internalAction({
   args: { jobId: v.id("jobs") },
-  handler: async (ctx, args): Promise<void> => {
-    const job = await ctx.runMutation(internal.jobs.start, args)
-    if (!job) return
-    try {
-      if (job.kind === "source") {
-        for (const citation of job.revision.citations) {
-          try {
-            const result = await safeFetchText(citation.url)
-            const text = plainText(result.text)
-            await ctx.runMutation(internal.jobs.saveSource, {
-              resourceId: job.resourceId,
-              revisionId: job.revisionId,
-              url: citation.url,
-              title: citation.title,
-              status: "retrieved",
-              fingerprint: digest(result.text),
-              excerpt: text.split(/\s+/).slice(0, 24).join(" "),
-            })
-          } catch (error) {
-            await ctx.runMutation(internal.jobs.saveSource, {
-              resourceId: job.resourceId,
-              revisionId: job.revisionId,
-              url: citation.url,
-              title: citation.title,
-              status: "unavailable",
-              error:
-                error instanceof Error
-                  ? error.message.slice(0, 300)
-                  : "Source retrieval failed.",
-            })
-          }
-        }
-      } else {
-        if (!embeddingsConfigured()) {
-          await ctx.runMutation(internal.jobs.finish, {
-            jobId: job._id,
-            attempt: job.attempt,
-            error:
-              "Configure EMBEDDING_SERVICE_URL and EMBEDDING_SERVICE_TOKEN to enable semantic indexing.",
-            blocked: true,
+  handler: (ctx, args): Promise<void> =>
+    runConvex(
+      Effect.gen(function* () {
+        const job = yield* attempt(() =>
+          ctx.runMutation(internal.jobs.start, args)
+        )
+        if (!job) return
+        const outcome = yield* Effect.exit(
+          Effect.gen(function* () {
+            if (job.kind === "source") {
+              let transient: AppError | undefined
+              for (const citation of job.revision.citations) {
+                const record = {
+                  resourceId: job.resourceId,
+                  revisionId: job.revisionId,
+                  url: citation.url,
+                  title: citation.title,
+                }
+                yield* safeFetchTextEffect(citation.url).pipe(
+                  Effect.matchEffect({
+                    onFailure: (error) => {
+                      if (isTransient(error)) transient = error
+                      return attempt(() =>
+                        ctx.runMutation(internal.jobs.saveSource, {
+                          ...record,
+                          status: "unavailable",
+                          error: error.message.slice(0, 300),
+                        })
+                      )
+                    },
+                    onSuccess: (result) =>
+                      attempt(() =>
+                        ctx.runMutation(internal.jobs.saveSource, {
+                          ...record,
+                          status: "retrieved",
+                          fingerprint: digest(result.text),
+                          excerpt: plainText(result.text)
+                            .split(/\s+/)
+                            .slice(0, 24)
+                            .join(" "),
+                        })
+                      ),
+                  })
+                )
+              }
+              if (transient) return yield* Effect.fail(transient)
+            } else {
+              for (let offset = 0; offset < job.chunks.length; offset += 16) {
+                const chunks = job.chunks.slice(offset, offset + 16)
+                const vectors = yield* embedManyEffect(
+                  chunks.map((chunk) => chunk.text),
+                  "passage"
+                )
+                // Await every issued mutation before recording the batch outcome.
+                const batch = yield* Effect.forEach(
+                  chunks,
+                  (chunk, index) =>
+                    attempt(() =>
+                      ctx.runMutation(internal.jobs.saveEmbedding, {
+                        id: chunk._id,
+                        revisionId: job.revisionId,
+                        embedding: vectors[index],
+                        model: EMBEDDING_MODEL,
+                      })
+                    ).pipe(Effect.exit),
+                  { concurrency: 16 }
+                )
+                const failures = batch.filter(Exit.isFailure)
+                if (failures.length)
+                  return yield* Effect.failCause(
+                    failures.reduce(
+                      (cause, exit) => Cause.parallel(cause, exit.cause),
+                      Cause.empty as Cause.Cause<AppError>
+                    )
+                  )
+              }
+            }
           })
-          return
-        }
-        for (let offset = 0; offset < job.chunks.length; offset += 16) {
-          const chunks = job.chunks.slice(offset, offset + 16)
-          const vectors = await embedMany(
-            chunks.map((chunk) => chunk.text),
-            "passage"
+        )
+        if (Exit.isSuccess(outcome)) {
+          yield* attempt(() =>
+            ctx.runMutation(internal.jobs.finish, {
+              jobId: job._id,
+              attempt: job.attempt,
+            })
           )
-          const batch = await Promise.allSettled(
-            chunks.map(async (chunk, index) =>
-              ctx.runMutation(internal.jobs.saveEmbedding, {
-                id: chunk._id,
-                revisionId: job.revisionId,
-                embedding: vectors[index],
-                model: EMBEDDING_MODEL,
-              })
-            )
+        } else {
+          const error = failureError(outcome.cause)
+          yield* attempt(() =>
+            ctx.runMutation(internal.jobs.finish, {
+              jobId: job._id,
+              attempt: job.attempt,
+              error: error.message.slice(0, 300),
+              blocked: error.code === "NOT_CONFIGURED",
+              terminal: !isTransient(error),
+            })
           )
-          if (batch.some((result) => result.status === "rejected"))
-            throw new Error("An embedding batch failed.")
+          if (!isExpectedCause(outcome.cause))
+            return yield* Effect.failCause(outcome.cause)
         }
-      }
-      await ctx.runMutation(internal.jobs.finish, {
-        jobId: job._id,
-        attempt: job.attempt,
-      })
-    } catch {
-      await ctx.runMutation(internal.jobs.finish, {
-        jobId: job._id,
-        attempt: job.attempt,
-        error:
-          "Background processing failed; retrying within the configured limit.",
-      })
-    }
-  },
+      }),
+      "background_job"
+    ),
 })
 export const indexNow = internalAction({
   args: {},
-  handler: async (ctx): Promise<void> => {
-    const site = process.env.SITE_URL
-    const key = process.env.INDEXNOW_KEY
-    if (!site || !key || !site.startsWith("https://")) return
-    const rows = await ctx.runQuery(internal.jobs.pendingIndex, {})
-    if (!rows.length) return
-    const sentAt = Date.now()
-    try {
-      const response = await fetch("https://api.indexnow.org/indexnow", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          host: new URL(site).host,
-          key,
-          keyLocation: `${site}/indexnow-key.txt`,
-          urlList: rows.map((r) => r.url),
-        }),
-        signal: AbortSignal.timeout(10_000),
-      })
-      await ctx.runMutation(internal.jobs.indexResult, {
-        ids: rows.map((r) => r._id),
-        sentAt,
-        success: response.ok,
-      })
-    } catch {
-      await ctx.runMutation(internal.jobs.indexResult, {
-        ids: rows.map((r) => r._id),
-        sentAt,
-        success: false,
-      })
-    }
-  },
+  handler: (ctx): Promise<void> =>
+    runConvex(
+      Effect.gen(function* () {
+        const site = process.env.SITE_URL,
+          key = process.env.INDEXNOW_KEY
+        if (!site || !key || !site.startsWith("https://")) return
+        const rows = yield* attempt(() =>
+          ctx.runQuery(internal.jobs.pendingIndex, {})
+        )
+        if (!rows.length) return
+        const sentAt = Date.now()
+        const outcome = yield* Effect.exit(
+          Effect.gen(function* () {
+            const response = yield* fetchEffect(
+              () =>
+                fetch("https://api.indexnow.org/indexnow", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    host: new URL(site).host,
+                    key,
+                    keyLocation: `${site}/indexnow-key.txt`,
+                    urlList: rows.map((r) => r.url),
+                  }),
+                  signal: AbortSignal.timeout(10_000),
+                }),
+              "IndexNow"
+            )
+            if (!response.ok)
+              return yield* Effect.fail(
+                externalError({ status: response.status }, "IndexNow") ??
+                  appError("BAD_GATEWAY", "IndexNow rejected the request.")
+              )
+          })
+        )
+        yield* attempt(() =>
+          ctx.runMutation(internal.jobs.indexResult, {
+            ids: rows.map((r) => r._id),
+            sentAt,
+            success: Exit.isSuccess(outcome),
+            terminal:
+              Exit.isFailure(outcome) &&
+              !isTransient(failureError(outcome.cause)),
+          })
+        )
+        if (Exit.isFailure(outcome) && !isExpectedCause(outcome.cause))
+          return yield* Effect.failCause(outcome.cause)
+      }),
+      "indexnow"
+    ),
 })
