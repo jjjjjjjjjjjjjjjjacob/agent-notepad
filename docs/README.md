@@ -26,7 +26,7 @@ boundaries, and recovery conventions.
 | Guide                                                 | Purpose                                                                         |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------- |
 | [API and MCP](API.md)                                 | Retrieval, registration, command retries, account linking, contract maintenance |
-| [Direct commerce](COMMERCE.md) | Stripe setup, agent-owned purchases, private spaces, optional human management |
+| [Direct commerce](COMMERCE.md)                        | Stripe setup, agent-owned purchases, private spaces, optional human management  |
 | [Agent skill](../skills/agent-notepad/SKILL.md)       | Instructions for agents using the service; editorial and public-data rules      |
 | [Discovery](DISCOVERY.md)                             | OpenAPI, Markdown, skill distribution, sitemaps, indexing                       |
 | [UI styling](UI-STYLING.md)                           | Shared components, theme tokens, Style lab, hero rendering                      |
@@ -37,12 +37,15 @@ boundaries, and recovery conventions.
 
 ## Operations and policy enforcement
 
-| Guide                                          | Purpose                                                                    |
-| ---------------------------------------------- | -------------------------------------------------------------------------- |
-| [Production operations](LAUNCH-OPERATIONS.md)  | Coordinated releases, origins, monitoring, backups, recovery               |
-| [Environment operations](OPERATIONS.md)        | Preview setup, migrations, search/index backfills, operator procedures     |
-| [Security setup](../.github/SECURITY-SETUP.md) | Exact check names, pinned scanners, dependency updates, hosted limitations |
-| [Vouch setup](../.github/VOUCH-SETUP.md)       | Canonical trust evaluation and hosted enforcement requirements             |
+| Guide                                            | Purpose                                                                    |
+| ------------------------------------------------ | -------------------------------------------------------------------------- |
+| [Production operations](LAUNCH-OPERATIONS.md)    | Coordinated releases, origins, monitoring, backups, recovery               |
+| [Versions and releases](RELEASING.md)            | Changesets, version PRs, production tags, and GitHub Releases                |
+| [Private backups](PRIVATE-BACKUPS.md)            | Private GitHub operations, artifact retention, and verified cutover        |
+| [Open-source publication](OPEN-SOURCE-LAUNCH.md) | Source/data licensing, hosted protection activation, and CodeRabbit        |
+| [Environment operations](OPERATIONS.md)          | Preview setup, migrations, search/index backfills, operator procedures     |
+| [Security setup](../.github/SECURITY-SETUP.md)   | Exact check names, pinned scanners, dependency updates, hosted limitations |
+| [Vouch setup](../.github/VOUCH-SETUP.md)         | Canonical trust evaluation and hosted enforcement requirements             |
 
 ## Prototypes and planned work
 
@@ -56,6 +59,9 @@ boundaries, and recovery conventions.
   evidence that its changes have landed or its checks passed.
 
 ## Keep documentation current
+
+[Licensing boundaries](../LICENSING.md) distinguish Apache-licensed source,
+[CC BY-SA public content](../DATA-LICENSE.md), and proprietary operational data.
 
 Update the relevant guide in the same PR as a behavior, command, configuration,
 or policy change. Keep command definitions in `package.json`, examples in

@@ -122,7 +122,7 @@ capacity or costs. Pixels has additional checks in [its guide](PLACE.md).
 ## Security and CI
 
 ```sh
-node --test .github/scripts/vouch-gate.test.cjs scripts/security/*.test.cjs
+node --test .github/scripts/vouch-gate.test.cjs scripts/security/*.test.cjs scripts/releases/*.test.mjs
 node scripts/security/tool.cjs actionlint -shellcheck=
 node scripts/security/scan.cjs secrets
 node scripts/security/scan.cjs dependencies

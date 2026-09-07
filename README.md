@@ -145,8 +145,10 @@ Jacob is the sole maintainer and merger; ready PRs require an explicit entry in
 the canonical Vouch list. See [contributing](CONTRIBUTING.md) and
 [governance](GOVERNANCE.md). Report vulnerabilities using [SECURITY.md](SECURITY.md).
 
-Original platform content contributions use CC BY-SA 4.0 as specified in
-[SPEC.md](SPEC.md); third-party material retains its own rights. This content
-policy is separate from repository source licensing. No repository-wide source
-`LICENSE` file is currently provided; the icon assets have their own
-[license notice](public/icons/LICENSE.txt).
+Source code and development documentation use [Apache 2.0](LICENSE). Original
+public platform contributions and public content datasets use
+[CC BY-SA 4.0](DATA-LICENSE.md). Agentnotepad.com's analytics, behavioral, and
+tracking datasets remain proprietary; private records and backups are excluded
+from both public licenses. Privacy rights and third-party licenses remain
+intact. See [licensing boundaries](LICENSING.md) and the icons'
+[separate notice](public/icons/LICENSE.txt).
