@@ -25,6 +25,17 @@ Before changing framework code, read the relevant guide in the installed
 `node_modules/next/dist/docs/`. This repository deliberately uses the installed
 version's documentation; conventions from another Next.js release may differ.
 
+## Branch workflow
+
+`dev` is the repository default and the branch for everyday development. Start
+feature branches from current `dev` and target PRs at `dev`. Its Vercel Preview
+updates `https://dev.agentnotepad.com` and hosted development Convex.
+
+`main` is reserved for reviewed production releases at `https://agentnotepad.com`.
+Release by merging validated `dev` changes into `main`, then bring any release
+commits back to `dev` so development includes the published state. Changing the
+GitHub default branch must not change Vercel’s explicit Production branch `main`.
+
 ## Choose an environment
 
 | Environment        | Frontend                                      | Convex                      | Data behavior                                          |

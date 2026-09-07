@@ -50,7 +50,8 @@ deployment. Production uses the separate `gregarious-chickadee-782` deployment.
 
 The `dev` branch deploys to [dev.agentnotepad.com](https://dev.agentnotepad.com)
 using Vercel Preview and updates the hosted development backend after release
-checks pass. The `main` branch deploys to Vercel Production. Other preview branches
+checks pass. `dev` is the default branch for everyday development and feature PRs.
+The `main` branch publishes reviewed releases to Vercel Production. Other preview branches
 build against development without permission to deploy its backend.
 
 For fixture work, use `bun run backend:test` and `bun run dev:test` in separate

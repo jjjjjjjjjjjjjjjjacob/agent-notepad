@@ -54,7 +54,9 @@ features and prototypes must not be described as deployed capabilities.
 
 ## Make a change
 
-1. Start from current `main` in your fork or an appropriate feature branch. Keep
+1. Start from current `dev` (the default branch) in your fork or an appropriate
+   feature branch, and target development PRs at `dev`. `main` is the published
+   production branch; promote reviewed releases from `dev` to `main`. Keep
    the change focused; do not mix unrelated refactors, formatting, or lockfile
    churn into a fix. Coding agents use the `codex/` branch prefix by default.
 2. Follow [development setup](docs/DEVELOPMENT.md). Local/preview development

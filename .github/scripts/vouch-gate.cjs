@@ -31,6 +31,7 @@ function decision(prs, entries, actionStatus) {
 async function finalize({ github, context, core, snapshot, actionStatus }) {
   if (`${context.repo.owner}/${context.repo.repo}` !== REPOSITORY) throw new Error('Unexpected repository');
   const repo = context.repo;
+  const target = snapshot.target ?? 'main';
   const status = (sha, state, description) => github.rest.repos.createCommitStatus({
     ...repo, sha, state, context: CONTEXT, description,
     target_url: `https://github.com/${REPOSITORY}/actions/runs/${context.runId}`,
@@ -41,24 +42,24 @@ async function finalize({ github, context, core, snapshot, actionStatus }) {
     const pr = (await github.rest.pulls.get({ ...repo, pull_number: snapshot.number })).data;
     currentSha = pr.head.sha;
     if (pr.state !== 'open') return;
-    if (currentSha !== snapshot.sha || pr.base.ref !== 'main' || pr.user.login !== snapshot.author || await head() !== snapshot.base) {
+    if (!['main', 'dev'].includes(target) || currentSha !== snapshot.sha || pr.base.ref !== target || pr.user.login !== snapshot.author || await head() !== snapshot.base) {
       await status(currentSha, 'pending', 'PR head or main changed; rerun Vouch on current state');
       throw new Error('PR or trust snapshot changed');
     }
     const file = (await github.rest.repos.getContent({ ...repo, path: '.github/VOUCHED.td', ref: snapshot.base })).data;
     if (file.type !== 'file' || file.encoding !== 'base64') throw new Error('Trust file unavailable');
     const entries = trust(Buffer.from(file.content, 'base64').toString('utf8'));
-    const all = await github.paginate(github.rest.pulls.list, { ...repo, state: 'open', base: 'main', per_page: 100 });
-    const sameHead = all.filter(p => p.head.sha === currentSha);
+    const all = await github.paginate(github.rest.pulls.list, { ...repo, state: 'open', per_page: 100 });
+    const sameHead = all.filter(p => ['main', 'dev'].includes(p.base.ref) && p.head.sha === currentSha);
     const eligible = decision(sameHead, entries, actionStatus);
     // Re-read both mutable inputs immediately before AND after publishing.
     const latest = (await github.rest.pulls.get({ ...repo, pull_number: snapshot.number })).data;
-    if (latest.head.sha !== currentSha || latest.base.ref !== 'main' || latest.draft !== pr.draft || latest.state !== 'open' || await head() !== snapshot.base) throw new Error('State changed before publication');
+    if (latest.head.sha !== currentSha || latest.base.ref !== target || latest.draft !== pr.draft || latest.state !== 'open' || await head() !== snapshot.base) throw new Error('State changed before publication');
     await status(currentSha, eligible ? 'success' : 'failure', eligible
       ? 'Explicitly vouched author; Jacob alone may merge'
       : 'Draft, unknown, denounced, or unavailable Vouch result');
     const after = (await github.rest.pulls.get({ ...repo, pull_number: snapshot.number })).data;
-    if (after.head.sha !== currentSha || after.base.ref !== 'main' || after.draft !== pr.draft || after.state !== 'open' || await head() !== snapshot.base) {
+    if (after.head.sha !== currentSha || after.base.ref !== target || after.draft !== pr.draft || after.state !== 'open' || await head() !== snapshot.base) {
       await status(currentSha, 'pending', 'Snapshot changed; recheck required');
       if (after.head.sha !== currentSha) await status(after.head.sha, 'pending', 'New PR head requires Vouch');
       throw new Error('State changed after publication');

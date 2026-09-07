@@ -15,6 +15,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Start with repository context
 
+- `dev` is the default and everyday development branch. Target feature PRs at
+  `dev`; `main` is the published production branch. Release merges into `main`
+  require task authorization. Keep Vercel Production explicitly assigned to `main`.
+
 - Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), and the relevant
   guide in [docs/README.md](docs/README.md). Use [SPEC.md](SPEC.md) for product and
   visual requirements; distinguish baseline behavior, prototypes, and planned work.
