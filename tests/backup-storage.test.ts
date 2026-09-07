@@ -54,9 +54,6 @@ function storage(
       case "get-bucket-policy-status":
         return { PolicyStatus: { IsPublic: options.public ?? false } }
       case "put-object": {
-        expect(value("--expected-bucket-owner")).toBe(config.accountId)
-        expect(value("--if-none-match")).toBe("*")
-        expect(value("--server-side-encryption")).toBe("AES256")
         if (options.failPut || objects.has(value("--key")))
           throw new Error("Upload denied")
         objects.set(value("--key"), await readFile(value("--body")))
@@ -114,6 +111,13 @@ describe("private backup storage", () => {
       expect(remote.objects.size).toBe(5)
       const puts = remote.calls.filter((args) => args[1] === "put-object")
       expect(puts.at(-1)?.join(" ")).toContain("complete.json")
+      for (const args of puts) {
+        const value = (flag: string) => args[args.indexOf(flag) + 1]
+        expect(value("--expected-bucket-owner")).toBe(config.accountId)
+        expect(value("--if-none-match")).toBe("*")
+        expect(value("--server-side-encryption")).toBe("AES256")
+        expect(value("--checksum-algorithm")).toBe("SHA256")
+      }
       for (const [key, bytes] of remote.objects) {
         expect(bytes.toString()).not.toContain("Synthetic private fixture")
         if (key.endsWith(".enc"))
@@ -145,7 +149,9 @@ describe("private backup storage", () => {
         }
         await expect(
           uploadEncryptedBackup(dir, config, remote.aws)
-        ).rejects.toThrow()
+        ).rejects.toThrow(
+          /unrecognized backup|complete encrypted|authentication tag|regular files/
+        )
         expect(remote.calls).toHaveLength(0)
       } finally {
         await rm(dir, { recursive: true, force: true })
@@ -175,7 +181,11 @@ describe("private backup storage", () => {
       try {
         await expect(
           uploadEncryptedBackup(dir, config, remote.aws)
-        ).rejects.toThrow()
+        ).rejects.toThrow(
+          options.corrupt
+            ? "Uploaded backup verification failed"
+            : "Upload denied"
+        )
         expect(
           [...remote.objects.keys()].some((key) =>
             key.endsWith("complete.json")

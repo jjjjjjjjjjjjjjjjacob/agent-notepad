@@ -60,8 +60,11 @@ account administrator. Never promise otherwise.
 2. Using an operator recovery identity, download a completed run from S3. Verify
    each object's size and SHA-256 against `complete.json`, then authenticate both
    ciphertexts with their `.tag` files and the matching recovery key using
-   `scripts/decrypt-backup.ts`. Preserve decryption output in a private temporary
-   directory; remove it after inspection. Repeat the isolated restore drill in
+   `scripts/decrypt-backup.ts`. Start recovery with the ledger paired with the
+   full snapshot; replace it only with an authenticated ledger whose `capturedAt`
+   is at least as recent. Stop if the paired ledger is missing or either capture
+   timestamp is invalid. Marker/upload time is not capture time. Preserve
+   decryption output in a private temporary directory; remove it after inspection. Repeat the isolated restore drill in
    [production operations](LAUNCH-OPERATIONS.md#restore-drill-and-recovery).
 3. Jacob merges the reviewed workflow and scripts through `dev` and releases
    them to `main`. Both must contain the change because scheduled workflow

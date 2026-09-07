@@ -50,7 +50,11 @@ other selected repositories. The saved GitHub settings were verified. No pending
 permission upgrade was accepted and no subscription was purchased. The granted
 app permissions include read/write access to code, commit statuses, issues, and
 pull requests, plus read access to Actions, checks, discussions, and metadata.
-Repository configuration does not remove those app permissions.
+Repository configuration does not remove those app permissions. The app posted
+a CodeRabbit status and its expected draft-review skip message on PR #11,
+confirming the webhook connection. It reports the Free plan provides summaries
+and walkthroughs; comprehensive hosted line reviews require a paid tier. CLI
+reviews were run separately. No paid plan was activated.
 
 Merge the configuration into the relevant base branches through normal review.
 Then verify a real PR receives a CodeRabbit review and that the current commit
