@@ -1,7 +1,7 @@
 # Scheduling and usage
 
-This describes the implementation in this checkout, not production deployment
-status. The [design and baseline](../plans/010-convex-scheduling-efficiency.md)
+This describes the implementation and the dated backend rollout below, not a
+guarantee of current deployment state. The [design and baseline](../plans/010-convex-scheduling-efficiency.md)
 distinguish measured usage from estimates. A usage warning is cumulative: these
 changes do not remove calls already charged during the current monthly window.
 
@@ -138,3 +138,43 @@ complete subscription delivery; HTTP failures are not retried or ignored.
   passed. IndexNow HTTP success/failure behavior was mocked, not sent to a live
   provider. Production per-function attribution and post-release savings remain
   unverified.
+
+### Hosted backend cutover, September 15, 2026
+
+Under Jacob's explicit development and production rollout authorization, the
+Convex-only hotfix from commit `28a2eb6` was deployed to shared development
+`incredible-boar-27` and production `gregarious-chickadee-782`. Both completed
+the two-stage procedure by 19:35 UTC: deploy with legacy recovery enabled,
+run `maintenance:rearm`, verify readiness, run the watchdog, set
+`SCHEDULING_LEGACY_RECOVERY=false`, and redeploy. Both migrations returned
+`armed: 0, more: false`; there were no legacy live records needing new timers.
+Both status queries returned `timersArmed: true`, no unarmed domains, and idle
+matching/indexing batches. Both manual watchdogs dispatched zero children.
+
+Read-only system-query inspection verified exactly the six intended cron jobs
+on both backends, including `Recover overdue work` at 300-second intervals.
+The legacy per-domain and IndexNow cron entries were absent. The watchdog's
+latest scheduled execution succeeded in both environments. Production health,
+origins, discovery, public API and MCP smoke checks passed after cutover. No
+hosted fixtures were seeded and no usage limits were raised. Actual full-day
+post-cutover call and I/O savings remain unmeasured.
+
+The integrated release passed local types/lint, 454 unit tests (one opt-in
+skip), the optimized build, and 43 release/security-policy tests. Restoring the
+pre-existing production admin operation then passed all 16 targeted admin and
+scheduling tests. That operation and its existing tests/runbook were preserved
+in a separate commit; no purge was executed.
+
+**Git/Vercel release is not complete.** [PR #13](https://github.com/jjjjjjjjjjjjjjjjacob/agent-notepad/pull/13)
+contains the hotfix and prepared version 0.0.1, but main/dev have not been
+updated. Application validation passed on the initial release candidate;
+full-release security gates rejected pre-existing Next.js critical advisories
+and four embedding image findings. No gate was bypassed and no new frontend
+or embedding image was published. Remediate those dependencies and complete
+the reviewed dev/main release before any ordinary backend deployment from the
+old branch tips: old code would reinstall the legacy crons.
+
+Work stayed on the harness-assigned `codex/remove-workos` checkout. Existing
+social-campaign work remained isolated on `codex/social-campaigns`, untouched.
+Unrelated README/discovery edits were restored locally; the original named
+stash was retained as an additional recovery copy.
