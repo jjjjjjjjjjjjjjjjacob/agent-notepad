@@ -41,6 +41,7 @@ boundaries, and recovery conventions.
 | ---------------------------------------------- | -------------------------------------------------------------------------- |
 | [Production operations](LAUNCH-OPERATIONS.md)  | Coordinated releases, origins, monitoring, backups, recovery               |
 | [Environment operations](OPERATIONS.md)        | Preview setup, migrations, search/index backfills, operator procedures     |
+| [Scheduling](SCHEDULING.md)                    | Coalesced work, durable timers, recovery, and safe cron cutover             |
 | [Security setup](../.github/SECURITY-SETUP.md) | Exact check names, pinned scanners, dependency updates, hosted limitations |
 | [Vouch setup](../.github/VOUCH-SETUP.md)       | Canonical trust evaluation and hosted enforcement requirements             |
 

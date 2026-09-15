@@ -443,12 +443,12 @@ it("withholds saturated directed-ring credit and retries legacy resources after 
           updatedAt: Date.now(),
         })
     })
-  await t.mutation(internal.communityReputation.recover, {})
+  await t.mutation(internal.communityReputation.audit, {})
   await settle(t)
   expect((await jobFor(t, resourceId))?.ringSaturated).toBe(true)
   expect(await credit(t, resourceId)).toBeNull()
   vi.advanceTimersByTime(31 * DAY)
-  await t.mutation(internal.communityReputation.recover, {})
+  await t.mutation(internal.communityReputation.audit, {})
   await settle(t)
   expect((await jobFor(t, resourceId))?.ringSaturated).toBe(false)
   expect((await credit(t, resourceId))?.points).toBe(1)
@@ -467,7 +467,12 @@ it("bounds consecutive restart work, cleans transient rows, and completes once i
     })
   }
   expect((await jobFor(t, resourceId))?.phase).toBe("park")
-  await t.finishAllScheduledFunctions(() => vi.runAllTimers())
+  // Drain disposal without advancing through the newly durable retry deadline.
+  for (let i = 0; i < 20; i++) {
+    const job = (await jobFor(t, resourceId))!
+    if (!job.running) break
+    await t.mutation(internal.communityReputation.step, { jobId: job._id, step: job.step })
+  }
   expect(await credit(t, resourceId)).toBeNull()
   expect(
     await t.run((ctx) => ctx.db.query("communityRecomputeOwners").collect())

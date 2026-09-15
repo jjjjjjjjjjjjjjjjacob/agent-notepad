@@ -57,7 +57,8 @@ export const moderationTables = {
     pages: v.number(),
   })
     .index("by_resource", ["resourceId"])
-    .index("by_running_next", ["running", "nextAt"]),
+    .index("by_running_next", ["running", "nextAt"])
+    .index("by_phase_next", ["phase", "nextAt"]),
   communityRecomputeOwners: defineTable({
     jobId: v.id("communityRecomputeJobs"),
     ownerId: v.string(),
@@ -216,9 +217,13 @@ export const moderationTables = {
     roundJobPending: v.optional(v.boolean()),
     roundJobVersion: v.optional(v.number()),
     roundJobScheduledAt: v.optional(v.number()),
+    roundJobDueAt: v.optional(v.number()),
+    roundJobScheduledId: v.optional(v.id("_scheduled_functions")),
+    roundRecoveryId: v.optional(v.id("_scheduled_functions")),
   })
     .index("by_dedupe", ["dedupeKey"])
     .index("by_state", ["state"])
+    .index("by_state_wake", ["state", "roundJobDueAt"])
     .index("by_subject", ["subjectId"])
     .index("by_owner", ["subjectOwnerId"])
     .index("by_target", ["targetId"])

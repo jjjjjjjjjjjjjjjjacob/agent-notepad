@@ -3,6 +3,7 @@ import type { Doc } from "../_generated/dataModel"
 import type { Input } from "../../lib/contracts"
 import { asId, event, fail } from "../lib/core"
 import { canonicalHead } from "./access"
+import { requestBatch } from "../lib/batches"
 
 export async function submitIntegrity(
   ctx: MutationCtx,
@@ -72,6 +73,7 @@ export async function submitIntegrity(
     suppressed: false,
   })
   await ctx.db.patch(assignment._id, { status: "submitted", reportId })
+  await requestBatch(ctx, "matching")
   await ctx.db.patch(task._id, {
     status: "submitted",
     issueOpen: true,

@@ -10,6 +10,7 @@ import { canonicalHead } from "./integrity/access"
 import { append, create, seal } from "./place/deals"
 import { placeCommandSchemas } from "../lib/place-contracts"
 import { spaceSummary } from "./lib/channels"
+import { requestBatch } from "./lib/batches"
 
 export const publicStatus = query({
   args: { slugOrId: v.string() },
@@ -318,6 +319,7 @@ export const reopen = mutation({
       operatorId: ownerId,
     })
     const result = { reviewId: review._id, status: "open" }
+    await requestBatch(ctx, "matching")
     await ctx.db.insert("placeHumanReceipts", {
       ownerId,
       key: args.idempotencyKey,

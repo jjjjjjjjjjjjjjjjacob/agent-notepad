@@ -15,6 +15,8 @@ import { openQualityCase } from "./moderation/cases"
 import { recomputeCommunity, reverseSource } from "./moderation/reputation"
 import { indexResource, metric } from "./lib/core"
 import { startRetention, retireEvidencePage } from "./governanceRetention"
+import { armCaseDeadline } from "./moderation/timers"
+import { cancelPending } from "./lib/batches"
 
 export const freezeRoster = internalMutation({
   args: {},
@@ -119,6 +121,7 @@ export const installDraw = internalMutation({
         : {}),
     })
     if (state === "seating") await fillSeats(ctx, (await ctx.db.get(c._id))!)
+    else await armCaseDeadline(ctx, c._id)
   },
 })
 export const quality = internalMutation({
@@ -131,34 +134,23 @@ export const quality = internalMutation({
   },
 })
 export const recover = internalMutation({
-  args: { state: v.optional(v.string()), cursor: v.optional(v.string()) },
+  args: { state: v.optional(v.string()), cursor: v.optional(v.string()), dueOnly: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
     const state = (args.state ?? "queued") as "queued" | "seating" | "voting"
     if (!["queued", "seating", "voting"].includes(state)) return
-    const page = await ctx.db
-      .query("moderationCases")
-      .withIndex("by_state", (q) => q.eq("state", state))
+    const query = args.dueOnly ? ctx.db.query("moderationCases").withIndex("by_state_wake", q => q.eq("state", state).lte("roundJobDueAt", Date.now() - 60_000)) : ctx.db.query("moderationCases").withIndex("by_state", q => q.eq("state", state))
+    const page = await query
       .paginate({ cursor: args.cursor ?? null, numItems: 30 })
     for (const c of page.page) {
-      if (state === "queued") {
-        if (Date.now() >= c.seatingUntil)
-          await ctx.db.patch(c._id, {
-            state: "escalated",
-            decisionReason:
-              "The roster could not be drawn before the seating deadline. Human review is required.",
-          })
-        else
-          await ctx.scheduler.runAfter(0, internal.committee.draw, {
-            caseId: c._id,
-          })
-      } else await queueRound(ctx, c)
+      await queueRound(ctx, c)
     }
     if (!page.isDone)
       await ctx.scheduler.runAfter(0, internal.governance.recover, {
         state,
         cursor: page.continueCursor,
+        dueOnly: args.dueOnly,
       })
-    else if (state !== "voting")
+    else if (state !== "voting" && !args.dueOnly)
       await ctx.scheduler.runAfter(0, internal.governance.recover, {
         state: state === "queued" ? "seating" : "voting",
       })
@@ -171,13 +163,25 @@ export const continueCase = internalMutation({
   handler: async (ctx, { caseId, generation }) => {
     const c = await ctx.db.get(caseId)
     if (!c?.roundJobPending || c.roundJobVersion !== generation) return
-    await ctx.db.patch(c._id, { roundJobPending: false })
-    if (c.state === "seating") await fillSeats(ctx, c)
+    await cancelPending(ctx, c.roundRecoveryId)
+    await ctx.db.patch(c._id, { roundJobPending: false, roundJobScheduledId: undefined, roundRecoveryId: undefined })
+    if (c.state === "queued") {
+      if (Date.now() >= c.seatingUntil) await escalateRound(ctx, c, "The roster could not be drawn before the seating deadline. Human review is required.")
+      else await ctx.scheduler.runAfter(0, internal.committee.draw, { caseId })
+    } else if (c.state === "seating") await fillSeats(ctx, c)
     else if (c.state === "voting") {
       if (Date.now() > c.deadline + 2 * 60000) await escalateRound(ctx, c,
         "Automatic closure did not complete by the deadline. Human review is required without lowering the thresholds.")
       else await closeRound(ctx, c)
     }
+    await armCaseDeadline(ctx, caseId)
+  },
+})
+export const checkWake = internalMutation({
+  args: { caseId: v.id("moderationCases"), generation: v.number() },
+  handler: async (ctx, { caseId, generation }) => {
+    const c = await ctx.db.get(caseId)
+    if (c?.roundJobPending && c.roundJobVersion === generation) await queueRound(ctx, c)
   },
 })
 export const releaseCaseSeats = internalMutation({

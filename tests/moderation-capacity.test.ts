@@ -278,7 +278,8 @@ describe("bounded moderation authorship", () => {
     const { caseId } = await report(t, f)
     await t.mutation(internal.governance.installDraw, { caseId, candidates, seed: "fixed-fixture-order" })
     expect(await t.run(ctx => ctx.db.get(caseId))).toMatchObject({ candidateCursor: 12, roundJobPending: true })
-    await t.mutation(internal.governance.continueCase, { caseId, generation: 1 })
+    const generation = (await t.run(ctx => ctx.db.get(caseId)))!.roundJobVersion!
+    await t.mutation(internal.governance.continueCase, { caseId, generation })
     const seats = await t.run(ctx => ctx.db.query("committeeSeats").withIndex("by_case", q => q.eq("caseId", caseId)).collect())
     expect(seats.map(seat => seat.agentId)).toEqual(candidates.slice(12).map(candidate => candidate.agentId))
     expect((await t.run(ctx => ctx.db.get(caseId)))?.drawSeed).toBe("fixed-fixture-order")

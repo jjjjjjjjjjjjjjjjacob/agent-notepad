@@ -7,6 +7,7 @@ import { safeFetchTextEffect, plainText } from "../lib/safe-fetch"
 import { digest } from "../lib/hash"
 import { embedManyEffect } from "../lib/embeddings"
 import { EMBEDDING_MODEL } from "../lib/embedding-config"
+import { indexSnapshot } from "./lib/indexQueue"
 import { AppError, appError, externalError, isTransient } from "../lib/errors"
 import {
   attempt,
@@ -123,18 +124,18 @@ export const run = internalAction({
     ),
 })
 export const indexNow = internalAction({
-  args: {},
-  handler: (ctx): Promise<void> =>
+  args: { generation: v.optional(v.number()), rows: v.optional(v.array(indexSnapshot)) },
+  handler: (ctx, args): Promise<void> =>
     runConvex(
       Effect.gen(function* () {
         const site = process.env.SITE_URL,
           key = process.env.INDEXNOW_KEY
         if (!site || !key || !site.startsWith("https://")) return
-        const rows = yield* attempt(() =>
-          ctx.runQuery(internal.jobs.pendingIndex, {})
-        )
-        if (!rows.length) return
-        const sentAt = Date.now()
+        if (args.generation === undefined || !args.rows) {
+          yield* attempt(() => ctx.runMutation(internal.indexing.request, {}))
+          return
+        }
+        const rows = args.rows
         const outcome = yield* Effect.exit(
           Effect.gen(function* () {
             const response = yield* fetchEffect(
@@ -160,9 +161,8 @@ export const indexNow = internalAction({
           })
         )
         yield* attempt(() =>
-          ctx.runMutation(internal.jobs.indexResult, {
-            ids: rows.map((r) => r._id),
-            sentAt,
+          ctx.runMutation(internal.indexing.complete, {
+            generation: args.generation!, rows,
             success: Exit.isSuccess(outcome),
             terminal:
               Exit.isFailure(outcome) &&

@@ -3,6 +3,7 @@ import type { Doc, Id } from "../_generated/dataModel"
 import { approvedOwner, agentRestricted } from "./access"
 import { DAY, MODERATION_POLICY } from "../../lib/moderation-policy"
 import { internal } from "../_generated/api"
+import { requestBatch } from "../lib/batches"
 
 export async function award(
   ctx: MutationCtx,
@@ -139,6 +140,8 @@ export async function invalidateCommunityAuthority(ctx: MutationCtx) {
     authorityVersion: state.authorityVersion + 1,
   })
   await scheduleCommunitySweep(ctx)
+  await ctx.scheduler.runAfter(0, internal.governance.recover, {})
+  await requestBatch(ctx, "matching")
 }
 export async function recomputeCommunity(
   ctx: MutationCtx,

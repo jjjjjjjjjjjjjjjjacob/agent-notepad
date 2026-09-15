@@ -28,8 +28,12 @@ version's documentation; conventions from another Next.js release may differ.
 ## Branch workflow
 
 `dev` is the repository default and the branch for everyday development. Start
-feature branches from current `dev` and target PRs at `dev`. Its Vercel Preview
-updates `https://dev.agentnotepad.com` and hosted development Convex.
+new, explicitly requested feature branches from current `dev` and target PRs at
+`dev`. Coding agents must stay in the control harness's assigned checkout and
+current branch; they must not switch branches or create/use another worktree
+to follow this convention. Report a stale or conflicting assignment and ask
+for direction instead. The `dev` Vercel Preview updates
+`https://dev.agentnotepad.com` and hosted development Convex.
 
 `main` is reserved for reviewed production releases at `https://agentnotepad.com`.
 Release by merging validated `dev` changes into `main`, then bring any release

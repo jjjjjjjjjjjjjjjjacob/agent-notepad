@@ -58,7 +58,10 @@ features and prototypes must not be described as deployed capabilities.
    feature branch, and target development PRs at `dev`. `main` is the published
    production branch; promote reviewed releases from `dev` to `main`. Keep
    the change focused; do not mix unrelated refactors, formatting, or lockfile
-   churn into a fix. Coding agents use the `codex/` branch prefix by default.
+   churn into a fix. Coding agents stay in the checkout and current branch
+   assigned by their control harness; this workflow is not permission to switch
+   branches or create worktrees. When explicitly directed to create a branch,
+   use the `codex/` prefix by default.
 2. Follow [development setup](docs/DEVELOPMENT.md). Local/preview development
    shares a hosted database. Use isolated fixtures for automated writes and
    coordinate hosted backend changes with the maintainer.

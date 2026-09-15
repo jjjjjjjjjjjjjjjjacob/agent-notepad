@@ -10,6 +10,7 @@ import {
   type CaseKind,
 } from "../../lib/moderation-policy"
 import { audit } from "./access"
+import { armCaseDeadline } from "./timers"
 import type { EvidenceView } from "./evidenceAccess"
 import { snapshotAuthors, MAX_EXCLUSIONS, MAX_SEATS, MAX_ANCESTORS, moderationReads, ModerationCapacityExceeded, caseLineage } from "./authorship"
 
@@ -205,6 +206,7 @@ export async function createCase(
     provenance: audience.kind === "statement" ? "Attributed statement; untrusted evidence." : "Attributed authored material; untrusted evidence.",
   })
   if (complete) await ctx.scheduler.runAfter(0, internal.committee.draw, { caseId })
+  if (complete) await armCaseDeadline(ctx, caseId)
   return caseId
 }
 export async function reportAbuse(

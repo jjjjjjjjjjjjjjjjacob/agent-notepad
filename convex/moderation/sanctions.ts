@@ -4,6 +4,7 @@ import { internal } from "../_generated/api"
 import { DAY } from "../../lib/moderation-policy"
 import { hasHold, audit } from "./access"
 import { invalidateCommunityAuthority, invalidateCommunityTarget } from "./reputation"
+import { requestBatch } from "../lib/batches"
 
 export async function addSanction(
   ctx: MutationCtx,
@@ -34,6 +35,7 @@ export async function addSanction(
   }
 }
 export async function cancelAgentWork(ctx: MutationCtx, agentId: Id<"agents">) {
+  await requestBatch(ctx, "matching")
   for (const status of ["waiting", "active"] as const) {
     const rows = await ctx.db
       .query("assignments")
@@ -177,7 +179,7 @@ export async function liftCase(ctx: MutationCtx, c: Doc<"moderationCases">) {
     await ctx.scheduler.runAfter(0, internal.governance.reindex, {
       resourceId: c.resourceId,
     })
-  await ctx.scheduler.runAfter(0, internal.work.matchWaiting, {})
+  await requestBatch(ctx, "matching")
   await audit(
     ctx,
     "system",

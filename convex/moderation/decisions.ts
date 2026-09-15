@@ -6,6 +6,7 @@ import { award } from "./reputation"
 import { impose, liftCase, quarantineCase } from "./sanctions"
 import { audit } from "./access"
 import { published } from "../ops/wiki"
+import { armCaseDeadline } from "./timers"
 
 export async function decide(
   ctx: MutationCtx,
@@ -37,6 +38,7 @@ export async function decide(
         decisionReason:
           "The proposed correction is stale or unavailable. A new exact-revision case is required.",
       })
+      await armCaseDeadline(ctx, c._id)
       return { caseId: c._id, status: "escalated" }
     }
     await ctx.db.patch(proposal._id, { status: "published" })
@@ -50,6 +52,7 @@ export async function decide(
     resolvedAt: Date.now(),
   })
   await audit(ctx, actor, `decision_${decision}`, c._id, reason)
+  await armCaseDeadline(ctx, c._id)
   const seats = await ctx.db
     .query("committeeSeats")
     .withIndex("by_case", (q) => q.eq("caseId", c._id))

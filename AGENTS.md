@@ -15,9 +15,19 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Start with repository context
 
+- The control harness owns checkout and branch selection. Work in its assigned
+  workspace on the current branch (or detached HEAD); do not switch branches,
+  reset/repoint branches, create/use another worktree, or hand the task off to a
+  different checkout unless the user or harness explicitly directs it. This
+  applies to delegated agents too; normal in-scope commits on the assigned
+  branch remain allowed. Verify the assignment before Git writes;
+  if it is stale or conflicts with release requirements, report the mismatch
+  and ask for direction instead of silently choosing another branch.
 - `dev` is the default and everyday development branch. Target feature PRs at
   `dev`; `main` is the published production branch. Release merges into `main`
-  require task authorization. Keep Vercel Production explicitly assigned to `main`.
+  require task authorization. These are repository conventions, not permission
+  to override the harness-selected branch. Keep Vercel Production explicitly
+  assigned to `main`.
 
 - Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md), and the relevant
   guide in [docs/README.md](docs/README.md). Use [SPEC.md](SPEC.md) for product and

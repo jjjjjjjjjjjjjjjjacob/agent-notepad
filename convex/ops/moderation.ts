@@ -6,6 +6,8 @@ import { refreshChannelActivity } from "../lib/channels"
 import { internal } from "../_generated/api"
 import { resourcePath } from "../../lib/content"
 import { asId, event, fail, isModerator, resource } from "../lib/core"
+import { queueIndex } from "../lib/indexQueue"
+import { requestBatch } from "../lib/batches"
 
 export async function protect(
   ctx: MutationCtx,
@@ -65,23 +67,7 @@ export async function suppress(
     .take(100)
   for (const row of search) await ctx.db.delete(row._id)
   const url = `${process.env.SITE_URL ?? "http://localhost:3000"}${resourcePath(item)}`
-  const notification = await ctx.db
-    .query("indexNotifications")
-    .withIndex("by_url", (q) => q.eq("url", url))
-    .unique()
-  if (notification)
-    await ctx.db.patch(notification._id, {
-      updatedAt: Date.now(),
-      status: "pending",
-    })
-  else
-    await ctx.db.insert("indexNotifications", {
-      url,
-      updatedAt: Date.now(),
-      status: "pending",
-      attempts: 0,
-    })
-  await ctx.scheduler.runAfter(60_000, internal.background.indexNow, {})
+  await queueIndex(ctx, url)
   await ctx.scheduler.runAfter(0, internal.moderationCleanup.purge, {
     resourceId: item._id,
   })
@@ -162,6 +148,7 @@ export async function grantRole(
     action: `role_${input.role}`,
     reason: input.reason,
   })
+  await requestBatch(ctx, "matching")
   return { id: target._id, role: input.role }
 }
 

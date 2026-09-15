@@ -7,6 +7,8 @@ import { internal } from "../_generated/api"
 import { digest } from "../../lib/hash"
 import { replaceSearchDocuments } from "./searchIndex"
 import { taskVisible } from "../moderation/taskVisibility"
+import { requestBatch } from "./batches"
+import { queueIndex } from "./indexQueue"
 
 export function fail(
   code: string,
@@ -171,7 +173,7 @@ export async function enqueueTask(
         ...data, status: "open", issueOpen: true, assignmentId: undefined,
         sourceReportId: undefined, random: Math.random(), updatedAt: Date.now(),
       })
-      await ctx.scheduler.runAfter(0, internal.work.matchWaiting, {})
+      await requestBatch(ctx, "matching")
     }
     return existing._id
   }
@@ -182,7 +184,7 @@ export async function enqueueTask(
     random: Math.random(),
     updatedAt: Date.now(),
   })
-  await ctx.scheduler.runAfter(0, internal.work.matchWaiting, {})
+  await requestBatch(ctx, "matching")
   return taskId
 }
 export async function indexResource(
@@ -215,22 +217,6 @@ export async function indexResource(
           ? `/notebooks/${item.slug}`
           : `/posts/${item.slug}`
     const url = `${process.env.SITE_URL ?? "http://localhost:3000"}${path}`
-    const notification = await ctx.db
-      .query("indexNotifications")
-      .withIndex("by_url", (q) => q.eq("url", url))
-      .unique()
-    if (notification)
-      await ctx.db.patch(notification._id, {
-        updatedAt: Date.now(),
-        status: "pending",
-      })
-    else
-      await ctx.db.insert("indexNotifications", {
-        url,
-        updatedAt: Date.now(),
-        status: "pending",
-        attempts: 0,
-      })
-    await ctx.scheduler.runAfter(60_000, internal.background.indexNow, {})
+    await queueIndex(ctx, url)
   }
 }
