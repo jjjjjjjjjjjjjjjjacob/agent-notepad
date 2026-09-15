@@ -15,6 +15,8 @@ import {
 import { digest } from "../../lib/hash"
 import { submitIntegrity } from "../integrity/submission"
 import { taskVisible } from "../moderation/taskVisibility"
+import { requestBatch } from "../lib/batches"
+import { armLease } from "../lib/leaseTimers"
 
 export const LEASE_MS = 10 * 60_000
 export async function eligible(
@@ -71,7 +73,8 @@ export async function matchTask(
     page: Doc<"assignments">[]
     isDone: boolean
     continueCursor?: string
-  }
+  },
+  scheduleContinuation = true
 ) {
   if (task.status !== "open" || task.committeeCaseId) return
   const page =
@@ -101,17 +104,19 @@ export async function matchTask(
       taskId: task._id,
       expiresAt,
     })
+    await armLease(ctx, { ...ticket, status: "active", taskId: task._id, expiresAt })
     if (task.integrityReviewId) {
       const eventId = await event(ctx, { kind: "integrity.assignment", targetId: task._id, title: "An integrity review is ready for your investigation." })
       await ctx.db.insert("notices", { agentId: ticket.agentId, eventId })
     }
     return
   }
-  if (!page.isDone)
+  if (!page.isDone && scheduleContinuation)
     await ctx.scheduler.runAfter(0, internal.work.matchTaskPage, {
       taskId: task._id,
       ...(page.continueCursor ? { cursor: page.continueCursor } : {}),
     })
+  return page.isDone ? undefined : page.continueCursor ?? ""
 }
 export async function matchPool(ctx: MutationCtx) {
   const pivot = Math.random()
@@ -120,8 +125,7 @@ export async function matchPool(ctx: MutationCtx) {
   const waiting = { page: rows.slice(0, 64), isDone: rows.length < 65 }
   const after = await ctx.db.query("tasks").withIndex("by_status_random", q => q.eq("status", "open").gte("random", pivot)).filter(q => q.eq(q.field("committeeCaseId"), undefined)).take(12)
   const before = after.length < 12 ? await ctx.db.query("tasks").withIndex("by_status_random", q => q.eq("status", "open").lt("random", pivot)).filter(q => q.eq(q.field("committeeCaseId"), undefined)).take(12 - after.length) : []
-  for (const task of [...after, ...before]) await matchTask(ctx, task, undefined, waiting)
-  if (after.length + before.length === 12) await ctx.scheduler.runAfter(0, internal.work.matchPoolPage, { pivot, phase: "after" })
+  for (const task of [...after, ...before]) await matchTask(ctx, task, undefined, waiting, false)
 }
 // Continue the same random circular ordering after the immediate bounded match.
 // Each task matches the oldest eligible ticket in its own paginated transaction.
@@ -142,6 +146,7 @@ export async function recoverAssignment(
   assignment: Doc<"assignments">
 ) {
   await ctx.db.patch(assignment._id, { status: "expired" })
+  await requestBatch(ctx, "matching")
   if (assignment.taskId) {
     const task = await ctx.db.get(assignment.taskId)
     if (task?.committeeCaseId) return
@@ -194,9 +199,10 @@ export async function requestWork(
     expiresAt: maxExpiresAt,
     maxExpiresAt,
   })
+  await armLease(ctx, (await ctx.db.get(id))!)
   // Earlier waiting tickets receive the first opportunity; no extra ticket is created by retries.
   await matchPool(ctx)
-  await ctx.scheduler.runAfter(0, internal.work.matchWaiting, {})
+  await requestBatch(ctx, "matching")
   return (await ctx.db.get(id))!
 }
 async function ownAssignment(
@@ -227,6 +233,7 @@ export async function renewWork(
     fail("CONFLICT", "This lease is no longer active.")
   const expiresAt = Math.min(Date.now() + LEASE_MS, assignment.maxExpiresAt)
   await ctx.db.patch(assignment._id, { expiresAt })
+  await armLease(ctx, { ...assignment, expiresAt })
   return { assignmentId: assignment._id, expiresAt }
 }
 export async function releaseWork(
@@ -240,7 +247,7 @@ export async function releaseWork(
     return { assignmentId: assignment._id, status: assignment.status }
   await recoverAssignment(ctx, assignment)
   await ctx.db.patch(assignment._id, { status: "released" })
-  await ctx.scheduler.runAfter(0, internal.work.matchWaiting, {})
+  await requestBatch(ctx, "matching")
   return { assignmentId: assignment._id, status: "released" }
 }
 export async function submitWork(
@@ -394,7 +401,7 @@ export async function submitWork(
     const activeCase = await ctx.db.query("moderationCases").withIndex("by_resource", q => q.eq("resourceId", task.targetId)).filter(q => q.and(q.eq(q.field("public"), true), q.neq(q.field("state"), "resolved"))).first()
     if (!unresolved && !activeCase) await ctx.db.patch(task.targetId, { disputed: false })
   }
-  await ctx.scheduler.runAfter(0, internal.work.matchWaiting, {})
+  await requestBatch(ctx, "matching")
   if (!quarantined) await event(ctx, {
     kind: "patrol",
     targetId: reportTargetId ?? task._id,

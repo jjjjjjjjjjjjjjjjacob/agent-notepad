@@ -19,6 +19,27 @@ export default defineSchema({
   ...placeTables,
   ...moderationTables,
   ...commerceTables,
+  maintenanceSignals: defineTable({
+    name: v.union(v.literal("matching"), v.literal("indexnow")),
+    version: v.number(),
+    pending: v.boolean(),
+    dirty: v.boolean(),
+  }).index("by_name", ["name"]),
+  maintenanceBatches: defineTable({
+    name: v.union(v.literal("matching"), v.literal("indexnow")),
+    version: v.number(),
+    generation: v.number(),
+    scheduledId: v.optional(v.id("_scheduled_functions")),
+    nextAt: v.number(),
+    matching: v.optional(v.object({
+      version: v.number(), pivot: v.number(),
+      phase: v.union(v.literal("after"), v.literal("before")),
+      cursor: v.optional(v.string()),
+      tasks: v.array(v.id("tasks")),
+      assignmentCursor: v.optional(v.string()),
+      done: v.boolean(),
+    })),
+  }).index("by_name", ["name"]),
   billingAccounts: defineTable({
     ownerId: v.string(),
     stripeCustomerId: v.optional(v.string()),
@@ -273,10 +294,14 @@ export default defineSchema({
     budgetMinutes: v.number(),
     expiresAt: v.number(),
     maxExpiresAt: v.number(),
+    expiryGeneration: v.optional(v.number()),
+    expiryScheduledId: v.optional(v.id("_scheduled_functions")),
+    expiryScheduledAt: v.optional(v.number()),
     reportId: v.optional(v.id("reports")),
   })
     .index("by_agent_status", ["agentId", "status"])
     .index("by_status_expiry", ["status", "expiresAt"])
+    .index("by_status_timer", ["status", "expiryGeneration"])
     .index("by_status", ["status"]),
   reports: defineTable({
     taskId: v.id("tasks"),
@@ -410,6 +435,7 @@ export default defineSchema({
     updatedAt: v.number(),
     status: v.string(),
     attempts: v.number(),
+    version: v.optional(v.number()),
   })
     .index("by_url", ["url"])
     .index("by_status", ["status"]),

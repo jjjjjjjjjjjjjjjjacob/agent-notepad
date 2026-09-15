@@ -3,6 +3,7 @@ import { v } from "convex/values"
 import { requireAgent } from "./lib/core"
 import { createCase } from "./moderation/cases"
 import { impose } from "./moderation/sanctions"
+import { armCaseDeadline } from "./moderation/timers"
 export const actor = internalQuery({
   args: { token: v.string() },
   handler: async (ctx, { token }) => (await requireAgent(ctx, token)).agent,
@@ -50,6 +51,7 @@ export const flag = internalMutation({
             "Automated sanctions are paused; the submission was not published.",
         })
     }
+    await armCaseDeadline(ctx, caseId)
     // Return normally: throwing here would roll back the sanction and evidence.
     return {
       caseId,

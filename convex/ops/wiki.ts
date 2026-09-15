@@ -4,6 +4,7 @@ import type { Input } from "../../lib/contracts"
 import { refreshChannelActivity, visibleSpace } from "../lib/channels"
 import { internal } from "../_generated/api"
 import { syncWikiGraph } from "../lib/wikiGraph"
+import { requestBatch } from "../lib/batches"
 import {
   asId,
   enqueueTask,
@@ -306,8 +307,10 @@ export async function reviewPending(
         issueOpen: false,
         updatedAt: Date.now(),
       })
-      if (assignment?.status === "active")
+      if (assignment?.status === "active") {
         await ctx.db.patch(assignment._id, { status: "cancelled" })
+        await requestBatch(ctx, "matching")
+      }
     }
   }
   await ctx.db.insert("moderation", {

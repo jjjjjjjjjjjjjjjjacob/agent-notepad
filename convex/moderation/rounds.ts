@@ -11,6 +11,10 @@ import {
   DAY,
 } from "../../lib/moderation-policy"
 import { decide } from "./decisions"
+import { queueRound, armCaseDeadline } from "./timers"
+import { armLease } from "../lib/leaseTimers"
+import { requestBatch } from "../lib/batches"
+export { queueRound } from "./timers"
 
 export async function eligibleNow(
   ctx: MutationCtx,
@@ -25,23 +29,17 @@ export async function eligibleNow(
     !(await agentRestricted(ctx, agent))
   )
 }
-export async function queueRound(ctx: MutationCtx, c: Doc<"moderationCases">) {
-  const current = await ctx.db.get(c._id)
-  if (!current || !["seating", "voting"].includes(current.state) ||
-    (current.roundJobPending && (current.roundJobScheduledAt ?? 0) > Date.now() - 5 * 60000)) return
-  const generation = (current.roundJobVersion ?? 0) + 1
-  await ctx.db.patch(c._id, { roundJobPending: true, roundJobVersion: generation, roundJobScheduledAt: Date.now() })
-  await ctx.scheduler.runAfter(0, internal.governance.continueCase, { caseId: c._id, generation })
-}
 export async function escalateRound(ctx: MutationCtx, c: Doc<"moderationCases">, reason = "Independent jury checks exceeded safe capacity. Human review is required without lowering thresholds.") {
   const current = await ctx.db.get(c._id)
   if (!current || !["queued", "seating", "voting"].includes(current.state)) return
   await ctx.db.patch(c._id, { state: "escalated", decisionReason: reason })
   await releaseSeats(ctx, { ...c, state: "escalated" })
+  await armCaseDeadline(ctx, c._id)
 }
 export async function fillSeats(ctx: MutationCtx, c: Doc<"moderationCases">) {
   try { await fillSeatsBounded(ctx, c, moderationReads(ctx)) }
   catch (error) { if (!(error instanceof ModerationCapacityExceeded)) throw error; await escalateRound(ctx, c) }
+  await armCaseDeadline(ctx, c._id)
 }
 async function fillSeatsBounded(ctx: MutationCtx, c: Doc<"moderationCases">, reads: ModerationReads) {
   if (c.state !== "seating") return
@@ -61,6 +59,7 @@ async function fillSeatsBounded(ctx: MutationCtx, c: Doc<"moderationCases">, rea
         await ctx.db.patch(task.assignmentId, { status: "cancelled" })
       await ctx.db.patch(seat.taskId, { status: "cancelled" })
       seat.declined = true
+      await requestBatch(ctx, "matching")
     }
   }
   const active = seats.filter((s) => !s.declined)
@@ -187,6 +186,7 @@ async function respondBounded(ctx: MutationCtx, agent: Doc<"agents">, caseId: Id
       maxExpiresAt: c.deadline,
     })
     await ctx.db.patch(seat.taskId, { assignmentId, status: "leased" })
+    await armLease(ctx, (await ctx.db.get(assignmentId))!)
     await ctx.db.patch(seat._id, { accepted: true, weight: voteWeight(score) })
   } else {
     await ctx.db.patch(seat._id, { declined: true })
@@ -196,6 +196,8 @@ async function respondBounded(ctx: MutationCtx, agent: Doc<"agents">, caseId: Id
       await ctx.db.patch(task.assignmentId, { status: "cancelled" })
   }
   await fillSeatsBounded(ctx, c, reads)
+  await requestBatch(ctx, "matching")
+  await armCaseDeadline(ctx, caseId)
   return { caseId, accepted: accept }
 }
 export async function releaseSeats(
@@ -219,6 +221,7 @@ export async function releaseSeats(
     })
   }
   if (!page.isDone) await ctx.scheduler.runAfter(0, internal.governance.releaseCaseSeats, { caseId: c._id, cursor: page.continueCursor })
+  await requestBatch(ctx, "matching")
 }
 export async function ballot(
   ctx: MutationCtx,
@@ -267,6 +270,7 @@ async function ballotBounded(ctx: MutationCtx, agent: Doc<"agents">, caseId: Id<
   if (task?.assignmentId)
     await ctx.db.patch(task.assignmentId, { status: "submitted" })
   await ctx.db.patch(seat.taskId, { status: "submitted" })
+  await requestBatch(ctx, "matching")
   // Never publish an early tally or outcome: all jurors get the full window.
   return { caseId, submitted: true }
 }
@@ -296,6 +300,7 @@ export async function closeRound(ctx: MutationCtx, c: Doc<"moderationCases">) {
         "Automated sanctions are paused; a human decision is required.",
     })
     await releaseSeats(ctx, (await ctx.db.get(c._id))!)
+    await armCaseDeadline(ctx, c._id)
     return
   }
   if (result)
@@ -313,6 +318,7 @@ export async function closeRound(ctx: MutationCtx, c: Doc<"moderationCases">) {
         "No outcome met both thresholds. Missing or invalid ballots retain their denominator weight.",
     })
   await releaseSeats(ctx, (await ctx.db.get(c._id))!)
+  await armCaseDeadline(ctx, c._id)
 }
 async function closurePreflight(
   ctx: MutationCtx,

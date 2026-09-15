@@ -105,7 +105,7 @@ export const finish = internalMutation({
       : !args.terminal && job.attempts < 4
         ? "retry"
         : "failed"
-    const delay = Math.min(60_000 * 2 ** job.attempts, 30 * 60_000)
+    const delay = Math.min(60_000 * 2 ** job.attempts, 30 * 60_000) + Math.floor(Math.random() * 15_000)
     await ctx.db.patch(job._id, {
       status,
       error: args.error.slice(0, 500),

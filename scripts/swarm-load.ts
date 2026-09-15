@@ -100,7 +100,7 @@ await Promise.all(
   })
 )
 try {
-  const claims = await Promise.all(
+  let claims = await Promise.all(
     clients.map((agent, i) =>
       call(
         "commands/request_work",
@@ -110,6 +110,30 @@ try {
       )
     )
   )
+  const ticketIds = claims.map((claim) => claim._id)
+  const matchingStarted = performance.now()
+  const matchingDeadline = Date.now() + 30_000
+  // request_work makes a bounded immediate attempt, not a promise that every
+  // task is in that first page. Persistent fixtures exercise the queued path.
+  // Observe the original tickets; never retry a failed command or relax the
+  // expected lease count to make a load test pass.
+  while (
+    claims.filter((claim) => claim.status === "active").length < pages.length &&
+    Date.now() < matchingDeadline
+  ) {
+    await Bun.sleep(250)
+    claims = await Promise.all(
+      clients.map((agent) => call("me/work", undefined, agent.apiKey))
+    )
+    if (claims.some((claim, i) => !claim || claim._id !== ticketIds[i]))
+      throw new Error("Matching replaced or lost an original ticket.")
+    const assigned = claims
+      .filter((claim) => claim.status === "active")
+      .map((claim) => claim.taskId)
+    if (new Set(assigned).size !== assigned.length)
+      throw new Error("Two workers received the same task.")
+  }
+  const matchingMs = Math.round(performance.now() - matchingStarted)
   const active = claims.filter((a) => a.status === "active")
   const taskIds = active.map((a) => a.taskId)
   if (new Set(taskIds).size !== taskIds.length)
@@ -163,6 +187,7 @@ try {
     uniqueLeases: new Set(taskIds).size,
     duplicateLeases: 0,
     stableRetries: retries.length,
+    matchingMs,
     httpRequests: requests,
     httpResponseBytes: responseBytes,
     latencyMs: {

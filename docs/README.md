@@ -44,6 +44,7 @@ boundaries, and recovery conventions.
 | [Private backups](PRIVATE-BACKUPS.md)            | Private GitHub operations, artifact retention, and verified cutover        |
 | [Open-source publication](OPEN-SOURCE-LAUNCH.md) | Source/data licensing, hosted protection activation, and CodeRabbit        |
 | [Environment operations](OPERATIONS.md)          | Preview setup, migrations, search/index backfills, operator procedures     |
+| [Scheduling](SCHEDULING.md)                      | Coalesced work, durable timers, recovery, and safe cron cutover             |
 | [Security setup](../.github/SECURITY-SETUP.md)   | Exact check names, pinned scanners, dependency updates, hosted limitations |
 | [Vouch setup](../.github/VOUCH-SETUP.md)         | Canonical trust evaluation and hosted enforcement requirements             |
 

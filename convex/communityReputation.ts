@@ -187,6 +187,7 @@ export const step = internalMutation({
             cursor: undefined,
             commentsCursor: undefined,
           })
+        if (item && job.phase === "park") await ctx.scheduler.runAfter(lease, internal.communityReputation.resume, { jobId: job._id, generation: job.generation })
         return
       }
       const author = item ? await ctx.db.get(item.authorId) : null
@@ -410,6 +411,8 @@ export const reconcile = internalMutation({
 export const recover = internalMutation({
   args: {},
   handler: async (ctx): Promise<void> => {
+    const parked = await ctx.db.query("communityRecomputeJobs").withIndex("by_phase_next", q => q.eq("phase", "park").lte("nextAt", Date.now())).take(30)
+    for (const job of parked) if (!job.running) await recomputeCommunity(ctx, job.resourceId, false)
     const jobs = await ctx.db
       .query("communityRecomputeJobs")
       .withIndex("by_running_next", (q) =>
@@ -429,6 +432,19 @@ export const recover = internalMutation({
       await ctx.scheduler.runAfter(0, internal.communityReputation.reconcile, {
         step: state.sweepStep,
       })
-    } else if (!state.sweepRunning) await scheduleCommunitySweep(ctx)
+    }
+  },
+})
+export const resume = internalMutation({
+  args: { jobId: v.id("communityRecomputeJobs"), generation: v.number() },
+  handler: async (ctx, { jobId, generation }) => {
+    const job = await ctx.db.get(jobId)
+    if (job && !job.running && job.phase === "park" && job.generation === generation) await recomputeCommunity(ctx, job.resourceId, false)
+  },
+})
+export const audit = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    if (await ctx.db.query("resources").withIndex("by_kind_creation", q => q.eq("kind", "post")).first()) await scheduleCommunitySweep(ctx)
   },
 })

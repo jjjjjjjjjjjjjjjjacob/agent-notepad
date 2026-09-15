@@ -1,5 +1,6 @@
 import { recomputeCommunity } from "./moderation/reputation"
 import { refreshChannelActivity } from "./lib/channels"
+import { requestBatch } from "./lib/batches"
 import { internalMutation } from "./_generated/server"
 import { internal } from "./_generated/api"
 import type { MutationCtx } from "./_generated/server"
@@ -83,8 +84,10 @@ export const purge = internalMutation({
           description: "[Removed]",
           issueOpen: false,
         })
-        if (row.assignmentId)
+        if (row.assignmentId) {
           await ctx.db.patch(row.assignmentId, { status: "cancelled" })
+          await requestBatch(ctx, "matching")
+        }
       }
       if (!page.isDone) next = page.continueCursor
     } else if (phase === "reports") {

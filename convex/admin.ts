@@ -29,6 +29,93 @@ export const bootstrapOperator = internalMutation({
     return { agentId: agent._id, role: "operator" }
   },
 })
+export const purgeRetiredAgent = internalMutation({
+  args: { agentId: v.id("agents"), reason: v.string() },
+  handler: async (ctx, args) => {
+    const agent = await ctx.db.get(args.agentId)
+    if (!agent) fail("NOT_FOUND", "Agent not found.")
+    if (agent.role === "operator")
+      fail("FORBIDDEN", "The operator identity cannot be purged.")
+    if (!agent.blocked)
+      fail("CONFLICT", "Block the agent with moderate_agent before purging it.")
+    const operator = await ctx.db
+      .query("agents")
+      .filter((q) => q.eq(q.field("role"), "operator"))
+      .first()
+    if (!operator) fail("CONFLICT", "Bootstrap an operator to attribute the purge.")
+    const resources = await ctx.db
+      .query("resources")
+      .withIndex("by_author", (q) => q.eq("authorId", agent._id))
+      .take(101)
+    if (resources.length > 100)
+      fail("VALIDATION", "Purge is limited to identities with at most 100 contributions.")
+    const live = resources.filter((r) => !r.suppressed)
+    if (live.length > 0)
+      fail(
+        "CONFLICT",
+        `Suppress ${live.length} remaining contribution(s) before purging the author.`
+      )
+    for (const item of resources) {
+      for (const rev of await ctx.db
+        .query("revisions")
+        .withIndex("by_resource", (q) => q.eq("resourceId", item._id))
+        .take(100))
+        await ctx.db.delete(rev._id)
+      for (const row of await ctx.db
+        .query("comments")
+        .withIndex("by_resource", (q) => q.eq("resourceId", item._id))
+        .take(100))
+        await ctx.db.delete(row._id)
+      for (const row of await ctx.db
+        .query("events")
+        .withIndex("by_target", (q) => q.eq("targetId", item._id))
+        .take(100))
+        await ctx.db.delete(row._id)
+      for (const row of await ctx.db
+        .query("watches")
+        .withIndex("by_target", (q) => q.eq("targetId", item._id))
+        .take(100))
+        await ctx.db.delete(row._id)
+      await ctx.db.delete(item._id)
+    }
+    const owned = [
+      ctx.db.query("keys").withIndex("by_agent", (q) => q.eq("agentId", agent._id)),
+      ctx.db.query("agentLinks").withIndex("by_agent", (q) => q.eq("agentId", agent._id)),
+      ctx.db.query("watches").withIndex("by_agent_target", (q) => q.eq("agentId", agent._id)),
+      ctx.db.query("notices").withIndex("by_agent", (q) => q.eq("agentId", agent._id)),
+      ctx.db.query("receipts").withIndex("by_agent_key", (q) => q.eq("agentId", agent._id)),
+      ctx.db.query("votes").withIndex("by_agent", (q) => q.eq("agentId", agent._id)),
+      ctx.db.query("memberships").withIndex("by_agent", (q) => q.eq("agentId", agent._id)),
+      ctx.db.query("channelParticipation").withIndex("by_agent_channel", (q) => q.eq("agentId", agent._id)),
+      ctx.db.query("assignments").withIndex("by_agent_status", (q) => q.eq("agentId", agent._id)),
+    ]
+    let related = 0
+    for (const query of owned)
+      for (const row of await query.take(100)) {
+        await ctx.db.delete(row._id)
+        related++
+      }
+    for (const row of await ctx.db
+      .query("events")
+      .withIndex("by_target", (q) => q.eq("targetId", agent._id))
+      .take(100))
+      await ctx.db.delete(row._id)
+    await ctx.db.delete(agent._id)
+    await ctx.db.insert("moderation", {
+      actorId: operator._id,
+      targetId: agent._id,
+      action: "identity_purge",
+      reason: args.reason,
+    })
+    await invalidateCommunityAuthority(ctx)
+    return {
+      agentId: agent._id,
+      slug: agent.slug,
+      resources: resources.length,
+      related,
+    }
+  },
+})
 export const status = internalQuery({
   args: {},
   handler: async (ctx) => {
