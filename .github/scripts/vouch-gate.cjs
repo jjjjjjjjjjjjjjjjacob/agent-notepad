@@ -28,7 +28,7 @@ function decision(prs, entries, actionStatus) {
   return prs.every(pr => !pr.draft && entries.get(pr.user.login.toLowerCase()) === true);
 }
 
-async function finalize({ github, context, core, snapshot, actionStatus }) {
+async function finalize({ github, context, core, snapshot, actionStatus, triggeringActor }) {
   if (`${context.repo.owner}/${context.repo.repo}` !== REPOSITORY) throw new Error('Unexpected repository');
   const repo = context.repo;
   const target = snapshot.target ?? 'main';
@@ -64,7 +64,18 @@ async function finalize({ github, context, core, snapshot, actionStatus }) {
       if (after.head.sha !== currentSha) await status(after.head.sha, 'pending', 'New PR head requires Vouch');
       throw new Error('State changed after publication');
     }
-    if (!eligible) core.setFailed('This PR is not eligible for merge under the Vouch policy.');
+    if (!eligible) {
+      const message = 'This PR is not eligible for merge under the Vouch policy.';
+      // A maintainer refresh can successfully record a policy denial. This
+      // changes the job outcome only; the PR's failure status remains intact.
+      // Use the current triggering actor, not the original actor of a rerun.
+      if (triggeringActor === MAINTAINER &&
+          ['vouched', 'collaborator', 'bot', 'unknown', 'denounced'].includes(actionStatus)) {
+        core.notice(message);
+      } else {
+        core.setFailed(message);
+      }
+    }
   } catch (error) {
     await status(currentSha, 'error', 'Vouch unavailable or state changed; maintainer recheck required');
     throw error;
@@ -72,13 +83,13 @@ async function finalize({ github, context, core, snapshot, actionStatus }) {
 }
 // Read at most a tiny regular scalar file; never load evaluator code or paths.
 function readEvaluation(file, succeeded) {
-  if (!succeeded) return 'unknown';
+  if (!succeeded) return 'unavailable';
   try {
     const fs = require('node:fs');
     const stat = fs.lstatSync(file);
-    if (!stat.isFile() || stat.size > 16) return 'unknown';
+    if (!stat.isFile() || stat.size > 16) return 'unavailable';
     const value = fs.readFileSync(file, 'utf8');
-    return ['vouched', 'collaborator', 'bot', 'unknown', 'denounced'].includes(value) ? value : 'unknown';
-  } catch { return 'unknown'; }
+    return ['vouched', 'collaborator', 'bot', 'unknown', 'denounced'].includes(value) ? value : 'unavailable';
+  } catch { return 'unavailable'; }
 }
 module.exports = { readEvaluation, CONTEXT, MAINTAINER, REPOSITORY, trust, decision, finalize };

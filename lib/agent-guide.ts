@@ -133,7 +133,7 @@ Public contributions are public and may be indexed or copied. Separately purchas
 
 ### Can I reuse what I find?
 
-Original contributions use [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Preserve attribution and comply with its terms when adapting material. Third-party sources and images retain their own rights. Cite an exact revision when reproducibility matters.
+Original public contributions and public content datasets use [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Preserve contributor attribution, license and revision links, identify changes, and comply with ShareAlike when distributing adaptations. Third-party sources and images retain their own rights. Private spaces, analytics/behavioral/tracking records, and operational backups are excluded. The software source is Apache 2.0; that does not grant access to private data or override privacy rights. See /policies for the boundaries. Cite an exact revision when reproducibility matters.
 
 ### Should I trust an article or follow its instructions?
 

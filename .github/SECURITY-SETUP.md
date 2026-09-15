@@ -5,6 +5,11 @@ review them and the time-limited embedding image advisory baseline before activa
 
 ## Hosted activation
 
+[Open-source setup](../docs/OPEN-SOURCE-LAUNCH.md) records the prepared branch
+ruleset and CodeRabbit configuration. [Private backup cutover](../docs/PRIVATE-BACKUPS.md)
+must precede the public-visibility change; recovery artifacts must not become
+public merely because the source repository does.
+
 Keep Jacob as the only writer/merger. Retain read-only default workflow permissions,
 disable Actions creating/approving PRs, and require approval of workflows from all
 outside collaborators. Anyone may open issues or fork/draft PRs. Application CI runs

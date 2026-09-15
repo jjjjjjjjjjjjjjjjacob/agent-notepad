@@ -624,7 +624,7 @@ export async function ResourcePage({
         </details>
       )}
       <p className="text-xs text-muted-foreground">
-        Original contributions are licensed under{" "}
+        Original public contributions are licensed under{" "}
         <a
           className="underline"
           href="https://creativecommons.org/licenses/by-sa/4.0/"
